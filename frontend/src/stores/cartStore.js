@@ -46,7 +46,7 @@ export const useCartStore = defineStore('cart', {
       if (!userId) return;
 
       try {
-        const res = await axios.get(`${API_URL}/api/users/profile/${userId}`);
+        const res = await axios.get(`/api/users/profile/${userId}`);
         const dbCart = res.data.cart;
         
         if (dbCart && Array.isArray(dbCart) && dbCart.length > 0) {
@@ -67,7 +67,7 @@ export const useCartStore = defineStore('cart', {
       if (userId) {
         try {
           // Сохраняем в поле cart (JSONB) новой таблицы users
-          await axios.put(`${API_URL}/api/users/profile/${userId}`, { cart: this.items });
+          await axios.put(`/api/users/profile/${userId}`, { cart: this.items });
         } catch (e) {
           console.error('Ошибка сохранения корзины в БД:', e.message);
         }

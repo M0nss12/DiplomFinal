@@ -128,7 +128,7 @@ const newCity = reactive({ name: '', region: '', lat: null, lon: null });
 
 const loadCities = async () => {
   try {
-    const res = await axios.get(`${API_URL}/api/admin/cities`, config);
+    const res = await axios.get(`/api/admin/cities`, config);
     cities.value = res.data;
   } catch (e) { console.error('Ошибка загрузки городов'); }
 };
@@ -136,7 +136,7 @@ const loadCities = async () => {
 const createCity = async () => {
   loading.value = true;
   try {
-    const res = await axios.post(`${API_URL}/api/admin/cities`, newCity, config); // Здесь нужен эндпоинт, который мы сейчас добавим в server.js или используем универсальный PUT/POST если он есть
+    const res = await axios.post(`/api/admin/cities`, newCity, config); // Здесь нужен эндпоинт, который мы сейчас добавим в server.js или используем универсальный PUT/POST если он есть
     await loadCities();
     Object.assign(newCity, { name: '', region: '', lat: null, lon: null });
     alert('Город добавлен');
@@ -146,14 +146,14 @@ const createCity = async () => {
 
 const updateCity = async (city) => {
   try {
-    await axios.put(`${API_URL}/api/admin/cities/${city.id}`, city, config);
+    await axios.put(`/api/admin/cities/${city.id}`, city, config);
   } catch (e) { console.error('Ошибка сохранения'); }
 };
 
 const deleteCity = async (id) => {
   if (!confirm('Удалить город? Это может повлиять на привязанные к нему склады!')) return;
   try {
-    await axios.delete(`${API_URL}/api/admin/cities/${id}`, config);
+    await axios.delete(`/api/admin/cities/${id}`, config);
     cities.value = cities.value.filter(c => c.id !== id);
   } catch (e) { alert('Ошибка удаления (возможно, город используется)'); }
 };

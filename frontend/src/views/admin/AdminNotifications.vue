@@ -180,8 +180,8 @@ const newNotif = reactive({ user_id: null, type: 'system', title: '', message: '
 const loadData = async () => {
   try {
     const [nRes, uRes] = await Promise.all([
-      axios.get(`${API_URL}/api/admin/notifications`, config),
-      axios.get(`${API_URL}/api/admin/users`, config)
+      axios.get(`/api/admin/notifications`, config),
+      axios.get(`/api/admin/users`, config)
     ]);
     notifications.value = nRes.data;
     users.value = uRes.data;
@@ -203,12 +203,12 @@ const sendNotification = async () => {
       // Массовая рассылка (логика: перебор всех пользователей)
       // Примечание: в крупном проекте это делается на бэкенде одним запросом
       const promises = users.value.map(u => 
-        axios.post(`${API_URL}/api/admin/notifications`, { ...newNotif, user_id: u.id }, config)
+        axios.post(`/api/admin/notifications`, { ...newNotif, user_id: u.id }, config)
       );
       await Promise.all(promises);
       alert(`Рассылка завершена для ${users.value.length} пользователей`);
     } else {
-      const res = await axios.post(`${API_URL}/api/admin/notifications`, newNotif, config);
+      const res = await axios.post(`/api/admin/notifications`, newNotif, config);
       notifications.value.unshift(res.data);
       alert('Уведомление отправлено!');
     }
@@ -221,7 +221,7 @@ const sendNotification = async () => {
 const deleteNotif = async (id) => {
   if (!confirm('Удалить это уведомление из истории?')) return;
   try {
-    await axios.delete(`${API_URL}/api/admin/notifications/${id}`, config);
+    await axios.delete(`/api/admin/notifications/${id}`, config);
     notifications.value = notifications.value.filter(n => n.id !== id);
   } catch (e) { alert('Ошибка при удалении'); }
 };

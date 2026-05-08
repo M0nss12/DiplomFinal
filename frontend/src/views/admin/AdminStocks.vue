@@ -209,10 +209,10 @@ const filters = reactive({
 const loadData = async () => {
   try {
     const [sRes, pRes, wRes, cRes] = await Promise.all([
-      axios.get(`${API_URL}/api/admin/product_stocks`, config),
-      axios.get(`${API_URL}/api/admin/products`, config),
-      axios.get(`${API_URL}/api/admin/warehouses`, config),
-      axios.get(`${API_URL}/api/admin/categories`, config)
+      axios.get(`/api/admin/product_stocks`, config),
+      axios.get(`/api/admin/products`, config),
+      axios.get(`/api/admin/warehouses`, config),
+      axios.get(`/api/admin/categories`, config)
     ]);
     stocks.value = sRes.data;
     products.value = pRes.data;
@@ -266,7 +266,7 @@ const createStock = async () => {
   if (!newStock.product_id || !newStock.warehouse_id) return alert('Выберите товар и склад!');
   loadingAction.value = true;
   try {
-    const res = await axios.post(`${API_URL}/api/admin/product_stocks`, newStock, config);
+    const res = await axios.post(`/api/admin/product_stocks`, newStock, config);
     stocks.value.unshift(res.data);
     newStock.quantity = 0; newStock.shelf_location = '';
     alert('Товар успешно оприходован');
@@ -278,14 +278,14 @@ const updateStock = async (stock) => {
   try { 
     // Очищаем объект от вложенных данных перед отправкой в БД
     const { products, warehouses, ...payload } = stock;
-    await axios.put(`${API_URL}/api/admin/product_stocks/${stock.id}`, payload, config); 
+    await axios.put(`/api/admin/product_stocks/${stock.id}`, payload, config); 
   } catch (e) { console.error("Update error", e); }
 };
 
 const deleteStock = async (id) => {
   if (!confirm('Удалить запись об остатке товара?')) return;
   try {
-    await axios.delete(`${API_URL}/api/admin/product_stocks/${id}`, config);
+    await axios.delete(`/api/admin/product_stocks/${id}`, config);
     stocks.value = stocks.value.filter(s => s.id !== id);
   } catch (e) { alert('Ошибка удаления'); }
 };

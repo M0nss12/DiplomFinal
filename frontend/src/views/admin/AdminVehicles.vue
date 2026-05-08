@@ -187,8 +187,8 @@ const newVehicle = reactive({
 const loadData = async () => {
   try {
     const [vRes, uRes] = await Promise.all([
-      axios.get(`${API_URL}/api/admin/user_vehicles`, config),
-      axios.get(`${API_URL}/api/admin/users`, config)
+      axios.get(`/api/admin/user_vehicles`, config),
+      axios.get(`/api/admin/users`, config)
     ]);
     vehicles.value = vRes.data;
     users.value = uRes.data;
@@ -207,7 +207,7 @@ const createVehicle = async () => {
   if (!newVehicle.user_id) return alert('Выберите владельца');
   loadingAction.value = true;
   try {
-    const res = await axios.post(`${API_URL}/api/admin/user_vehicles`, newVehicle, config);
+    const res = await axios.post(`/api/admin/user_vehicles`, newVehicle, config);
     vehicles.value.unshift(res.data);
     Object.assign(newVehicle, { brand: '', model: '', year: 2024, vin: '', engine_volume: 1.6, is_primary: false });
     alert('Автомобиль добавлен в гараж');
@@ -217,14 +217,14 @@ const createVehicle = async () => {
 
 const updateVehicle = async (v) => {
   try {
-    await axios.put(`${API_URL}/api/admin/user_vehicles/${v.id}`, v, config);
+    await axios.put(`/api/admin/user_vehicles/${v.id}`, v, config);
   } catch (e) { console.error('Ошибка обновления'); }
 };
 
 const deleteVehicle = async (id) => {
   if (!confirm('Удалить этот автомобиль из базы?')) return;
   try {
-    await axios.delete(`${API_URL}/api/admin/user_vehicles/${id}`, config);
+    await axios.delete(`/api/admin/user_vehicles/${id}`, config);
     vehicles.value = vehicles.value.filter(v => v.id !== id);
   } catch (e) { alert('Ошибка при удалении'); }
 };

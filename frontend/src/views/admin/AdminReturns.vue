@@ -138,8 +138,8 @@ const loadData = async () => {
   loading.value = true;
   try {
     const [rRes, uRes] = await Promise.all([
-      axios.get(`${API_URL}/api/admin/return_requests`, config),
-      axios.get(`${API_URL}/api/admin/users`, config)
+      axios.get(`/api/admin/return_requests`, config),
+      axios.get(`/api/admin/users`, config)
     ]);
     requests.value = rRes.data;
     users.value = uRes.data;
@@ -161,7 +161,7 @@ const previewImage = (url) => { fullscreenImage.value = url; };
 
 const updateStatus = async (id, newStatus) => {
   try {
-    await axios.put(`${API_URL}/api/admin/return_requests/${id}`, { status: newStatus }, config);
+    await axios.put(`/api/admin/return_requests/${id}`, { status: newStatus }, config);
     const req = requests.value.find(r => r.id === id);
     if (req) req.status = newStatus;
     alert(`Статус изменен на: ${translateStatus(newStatus)}`);
@@ -175,11 +175,11 @@ const deleteRequest = async (req) => {
     if (req.images && req.images.length) {
         for (const url of req.images) {
             const fname = url.split('/').pop();
-            await axios.delete(`${API_URL}/api/storage/returns/${fname}`, config).catch(() => {});
+            await axios.delete(`/api/storage/returns/${fname}`, config).catch(() => {});
         }
     }
     // 2. Удаление из БД
-    await axios.delete(`${API_URL}/api/admin/return_requests/${req.id}`, config);
+    await axios.delete(`/api/admin/return_requests/${req.id}`, config);
     requests.value = requests.value.filter(r => r.id !== req.id);
   } catch (e) { alert('Ошибка при удалении'); }
 };

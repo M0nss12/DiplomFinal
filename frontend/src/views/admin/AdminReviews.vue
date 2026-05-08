@@ -183,9 +183,9 @@ const itemsPerPage = 10;
 const loadData = async () => {
   try {
     const [rRes, pRes, uRes] = await Promise.all([
-      axios.get(`${API_URL}/api/admin/reviews`, config),
-      axios.get(`${API_URL}/api/admin/products`, config),
-      axios.get(`${API_URL}/api/admin/users`, config)
+      axios.get(`/api/admin/reviews`, config),
+      axios.get(`/api/admin/products`, config),
+      axios.get(`/api/admin/users`, config)
     ]);
     
     reviews.value = rRes.data.map(rev => ({
@@ -205,7 +205,7 @@ const getFilenameFromUrl = (url) => url ? url.split('/').pop() : null;
 const saveReview = async (review) => {
   try {
     const { users, products, ...payload } = review; // Очищаем вложенные объекты
-    await axios.put(`${API_URL}/api/admin/reviews/${review.id}`, payload, config);
+    await axios.put(`/api/admin/reviews/${review.id}`, payload, config);
   } catch (e) { console.error('Ошибка сохранения'); }
 };
 
@@ -218,7 +218,7 @@ const handleImageUpload = async (event, review) => {
   uploadLoadingId.value = review.id;
 
   try {
-    const res = await axios.post(`${API_URL}/api/upload/reviews`, formData, config);
+    const res = await axios.post(`/api/upload/reviews`, formData, config);
     if (!Array.isArray(review.images)) review.images = [];
     review.images.push(res.data.url);
     await saveReview(review);
@@ -235,7 +235,7 @@ const deleteSpecificImage = async (review, index) => {
   if (!confirm('Удалить фото навсегда?')) return;
 
   try {
-    await axios.delete(`${API_URL}/api/storage/reviews/${filename}`, config);
+    await axios.delete(`/api/storage/reviews/${filename}`, config);
     review.images.splice(index, 1);
     await saveReview(review);
   } catch (e) {
@@ -253,10 +253,10 @@ const removeReview = async (id) => {
     if (review.images && review.images.length > 0) {
       for (const url of review.images) {
         const filename = getFilenameFromUrl(url);
-        await axios.delete(`${API_URL}/api/storage/reviews/${filename}`, config).catch(() => {});
+        await axios.delete(`/api/storage/reviews/${filename}`, config).catch(() => {});
       }
     }
-    await axios.delete(`${API_URL}/api/admin/reviews/${id}`, config);
+    await axios.delete(`/api/admin/reviews/${id}`, config);
     reviews.value = reviews.value.filter(r => r.id !== id);
   } catch (e) { alert('Ошибка при удалении'); }
 };

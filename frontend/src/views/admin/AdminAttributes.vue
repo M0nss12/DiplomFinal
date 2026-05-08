@@ -188,8 +188,8 @@ const newAttr = reactive({
 const loadData = async () => {
   try {
     const [aRes, cRes] = await Promise.all([
-      axios.get(`${API_URL}/api/admin/category_attributes`, config),
-      axios.get(`${API_URL}/api/admin/categories`, config)
+      axios.get(`/api/admin/category_attributes`, config),
+      axios.get(`/api/admin/categories`, config)
     ]);
     attributes.value = aRes.data;
     categories.value = cRes.data;
@@ -209,7 +209,7 @@ const createAttribute = async () => {
       newAttr.options_json = [];
     }
 
-    const res = await axios.post(`${API_URL}/api/admin/category_attributes`, newAttr, config);
+    const res = await axios.post(`/api/admin/category_attributes`, newAttr, config);
     attributes.value.unshift(res.data);
     
     // Сброс
@@ -223,14 +223,14 @@ const createAttribute = async () => {
 
 const updateAttr = async (a) => {
   try {
-    await axios.put(`${API_URL}/api/admin/category_attributes/${a.id}`, a, config);
+    await axios.put(`/api/admin/category_attributes/${a.id}`, a, config);
   } catch (e) { console.error('Ошибка обновления'); }
 };
 
 const deleteAttr = async (id) => {
   if (!confirm('Удалить этот атрибут? Он исчезнет из всех товаров этой категории!')) return;
   try {
-    await axios.delete(`${API_URL}/api/admin/category_attributes/${id}`, config);
+    await axios.delete(`/api/admin/category_attributes/${id}`, config);
     attributes.value = attributes.value.filter(a => a.id !== id);
   } catch (e) { alert('Ошибка при удалении'); }
 };

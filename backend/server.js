@@ -8,6 +8,8 @@ const multer = require('multer');
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
+const https = require('https');
+const querystring = require('querystring');
 
 // 1. Настройка DNS
 const dns = require('dns');
@@ -27,6 +29,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // 3. Настройка приложения
 const app = express();
+app.set('trust proxy', true); 
 const PORT = process.env.PORT || 3000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'my_super_secret_admin_123';
 const upload = multer({ storage: multer.memoryStorage() });
@@ -147,17 +150,47 @@ const verifyAdmin = (req, res, next) => {
     else res.status(403).json({ error: 'Доступ запрещен.' });
 };
 
-// Проверка Яндекс Капчи
-const verifyYandexCaptcha = async (token, ip) => {
-    if (!token) return false;
-    try {
-        const url = `https://smartcaptcha.yandexcloud.net/validate?secret=${process.env.YANDEX_API_KEY}&token=${token}&ip=${ip}`;
-        const res = await axios.get(url);
-        return res.data.status === 'ok';
-    } catch (e) {
-        console.error("Ошибка капчи:", e.message);
-        return false;
-    }
+// Функция проверки капчи (по примеру Яндекса)
+const verifyYandexCaptcha = (token, ip) => {
+    return new Promise((resolve) => {
+        const SMARTCAPTCHA_SERVER_KEY = process.env.YANDEX_API_KEY;
+
+        const options = {
+            hostname: 'smartcaptcha.yandexcloud.net',
+            port: 443,
+            path: '/validate?' + querystring.stringify({
+                secret: SMARTCAPTCHA_SERVER_KEY,
+                token: token,
+                ip: ip, // IP пользователя
+            }),
+            method: 'GET',
+        };
+
+        const req = https.request(options, (res) => {
+            let body = '';
+            res.on('data', (chunk) => { body += chunk; });
+            res.on('end', () => {
+                if (res.statusCode !== 200) {
+                    console.error(`Ошибка SmartCaptcha: код=${res.statusCode}; сообщение=${body}`);
+                    resolve(false); 
+                    return;
+                }
+                try {
+                    const parsed = JSON.parse(body);
+                    console.log("📝 Ответ Яндекса:", parsed);
+                    resolve(parsed.status === 'ok');
+                } catch (e) {
+                    resolve(false);
+                }
+            });
+        });
+
+        req.on('error', (error) => {
+            console.error("Сетевая ошибка капчи:", error);
+            resolve(false);
+        });
+        req.end();
+    });
 };
 
 // =====================================================================

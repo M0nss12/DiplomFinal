@@ -243,7 +243,7 @@ const previewUrl = ref(null);
 
 const loadData = async () => {
   try {
-    const res = await axios.get(`${API_URL}/api/admin/users`, config);
+    const res = await axios.get(`/api/admin/users`, config);
     // Приводим данные к удобному виду (город из связей)
     users.value = res.data.map(u => ({
       ...u,
@@ -266,7 +266,7 @@ const isProtectedAvatar = (url) => {
 const deleteAvatarFromStorage = async (url) => {
   if (!url || isProtectedAvatar(url)) return;
   try {
-    await axios.delete(`${API_URL}/api/storage/avatars/${getFilenameFromUrl(url)}`, config);
+    await axios.delete(`/api/storage/avatars/${getFilenameFromUrl(url)}`, config);
   } catch (e) { }
 };
 
@@ -286,7 +286,7 @@ const handleFileUpload = async (e) => {
   const formData = new FormData();
   formData.append('file', file);
   try {
-    const res = await axios.post(`${API_URL}/api/upload/avatars`, formData, config);
+    const res = await axios.post(`/api/upload/avatars`, formData, config);
     await setAvatar(res.data.url);
   } catch (err) { alert('Ошибка загрузки'); }
 };
@@ -297,7 +297,7 @@ const newUser = reactive({ first_name: '', last_name: '', otchestvo: '', email: 
 const createUser = async () => {
   loadingAction.value = true;
   try {
-    const res = await axios.post(`${API_URL}/api/users/register`, { ...newUser, captchaToken: 'admin_bypass' }, config);
+    const res = await axios.post(`/api/users/register`, { ...newUser, captchaToken: 'admin_bypass' }, config);
     await loadData();
     Object.assign(newUser, { first_name: '', last_name: '', otchestvo: '', email: '', phone_number: '', password: '', city: '' });
     alert('Пользователь создан!');
@@ -313,14 +313,14 @@ const updateUser = async (user) => {
     const { cities, cityName, ...payload } = user;
     // Передаем cityName, бэкенд обработает это в saved_city_id
     payload.city = cityName; 
-    await axios.put(`${API_URL}/api/users/profile/${user.id}`, payload, config);
+    await axios.put(`/api/users/profile/${user.id}`, payload, config);
   } catch (e) { console.error("Update error"); }
 };
 
 const resetUserPassword = async (user) => {
   const newPass = prompt(`Новый пароль для ${user.first_name}:`);
   if (newPass && newPass.length >= 6) {
-    await axios.put(`${API_URL}/api/users/profile/${user.id}`, { password_hash: newPass }, config);
+    await axios.put(`/api/users/profile/${user.id}`, { password_hash: newPass }, config);
     alert('Пароль обновлен');
   } else if (newPass) alert('Минимум 6 символов');
 };
@@ -329,7 +329,7 @@ const deleteUser = async (user) => {
   if (!confirm(`Удалить ${user.first_name}?`)) return;
   try {
     await deleteAvatarFromStorage(user.avatar_url);
-    await axios.delete(`${API_URL}/api/admin/users/${user.id}`, config);
+    await axios.delete(`/api/admin/users/${user.id}`, config);
     users.value = users.value.filter(u => u.id !== user.id);
   } catch (e) { alert('Ошибка удаления'); }
 };

@@ -122,7 +122,7 @@ const itemsPerPage = 20;
 const loadData = async () => {
   try {
     // В server.js должен быть эндпоинт /api/admin/order_items
-    const res = await axios.get(`${API_URL}/api/admin/order_items`, config);
+    const res = await axios.get(`/api/admin/order_items`, config);
     items.value = res.data;
   } catch (e) {
     console.error('Ошибка загрузки данных продаж');
@@ -132,7 +132,7 @@ const loadData = async () => {
 const deleteItem = async (id) => {
   if (!confirm('Вы уверены? Это изменит только запись в базе состава заказа, но не итоговую сумму в самом заказе!')) return;
   try {
-    await axios.delete(`${API_URL}/api/admin/order_items/${id}`, config);
+    await axios.delete(`/api/admin/order_items/${id}`, config);
     items.value = items.value.filter(i => i.id !== id);
   } catch (e) { alert('Ошибка при удалении'); }
 };

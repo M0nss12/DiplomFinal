@@ -316,11 +316,11 @@ const totals = computed(() => {
 const loadData = async () => {
   try {
     const [oRes, uRes, pRes, iRes, wRes] = await Promise.all([
-      axios.get(`${API_URL}/api/admin/orders`, config), 
-      axios.get(`${API_URL}/api/admin/users`, config),
-      axios.get(`${API_URL}/api/admin/products`, config), 
-      axios.get(`${API_URL}/api/admin/order_items`, config),
-      axios.get(`${API_URL}/api/admin/warehouses`, config)
+      axios.get(`/api/admin/orders`, config), 
+      axios.get(`/api/admin/users`, config),
+      axios.get(`/api/admin/products`, config), 
+      axios.get(`/api/admin/order_items`, config),
+      axios.get(`/api/admin/warehouses`, config)
     ]);
     orders.value = oRes.data; users.value = uRes.data; products.value = pRes.data;
     orderItems.value = iRes.data; warehouses.value = wRes.data;
@@ -349,12 +349,12 @@ const createOrder = async () => {
         payment_status: 'unpaid', 
         delivery_status: 'processing'
     };
-    const res = await axios.post(`${API_URL}/api/orders`, payload, config);
+    const res = await axios.post(`/api/orders`, payload, config);
     const orderId = res.data.orderId;
     
     // Добавляем товары через order_items (в реальности лучше делать это одним запросом, но следуем логике файла)
     for (const item of selectedProducts.value) {
-        await axios.post(`${API_URL}/api/admin/order_items`, { order_id: orderId, product_id: item.product_id, quantity: item.quantity, unit_price: item.price }, config);
+        await axios.post(`/api/admin/order_items`, { order_id: orderId, product_id: item.product_id, quantity: item.quantity, unit_price: item.price }, config);
     }
     alert('Заказ создан!');
     await loadData();
@@ -365,7 +365,7 @@ const createOrder = async () => {
 const updateOrderStatus = async (order) => {
     try {
         // Используем специальный эндпоинт для смены статуса (который шлет уведомления)
-        await axios.patch(`${API_URL}/api/admin/orders/${order.id}/status`, {
+        await axios.patch(`/api/admin/orders/${order.id}/status`, {
             delivery_status: order.delivery_status,
             payment_status: order.payment_status
         }, config);
@@ -375,7 +375,7 @@ const updateOrderStatus = async (order) => {
 const deleteOrder = async (id) => {
   if (confirm('Удалить заказ навсегда?')) {
     try {
-        await axios.delete(`${API_URL}/api/admin/orders/${id}`, config);
+        await axios.delete(`/api/admin/orders/${id}`, config);
         orders.value = orders.value.filter(o => o.id !== id);
     } catch (e) { alert("Ошибка при удалении"); }
   }

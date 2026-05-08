@@ -97,7 +97,7 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.is_read).l
 const loadNotifications = async () => {
   if (!userId) return;
   try {
-    const res = await axios.get(`${API_URL}/api/notifications/${userId}`);
+    const res = await axios.get(`/api/notifications/${userId}`);
     notifications.value = res.data;
   } catch (e) {
     console.error("Ошибка загрузки уведомлений");
@@ -109,7 +109,7 @@ const loadNotifications = async () => {
 const markAsRead = async (notif) => {
   if (notif.is_read) return;
   try {
-    await axios.patch(`${API_URL}/api/notifications/${notif.id}`, { is_read: true });
+    await axios.patch(`/api/notifications/${notif.id}`, { is_read: true });
     notif.is_read = true;
   } catch (e) {
     console.error("Ошибка при обновлении статуса");
@@ -122,7 +122,7 @@ const markAllAsRead = async () => {
     // В реальности лучше иметь один эндпоинт на бэкенде для этого,
     // но пока пройдемся циклом по непрочитанным
     const unread = notifications.value.filter(n => !n.is_read);
-    await Promise.all(unread.map(n => axios.patch(`${API_URL}/api/notifications/${n.id}`, { is_read: true })));
+    await Promise.all(unread.map(n => axios.patch(`/api/notifications/${n.id}`, { is_read: true })));
     notifications.value.forEach(n => n.is_read = true);
   } catch (e) {
     console.error("Ошибка при обновлении всех уведомлений");
@@ -134,7 +134,7 @@ const markAllAsRead = async () => {
 const deleteNotif = async (id) => {
   try {
     // Используем админский или общий эндпоинт удаления, если он есть
-    await axios.delete(`${API_URL}/api/admin/notifications/${id}`, { 
+    await axios.delete(`/api/admin/notifications/${id}`, { 
         headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' } 
     });
     notifications.value = notifications.value.filter(n => n.id !== id);

@@ -384,8 +384,8 @@ const loadData = async () => {
   try {
     const API_URL = import.meta.env.VITE_API_URL || '';
     const [b, pRes] = await Promise.all([
-      axios.get(`${API_URL}/api/admin/brands`, { headers: {'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123'} }).catch(() => ({data: []})),
-      axios.get(`${API_URL}/api/products`)
+      axios.get(`/api/admin/brands`, { headers: {'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123'} }).catch(() => ({data: []})),
+      axios.get(`/api/products`)
     ]);
     
     // Бренды (забираем из админского эндпоинта, так как отдельного нет)
@@ -400,13 +400,13 @@ const loadData = async () => {
 
     const uid = localStorage.getItem('user_id');
     if (uid) {
-      const w = await axios.get(`${API_URL}/api/wishlist/${uid}`);
+      const w = await axios.get(`/api/wishlist/${uid}`);
       wishlistIds.value = w.data.map(i => i.product_id);
     }
 
     const recentIds = JSON.parse(localStorage.getItem('recent_views') || '[]');
     if (recentIds.length) {
-      const recentRes = await axios.post(`${API_URL}/api/products/recent`, { ids: recentIds.slice(0, 15) });
+      const recentRes = await axios.post(`/api/products/recent`, { ids: recentIds.slice(0, 15) });
       recentProducts.value = recentRes.data;
     }
   } catch (e) {
@@ -454,10 +454,10 @@ const toggleWishlist = async (id) => {
   try {
     const API_URL = import.meta.env.VITE_API_URL || '';
     if (wishlistIds.value.includes(id)) {
-      await axios.delete(`${API_URL}/api/wishlist/${uid}/${id}`);
+      await axios.delete(`/api/wishlist/${uid}/${id}`);
       wishlistIds.value = wishlistIds.value.filter(i => i !== id);
     } else {
-      await axios.post(`${API_URL}/api/wishlist`, { user_id: uid, product_id: id });
+      await axios.post(`/api/wishlist`, { user_id: uid, product_id: id });
       wishlistIds.value.push(id);
     }
     window.dispatchEvent(new Event('wishlist-updated'));

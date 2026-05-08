@@ -174,7 +174,7 @@ const newWarehouse = reactive({ city_name: '', address: '', phone: '', working_h
 
 const fetchWarehouses = async () => {
   try {
-    const res = await axios.get(`${API_URL}/api/admin/warehouses`, config);
+    const res = await axios.get(`/api/admin/warehouses`, config);
     // Приводим город к строке cityName для удобства инпутов
     warehouses.value = res.data.map(w => ({
         ...w,
@@ -206,7 +206,7 @@ const filteredWarehouses = computed(() => {
 const createWarehouse = async () => {
   loading.value = true;
   try {
-    const res = await axios.post(`${API_URL}/api/admin/warehouses`, newWarehouse, config);
+    const res = await axios.post(`/api/admin/warehouses`, newWarehouse, config);
     await fetchWarehouses(); // Обновляем список для синхронизации связей
     Object.assign(newWarehouse, { city_name: '', address: '', phone: '', working_hours: '', is_pickup_point: true });
     alert('Объект добавлен!');
@@ -220,14 +220,14 @@ const updateWarehouse = async (w) => {
     // Либо отправляем как есть, если сервер умеет обрабатывать city_id
     const { cities, city_display_name, ...payload } = w;
     payload.city_name = city_display_name; // Передаем имя города для обработки на бэке
-    await axios.put(`${API_URL}/api/admin/warehouses/${w.id}`, payload, config);
+    await axios.put(`/api/admin/warehouses/${w.id}`, payload, config);
   } catch (e) { console.error('Ошибка сохранения'); }
 };
 
 const deleteWarehouse = async (id) => {
   if (!confirm('ВНИМАНИЕ! Удаление склада удалит все связанные остатки товаров на нем. Продолжить?')) return;
   try {
-    await axios.delete(`${API_URL}/api/admin/warehouses/${id}`, config);
+    await axios.delete(`/api/admin/warehouses/${id}`, config);
     warehouses.value = warehouses.value.filter(item => item.id !== id);
   } catch (e) { alert('Ошибка при удалении'); }
 };

@@ -71,7 +71,7 @@ const handleReset = async () => {
 
   try {
     const API_URL = import.meta.env.VITE_API_URL || '';
-    await axios.post(`${API_URL}/api/users/reset-password`, {
+    await axios.post(`/api/users/reset-password`, {
       token,
       newPassword: password.value
     });

@@ -118,7 +118,7 @@ const newCar = reactive({
 const loadVehicles = async () => {
   if (!userId) return;
   try {
-    const res = await axios.get(`${API_URL}/api/admin/user_vehicles`); 
+    const res = await axios.get(`/api/admin/user_vehicles`); 
     // Фильтруем на фронте (в идеале сделать эндпоинт /api/user_vehicles/:userId)
     vehicles.value = res.data.filter(v => v.user_id === userId).sort((a, b) => b.is_primary - a.is_primary);
   } catch (e) {
@@ -131,7 +131,7 @@ const loadVehicles = async () => {
 const addVehicle = async () => {
   loadingAdd.value = true;
   try {
-    const res = await axios.post(`${API_URL}/api/admin/user_vehicles`, { ...newCar, user_id: userId }, {
+    const res = await axios.post(`/api/admin/user_vehicles`, { ...newCar, user_id: userId }, {
       headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' }
     });
     vehicles.value.unshift(res.data);
@@ -147,7 +147,7 @@ const addVehicle = async () => {
 
 const setPrimary = async (id) => {
   try {
-    await axios.put(`${API_URL}/api/admin/user_vehicles/${id}`, { is_primary: true }, {
+    await axios.put(`/api/admin/user_vehicles/${id}`, { is_primary: true }, {
       headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' }
     });
     await loadVehicles();
@@ -157,7 +157,7 @@ const setPrimary = async (id) => {
 const deleteVehicle = async (id) => {
   if (!confirm("Удалить этот автомобиль из гаража?")) return;
   try {
-    await axios.delete(`${API_URL}/api/admin/user_vehicles/${id}`, {
+    await axios.delete(`/api/admin/user_vehicles/${id}`, {
       headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' }
     });
     vehicles.value = vehicles.value.filter(v => v.id !== id);

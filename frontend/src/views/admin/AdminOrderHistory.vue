@@ -121,7 +121,7 @@ const filters = reactive({
 const loadHistory = async () => {
   loading.value = true;
   try {
-    const res = await axios.get(`${API_URL}/api/admin/order_status_history`, config);
+    const res = await axios.get(`/api/admin/order_status_history`, config);
     history.value = res.data;
   } catch (e) {
     console.error('Ошибка загрузки истории');

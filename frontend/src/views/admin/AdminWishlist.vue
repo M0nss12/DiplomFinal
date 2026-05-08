@@ -129,7 +129,7 @@ const itemsPerPage = 20;
 const loadData = async () => {
   loading.value = true;
   try {
-    const res = await axios.get(`${API_URL}/api/admin/wishlists`, config);
+    const res = await axios.get(`/api/admin/wishlists`, config);
     wishlist.value = res.data;
   } catch (e) {
     console.error('Ошибка загрузки данных избранного');
@@ -150,7 +150,7 @@ const formatDateTime = (iso) => {
 const removeFromWishlist = async (id) => {
   if (!confirm('Удалить эту позицию из избранного пользователя?')) return;
   try {
-    await axios.delete(`${API_URL}/api/admin/wishlists/${id}`, config);
+    await axios.delete(`/api/admin/wishlists/${id}`, config);
     wishlist.value = wishlist.value.filter(item => item.id !== id);
   } catch (e) { alert('Ошибка при удалении'); }
 };

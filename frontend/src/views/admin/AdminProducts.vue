@@ -297,9 +297,9 @@ const newProduct = reactive({
 const loadData = async () => {
   try {
     const [pRes, cRes, bRes] = await Promise.all([
-      axios.get(`${API_URL}/api/admin/products`, config),
-      axios.get(`${API_URL}/api/admin/categories`, config),
-      axios.get(`${API_URL}/api/admin/brands`, config)
+      axios.get(`/api/admin/products`, config),
+      axios.get(`/api/admin/categories`, config),
+      axios.get(`/api/admin/brands`, config)
     ]);
     products.value = pRes.data;
     categories.value = cRes.data;
@@ -342,7 +342,7 @@ const uploadPhoto = async (e) => {
   formData.append('file', file);
   uploading.value = true;
   try {
-    const res = await axios.post(`${API_URL}/api/upload/products`, formData, config);
+    const res = await axios.post(`/api/upload/products`, formData, config);
     newProduct.images.push(res.data.url);
   } finally { uploading.value = false; }
 };
@@ -353,7 +353,7 @@ const uploadPhotoToExisting = async (e, p) => {
   const formData = new FormData();
   formData.append('file', file);
   try {
-    const res = await axios.post(`${API_URL}/api/upload/products`, formData, config);
+    const res = await axios.post(`/api/upload/products`, formData, config);
     if (!p.images) p.images = [];
     p.images.push(res.data.url);
     await updateProduct(p);
@@ -363,7 +363,7 @@ const uploadPhotoToExisting = async (e, p) => {
 // --- CRUD ---
 const createProduct = async () => {
   try {
-    const res = await axios.post(`${API_URL}/api/admin/products`, newProduct, config);
+    const res = await axios.post(`/api/admin/products`, newProduct, config);
     products.value.unshift(res.data);
     alert('Товар успешно добавлен!');
     // Сброс формы
@@ -374,7 +374,7 @@ const createProduct = async () => {
 const updateProduct = async (p) => { 
   try { 
     const { brands, categories, product_stocks, ...payload } = p;
-    await axios.put(`${API_URL}/api/admin/products/${p.id}`, payload, config); 
+    await axios.put(`/api/admin/products/${p.id}`, payload, config); 
   } catch(e) { console.error("Update error", e); }
 };
 
@@ -385,10 +385,10 @@ const deleteProduct = async (id) => {
     if (p.images && p.images.length > 0) {
       for (const url of p.images) {
         const fname = getFilenameFromUrl(url);
-        await axios.delete(`${API_URL}/api/storage/products/${fname}`, config).catch(() => {});
+        await axios.delete(`/api/storage/products/${fname}`, config).catch(() => {});
       }
     }
-    await axios.delete(`${API_URL}/api/admin/products/${id}`, config);
+    await axios.delete(`/api/admin/products/${id}`, config);
     products.value = products.value.filter(p => p.id !== id);
   } catch (e) { alert('Ошибка при удалении'); }
 };

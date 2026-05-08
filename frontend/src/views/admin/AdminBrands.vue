@@ -176,7 +176,7 @@ const newBrand = reactive({ name: '', country: '', logo_url: '', is_popular: tru
 
 const loadData = async () => {
   try {
-    const res = await axios.get(`${API_URL}/api/admin/brands`, config);
+    const res = await axios.get(`/api/admin/brands`, config);
     brands.value = res.data;
   } catch (e) { console.error('Ошибка загрузки брендов'); }
 };
@@ -194,7 +194,7 @@ const removeExistingLogo = async (brand) => {
   if (!confirm('Удалить логотип физически из хранилища?')) return;
   const filename = getFilenameFromUrl(brand.logo_url);
   try {
-    if (filename) await axios.delete(`${API_URL}/api/storage/brands/${filename}`, config);
+    if (filename) await axios.delete(`/api/storage/brands/${filename}`, config);
     brand.logo_url = null;
     await updateBrand(brand);
   } catch (e) { alert('Ошибка при удалении файла'); }
@@ -209,13 +209,13 @@ const handleFileUpload = async (event, mode, target = null) => {
   uploading.value = true;
 
   try {
-    const res = await axios.post(`${API_URL}/api/upload/brands`, formData, config);
+    const res = await axios.post(`/api/upload/brands`, formData, config);
     if (mode === 'new') {
       newBrand.logo_url = res.data.url;
     } else {
       if (target.logo_url) {
         const oldFile = getFilenameFromUrl(target.logo_url);
-        await axios.delete(`${API_URL}/api/storage/brands/${oldFile}`, config).catch(() => {});
+        await axios.delete(`/api/storage/brands/${oldFile}`, config).catch(() => {});
       }
       target.logo_url = res.data.url;
       await updateBrand(target);
@@ -227,7 +227,7 @@ const handleFileUpload = async (event, mode, target = null) => {
 // --- CRUD ---
 const createBrand = async () => {
   try {
-    const res = await axios.post(`${API_URL}/api/admin/brands`, newBrand, config);
+    const res = await axios.post(`/api/admin/brands`, newBrand, config);
     brands.value.unshift(res.data);
     Object.assign(newBrand, { name: '', country: '', logo_url: '', is_popular: true });
     alert('Бренд создан');
@@ -235,7 +235,7 @@ const createBrand = async () => {
 };
 
 const updateBrand = async (brand) => {
-  try { await axios.put(`${API_URL}/api/admin/brands/${brand.id}`, brand, config); } catch (e) { }
+  try { await axios.put(`/api/admin/brands/${brand.id}`, brand, config); } catch (e) { }
 };
 
 const deleteBrand = async (brand) => {
@@ -243,9 +243,9 @@ const deleteBrand = async (brand) => {
   try {
     if (brand.logo_url) {
       const filename = getFilenameFromUrl(brand.logo_url);
-      await axios.delete(`${API_URL}/api/storage/brands/${filename}`, config).catch(() => {});
+      await axios.delete(`/api/storage/brands/${filename}`, config).catch(() => {});
     }
-    await axios.delete(`${API_URL}/api/admin/brands/${brand.id}`, config);
+    await axios.delete(`/api/admin/brands/${brand.id}`, config);
     brands.value = brands.value.filter(b => b.id !== brand.id);
   } catch (e) { alert('Ошибка удаления'); }
 };

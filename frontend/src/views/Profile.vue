@@ -189,18 +189,18 @@ const loadData = async () => {
 
   // Профиль
   try {
-    const uRes = await axios.get(`${API_URL}/api/users/profile/${userId}`);
+    const uRes = await axios.get(`/api/users/profile/${userId}`);
     user.value = uRes.data;
   } catch (e) { console.error("Ошибка загрузки профиля"); }
 
   // Заказы
-  axios.get(`${API_URL}/api/orders/${userId}`).then(res => { orders.value = res.data; loadingOrders.value = false; });
+  axios.get(`/api/orders/${userId}`).then(res => { orders.value = res.data; loadingOrders.value = false; });
   
   // Избранное
-  axios.get(`${API_URL}/api/wishlist/${userId}`).then(res => wishlistCount.value = res.data.length);
+  axios.get(`/api/wishlist/${userId}`).then(res => wishlistCount.value = res.data.length);
 
   // Уведомления (Новое)
-  axios.get(`${API_URL}/api/notifications/${userId}`).then(res => {
+  axios.get(`/api/notifications/${userId}`).then(res => {
     notifications.value = res.data.slice(0, 3); // Показываем 3 последних
     unreadCount.value = res.data.filter(n => !n.is_read).length;
     loadingNotifs.value = false;
@@ -208,7 +208,7 @@ const loadData = async () => {
 
 
    try {
-    const vRes = await axios.get(`${API_URL}/api/admin/user_vehicles`, config);
+    const vRes = await axios.get(`/api/admin/user_vehicles`, config);
     // Фильтруем машины, чтобы посчитать только те, что принадлежат текущему юзеру
     vehiclesCount.value = vRes.data.filter(v => v.user_id === userId).length;
   } catch (e) {
@@ -218,7 +218,7 @@ const loadData = async () => {
   // Недавно просмотренные
   const savedIds = JSON.parse(localStorage.getItem('recent_views') || '[]');
   if (savedIds.length) {
-    axios.post(`${API_URL}/api/products/recent`, { ids: savedIds.slice(0, 15) }).then(res => {
+    axios.post(`/api/products/recent`, { ids: savedIds.slice(0, 15) }).then(res => {
       const productsMap = new Map(res.data.map(p => [p.id, p]));
       recentProducts.value = savedIds.map(id => productsMap.get(id)).filter(p => p);
     });

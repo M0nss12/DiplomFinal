@@ -126,8 +126,8 @@ const itemsPerPage = 15;
 const loadData = async () => {
   try {
     const [tRes, uRes] = await Promise.all([
-      axios.get(`${API_URL}/api/admin/password_reset_tokens`, config),
-      axios.get(`${API_URL}/api/admin/users`, config)
+      axios.get(`/api/admin/password_reset_tokens`, config),
+      axios.get(`/api/admin/users`, config)
     ]);
     tokens.value = tRes.data;
     users.value = uRes.data;
@@ -162,7 +162,7 @@ const getTokenStatusClass = (t) => {
 const deleteToken = async (id) => {
   if (!confirm('Удалить этот токен? Пользователь не сможет сбросить пароль по старой ссылке.')) return;
   try {
-    await axios.delete(`${API_URL}/api/admin/password_reset_tokens/${id}`, config);
+    await axios.delete(`/api/admin/password_reset_tokens/${id}`, config);
     tokens.value = tokens.value.filter(t => t.id !== id);
   } catch (e) {
     alert('Ошибка при удалении');

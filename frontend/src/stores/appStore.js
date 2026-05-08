@@ -60,7 +60,7 @@ export const useAppStore = defineStore('app', {
       // мы сохраняем город напрямую в профиль (связь saved_city_id)
       if (userId) {
         try {
-          await axios.put(`${API_URL}/api/users/profile/${userId}`, { 
+          await axios.put(`/api/users/profile/${userId}`, { 
             city: newCity 
           });
         } catch (e) {

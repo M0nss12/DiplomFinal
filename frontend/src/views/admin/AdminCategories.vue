@@ -178,7 +178,7 @@ const newCategory = reactive({ name: '', slug: '', parent_id: null, image_url: '
 // Загрузка данных
 const loadData = async () => {
   try {
-    const res = await axios.get(`${API_URL}/api/admin/categories`, config);
+    const res = await axios.get(`/api/admin/categories`, config);
     categories.value = Array.isArray(res.data) ? res.data : [];
   } catch (e) { 
     console.error('Ошибка загрузки данных категорий'); 
@@ -198,7 +198,7 @@ const removeExistingIcon = async (cat) => {
   if (!confirm('Удалить иконку физически из хранилища?')) return;
   const filename = getFilenameFromUrl(cat.image_url);
   try {
-    if (filename) await axios.delete(`${API_URL}/api/storage/categories/${filename}`, config);
+    if (filename) await axios.delete(`/api/storage/categories/${filename}`, config);
     cat.image_url = null;
     await updateCategory(cat);
   } catch (e) { 
@@ -215,14 +215,14 @@ const handleFileUpload = async (event, mode, target = null) => {
   uploading.value = true;
 
   try {
-    const res = await axios.post(`${API_URL}/api/upload/categories`, formData, config);
+    const res = await axios.post(`/api/upload/categories`, formData, config);
     if (mode === 'new') {
       newCategory.image_url = res.data.url;
     } else {
       // Очистка старой иконки при замене
       if (target.image_url) {
         const oldFile = getFilenameFromUrl(target.image_url);
-        await axios.delete(`${API_URL}/api/storage/categories/${oldFile}`, config).catch(() => {});
+        await axios.delete(`/api/storage/categories/${oldFile}`, config).catch(() => {});
       }
       target.image_url = res.data.url;
       await updateCategory(target);
@@ -237,7 +237,7 @@ const handleFileUpload = async (event, mode, target = null) => {
 // --- CRUD ---
 const createCategory = async () => {
   try {
-    const res = await axios.post(`${API_URL}/api/admin/categories`, newCategory, config);
+    const res = await axios.post(`/api/admin/categories`, newCategory, config);
     categories.value.unshift(res.data);
     Object.assign(newCategory, { name: '', slug: '', parent_id: null, image_url: '' });
     alert('Категория создана');
@@ -248,7 +248,7 @@ const createCategory = async () => {
 
 const updateCategory = async (cat) => {
   try { 
-    await axios.put(`${API_URL}/api/admin/categories/${cat.id}`, cat, config); 
+    await axios.put(`/api/admin/categories/${cat.id}`, cat, config); 
   } catch (e) { 
     console.error("Update error", e);
   }
@@ -259,9 +259,9 @@ const deleteCategory = async (cat) => {
   try {
     if (cat.image_url) {
       const filename = getFilenameFromUrl(cat.image_url);
-      await axios.delete(`${API_URL}/api/storage/categories/${filename}`, config).catch(() => {});
+      await axios.delete(`/api/storage/categories/${filename}`, config).catch(() => {});
     }
-    await axios.delete(`${API_URL}/api/admin/categories/${cat.id}`, config);
+    await axios.delete(`/api/admin/categories/${cat.id}`, config);
     categories.value = categories.value.filter(c => c.id !== cat.id);
   } catch (e) { 
     alert('Ошибка удаления (возможно, в категории есть товары или подкатегории)'); 

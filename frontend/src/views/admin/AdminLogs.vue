@@ -192,7 +192,7 @@ const setLogType = (type) => {
 const fetchLogs = async () => {
   loading.value = true;
   try {
-    const res = await axios.get(`${API_URL}/api/admin/system/logs?type=${logType.value}`, config);
+    const res = await axios.get(`/api/admin/system/logs?type=${logType.value}`, config);
     logs.value = res.data;
   } catch (e) {
     console.error('Ошибка загрузки журналов');
