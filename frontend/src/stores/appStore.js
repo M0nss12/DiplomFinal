@@ -71,33 +71,33 @@ export const useAppStore = defineStore('app', {
 
     // 5. Синхронизация при входе (Умное извлечение из новой БД)
 async syncCity() {
-      const userId = localStorage.getItem('user_id');
-      if (userId) {
-        try {
-          const res = await axios.get(`/api/users/profile/${userId}`);
-          const dbCityName = res.data.cities?.name;
-          if (dbCityName) {
-            this.city = dbCityName;
-            this.isCityConfirmed = true;
-            localStorage.setItem('user_city', dbCityName);
-            return;
-          }
-        } catch (e) { console.error('Ошибка профиля'); }
+  const userId = localStorage.getItem('user_id');
+  if (userId) {
+    try {
+      const res = await axios.get(`/api/users/profile/${userId}`);
+      if (res.data.cities?.name) {
+        this.city = res.data.cities.name;
+        this.isCityConfirmed = true;
+        localStorage.setItem('user_city', this.city);
+        return;
       }
-      
-      // Если не авторизован или в профиле нет города
-      if (!this.isCityConfirmed) {
-        try {
-          const res = await fetch('https://ipwho.is/'); // Более надежный бесплатный сервис
-          const data = await res.json();
-          if (data.success && data.city) {
-            this.city = data.city;
-          }
-        } catch (e) {
-          console.warn('Геолокация недоступна, город по умолчанию: Москва');
-          this.city = 'Москва';
-        }
+    } catch (e) { console.error('Профиль пока недоступен'); }
+  }
+
+  // Если не авторизован или ошибка профиля - ставим дефолт
+  if (!this.isCityConfirmed) {
+    try {
+      const res = await fetch('https://ipwho.is/');
+      const data = await res.json();
+      if (data && data.success) {
+        this.city = data.city || 'Москва';
+      } else {
+        this.city = 'Москва'; // Фолбэк если лимит исчерпан
       }
+    } catch (e) {
+      this.city = 'Москва'; // Фолбэк при 403 или ошибке сети
     }
+  }
+}
   }
 });

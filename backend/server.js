@@ -32,7 +32,7 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || 'my_super_secret_admin_123';
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors({
-    origin: ['https://diplomv2-0.onrender.com', 'http://localhost:3000', 'http://localhost:5173'], 
+    origin: ['https://diplomfinal.onrender.com', 'http://localhost:3000', 'http://localhost:5173'], 
     credentials: true
 }));
 
