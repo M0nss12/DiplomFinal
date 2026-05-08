@@ -547,7 +547,10 @@ app.delete('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
 });
 
 // catch-all для SPA
-app.get(/(.*)/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// Используем чистый RegExp, чтобы обойти ошибки парсера в новых версиях Node.js
+app.get(/^(?!\/api).+/, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 app.listen(PORT, () => console.log(`🚀 ApexDrive Server Active: http://localhost:${PORT}`));
 
