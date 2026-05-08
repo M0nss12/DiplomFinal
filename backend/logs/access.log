@@ -1,0 +1,5 @@
+[2026-03-03T17:09:31.432Z] [INFO] GET /api/admin/warehouses - 200 | Details: {"ip":"::1","duration":"1113ms","body":null}
+[2026-03-03T17:09:49.592Z] [INFO] GET /api/admin/warehouses - 304 | Details: {"ip":"::1","duration":"315ms","body":null}
+[2026-03-03T17:11:38.983Z] [INFO] GET /api/admin/warehouses - 304 | Details: {"ip":"::1","duration":"358ms","body":null}
+[2026-03-03T17:11:39.961Z] [INFO] GET /api/admin/warehouses - 304 | Details: {"ip":"::1","duration":"162ms","body":null}
+[2026-03-03T17:12:27.211Z] [INFO] GET /api/admin/warehouses - 304 | Details: {"ip":"::1","duration":"334ms","body":null}
