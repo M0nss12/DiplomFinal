@@ -105,15 +105,20 @@ const notifyAndEmail = async ({ userId, type, title, message, email, templateNam
         if (userId) await supabase.from('notifications').insert([{ user_id: userId, type, title, message }]);
     } catch (e) { console.error('Ошибка записи уведомления в БД:', e.message); }
 
-    if (email && templateName) {
-        try {
-            const html = getEmailTemplate(templateName, { title, message, ...templateVars });
-            await transporter.sendMail({
-                from: '"ApexDrive" <monsswhat@gmail.com>', 
-                to: email, subject: title, html: html
-            });
-        } catch (e) { console.error('Ошибка отправки email:', e.message); }
+if (email && templateName) {
+    try {
+        const html = getEmailTemplate(templateName, { title, message, ...templateVars });
+        const info = await transporter.sendMail({
+            from: `"ApexDrive" <${process.env.EMAIL_USER}>`, 
+            to: email,
+            subject: title,
+            html: html
+        });
+        console.log("📧 Письмо успешно отправлено:", info.messageId);
+    } catch (e) { 
+        console.error("❌ ОШИБКА ПОЧТЫ (SMTP):", e.message); 
     }
+}
 };
 
 const logError = (err, req = null) => {
@@ -178,6 +183,35 @@ const verifyYandexCaptcha = (token, ip) => {
 // =====================================================================
 // 🏠 API: КАТАЛОГ И МАРКЕТИНГ
 // =====================================================================
+
+// Получить все категории (публичный роут для каталога)
+app.get('/api/categories', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('categories')
+            .select('*')
+            .order('name', { ascending: true });
+        if (error) throw error;
+        res.json(data || []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Получить все бренды (публичный роут)
+app.get('/api/brands', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('brands')
+            .select('*')
+            .order('name', { ascending: true });
+        if (error) throw error;
+        res.json(data || []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/marketing/currency', async (req, res) => {
     try {
         const cbrRes = await axios.get('https://www.cbr-xml-daily.ru/daily_json.js');
@@ -281,6 +315,38 @@ app.get('/api/reviews/:productId', async (req, res) => {
 // =====================================================================
 // 👤 API: ПОЛЬЗОВАТЕЛИ И АВТОРИЗАЦИЯ
 // =====================================================================
+
+// Смена пароля из настроек профиля
+app.post('/api/users/change-password/:id', async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    const userId = req.params.id;
+
+    try {
+        // 1. Проверяем старый пароль через нашу RPC функцию в базе
+        const { data: isValid } = await supabase.rpc('verify_user_password', { 
+            user_id_param: userId, 
+            pass_param: oldPassword 
+        });
+
+        if (!isValid) {
+            return res.status(401).json({ error: 'Текущий пароль введен неверно' });
+        }
+
+        // 2. Если верный — обновляем на новый
+        // Триггер в БД сам захеширует новый пароль при обновлении
+        const { error } = await supabase
+            .from('users')
+            .update({ password_hash: newPassword })
+            .eq('id', userId);
+
+        if (error) throw error;
+
+        res.json({ success: true, message: 'Пароль успешно изменен' });
+    } catch (e) {
+        res.status(500).json({ error: 'Ошибка сервера при смене пароля' });
+    }
+});
+
 app.post('/api/users/register', async (req, res) => {
     try {
         const { email, phone, password, first_name, last_name, otchestvo, city, captchaToken } = req.body;

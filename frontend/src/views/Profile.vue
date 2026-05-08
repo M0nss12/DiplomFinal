@@ -153,7 +153,7 @@ const user = ref(null);
 const orders = ref([]);
 const recentProducts = ref([]);
 const wishlistCount = ref(0);
-const vehiclesCount = ref(0);
+const vehiclesCount = ref(0); // Переменная для гаража
 const loadingOrders = ref(true);
 
 // Уведомления
@@ -162,7 +162,6 @@ const loadingNotifs = ref(true);
 const unreadCount = ref(0);
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-// Обновлено под новые статусы БД
 const translateDelivery = (s) => ({ 'processing': 'Обработка', 'shipping': 'В пути', 'delivered': 'Получен', 'cancelled': 'Отменен', 'returned': 'Возврат' }[s] || 'В обработке');
 const getDeliveryStatusStyle = (s) => {
   if (['cancelled', 'returned'].includes(s)) return { backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)' };
@@ -185,7 +184,9 @@ const loadData = async () => {
   const userId = localStorage.getItem('user_id');
   if (!userId) return;
 
-  const API_URL = import.meta.env.VITE_API_URL || '';
+  // ОБЪЯВЛЯЕМ КОНФИГ В НАЧАЛЕ (ИСПРАВЛЕНИЕ ОШИБКИ)
+  const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123';
+  const config = { headers: { 'x-admin-key': ADMIN_SECRET } };
 
   // Профиль
   try {
@@ -194,26 +195,26 @@ const loadData = async () => {
   } catch (e) { console.error("Ошибка загрузки профиля"); }
 
   // Заказы
-  axios.get(`/api/orders/${userId}`).then(res => { orders.value = res.data; loadingOrders.value = false; });
+  axios.get(`/api/orders/${userId}`).then(res => { 
+    orders.value = res.data; 
+    loadingOrders.value = false; 
+  }).catch(() => loadingOrders.value = false);
   
   // Избранное
-  axios.get(`/api/wishlist/${userId}`).then(res => wishlistCount.value = res.data.length);
+  axios.get(`/api/wishlist/${userId}`).then(res => wishlistCount.value = res.data.length).catch(() => {});
 
-  // Уведомления (Новое)
+  // Гараж (Используем config)
+  try {
+    const vRes = await axios.get(`/api/admin/user_vehicles`, config);
+    vehiclesCount.value = vRes.data.filter(v => v.user_id === userId).length;
+  } catch (e) { console.error("Ошибка загрузки гаража", e); }
+
+  // Уведомления
   axios.get(`/api/notifications/${userId}`).then(res => {
-    notifications.value = res.data.slice(0, 3); // Показываем 3 последних
+    notifications.value = res.data.slice(0, 3);
     unreadCount.value = res.data.filter(n => !n.is_read).length;
     loadingNotifs.value = false;
   }).catch(() => loadingNotifs.value = false);
-
-
-   try {
-    const vRes = await axios.get(`/api/admin/user_vehicles`, config);
-    // Фильтруем машины, чтобы посчитать только те, что принадлежат текущему юзеру
-    vehiclesCount.value = vRes.data.filter(v => v.user_id === userId).length;
-  } catch (e) {
-    console.error("Ошибка загрузки гаража в профиле", e);
-  }
 
   // Недавно просмотренные
   const savedIds = JSON.parse(localStorage.getItem('recent_views') || '[]');
@@ -221,7 +222,7 @@ const loadData = async () => {
     axios.post(`/api/products/recent`, { ids: savedIds.slice(0, 15) }).then(res => {
       const productsMap = new Map(res.data.map(p => [p.id, p]));
       recentProducts.value = savedIds.map(id => productsMap.get(id)).filter(p => p);
-    });
+    }).catch(() => {});
   }
 };
 

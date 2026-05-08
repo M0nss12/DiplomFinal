@@ -187,7 +187,9 @@ const handlePasswordReset = async () => {
   resetMessage.value = '';
   resetLoading.value = true;
   try {
-    await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/users/request-password-reset`, {
+    // УБЕРИ `${import.meta.env.VITE_API_URL || ''}`
+    // Оставь только относительный путь
+    await axios.post('/api/users/request-password-reset', {
       email: resetEmail.value
     });
     resetMessage.value = 'Письмо отправлено! Проверьте папку "Входящие" или "Спам".';

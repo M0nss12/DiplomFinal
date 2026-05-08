@@ -222,38 +222,59 @@ const saveChanges = async () => {
   const userId = localStorage.getItem('user_id');
   isSaving.value = true;
 
+  // ЛОГИКА СМЕНЫ ПАРОЛЯ
   if (passwords.new) {
-    if (!passwords.old) { alert("Введите текущий пароль"); isSaving.value = false; return; }
-    if (passwords.new !== passwords.confirm) { alert("Пароли не совпадают"); isSaving.value = false; return; }
-    
-    // Эндпоинт смены пароля (если ты его сделаешь в будущем, пока заглушка)
-    // await axios.post(`/api/users/change-password/${userId}`, { oldPassword: passwords.old, newPassword: passwords.new });
+    if (!passwords.old) { 
+      alert("Введите текущий пароль для подтверждения изменений"); 
+      isSaving.value = false; 
+      return; 
+    }
+    if (passwords.new !== passwords.confirm) { 
+      alert("Новые пароли не совпадают"); 
+      isSaving.value = false; 
+      return; 
+    }
+    if (passwords.new.length < 6) {
+      alert("Новый пароль должен быть не короче 6 символов");
+      isSaving.value = false;
+      return;
+    }
+
+    try {
+      // Отправляем запрос на бэкенд (теперь он там есть!)
+      await axios.post(`/api/users/change-password/${userId}`, {
+        oldPassword: passwords.old,
+        newPassword: passwords.new
+      });
+      // Если успешно — очищаем поля
+      passwords.old = ''; passwords.new = ''; passwords.confirm = '';
+      alert("Пароль успешно обновлен!");
+    } catch (e) { 
+      alert(e.response?.data?.error || "Ошибка при смене пароля"); 
+      isSaving.value = false;
+      return; // Прерываем сохранение остального, если пароль не подошел
+    }
   }
 
+  // СОХРАНЕНИЕ ОСТАЛЬНЫХ ДАННЫХ (ФИО, Город и т.д.)
   try {
-    // Извлекаем системные поля, которые нельзя обновлять напрямую
-    const { password_hash, cities, ...updateData } = user.value;
-    
-    // Передаем город на бэк, чтобы он нашел его ID или создал
+    const { password_hash, cities, cityName: _, ...updateData } = user.value;
     updateData.city = cityName.value;
 
-    const res = await axios.put(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${userId}`, updateData);
+    const res = await axios.put(`/api/users/profile/${userId}`, updateData);
     
-    // Обновляем локальные данные
     localStorage.setItem('user_name', `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim());
     localStorage.setItem('user_first_name', res.data.first_name || '');
     localStorage.setItem('user_avatar', res.data.avatar_url || defaultAvatars.value[0]);
     
-    // Обновляем город в глобальном хранилище
     if (cityName.value) {
       appStore.setCity(cityName.value);
     }
 
-    passwords.old = ''; passwords.new = ''; passwords.confirm = '';
-    alert("Профиль успешно обновлен!");
+    alert("Данные профиля сохранены!");
     await loadData();
   } catch (e) { 
-    alert("Ошибка сохранения: " + (e.response?.data?.error || e.message)); 
+    alert("Ошибка сохранения профиля: " + (e.response?.data?.error || e.message)); 
   } finally {
     isSaving.value = false;
   }
