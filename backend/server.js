@@ -370,25 +370,37 @@ app.post('/api/users/register', async (req, res) => {
 });
 
 // Создание пользователя администратором (без капчи)
+// Создание пользователя администратором (без капчи, с письмом подтверждения)
 app.post('/api/admin/users', verifyAdmin, async (req, res) => {
     try {
-        const { email, phone, password, first_name, last_name, otchestvo, city, role } = req.body;
+        const { email, phone_number, password, first_name, last_name, otchestvo, city, role } = req.body;
+
+        if (!first_name) return res.status(400).json({ error: 'Имя обязательно' });
+        if (!password || password.length < 6) return res.status(400).json({ error: 'Пароль должен быть минимум 6 символов' });
 
         const newUserId = crypto.randomUUID();
         const cityId = await getOrCreateCity(city);
 
-        // Проверка существующего пользователя
-        let filter = email ? `email.eq.${email}` : `phone_number.eq.${phone}`;
+        // Фильтр по email или телефону
+        let filter = email ? `email.eq.${email}` : `phone_number.eq.${phone_number}`;
         const { data: existing } = await supabase.from('users').select('*').or(filter).maybeSingle();
 
         if (existing) {
             if (existing.password_hash) return res.status(400).json({ error: 'Пользователь уже существует' });
-            const { data: updatedUser } = await supabase.from('users').update({
-                password_hash: password, role: role || 'user', first_name, last_name, otchestvo,
-                saved_city_id: cityId, is_email_verified: false
+
+            const { data: updatedUser, error: updateErr } = await supabase.from('users').update({
+                password_hash: password,
+                role: role || 'user',
+                first_name,
+                last_name,
+                otchestvo,
+                saved_city_id: cityId,
+                is_email_verified: false
             }).eq('id', existing.id).select().single();
-            
-            // Отправить письмо подтверждения, если указан email
+
+            if (updateErr) throw updateErr;
+
+            // Отправляем письмо с подтверждением, если указан email
             if (email) {
                 const token = crypto.randomBytes(32).toString('hex');
                 const expiresAt = new Date(Date.now() + 3600000).toISOString();
@@ -405,15 +417,16 @@ app.post('/api/admin/users', verifyAdmin, async (req, res) => {
                     templateVars: { link: verifyLink, first_name }
                 });
             }
-            
+
             return res.json(updatedUser);
         }
 
-        const { data: newUser, error } = await supabase.from('users').insert([{
+        // Создаём нового пользователя
+        const { data: newUser, error: createErr } = await supabase.from('users').insert([{
             id: newUserId,
             role: role || 'user',
             email: email || null,
-            phone_number: phone || null,
+            phone_number: phone_number || null,
             password_hash: password,
             first_name,
             last_name,
@@ -423,9 +436,9 @@ app.post('/api/admin/users', verifyAdmin, async (req, res) => {
             is_email_verified: false
         }]).select().single();
 
-        if (error) throw error;
+        if (createErr) throw createErr;
 
-        // Отправляем письмо для подтверждения, если email указан
+        // Отправляем письмо с подтверждением, если email указан
         if (email) {
             const token = crypto.randomBytes(32).toString('hex');
             const expiresAt = new Date(Date.now() + 3600000).toISOString();
@@ -445,8 +458,8 @@ app.post('/api/admin/users', verifyAdmin, async (req, res) => {
 
         res.json(newUser);
     } catch (e) {
-        logError(e, req);
-        res.status(500).json({ error: e.message });
+        console.error('Ошибка создания пользователя админом:', e);
+        res.status(500).json({ error: e.message || 'Внутренняя ошибка сервера' });
     }
 });
 

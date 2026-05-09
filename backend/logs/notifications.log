@@ -20,3 +20,4 @@
 {"id":"13284f4a","timestamp":"09.05.2026, 16:51:10","userId":"c112b0ee-cc34-4079-818e-1fa721e795aa","type":"order","title":"Заказ №35 выдан","message":"Ваш заказ был выдан.","emailSentTo":"customer@mail.com"}
 {"id":"e1a0cfc3","timestamp":"09.05.2026, 17:32:38","userId":"111","type":"order","title":"Заказ №41 оформлен","message":"Ваш заказ на сумму 22200 ₽ принят в обработку.","emailSentTo":"monsschogath@gmail.com"}
 {"id":"2cbc5d40","timestamp":"09.05.2026, 18:17:19","userId":"111","type":"order","title":"Заказ №42 оформлен","message":"Ваш заказ на сумму 22200 ₽ принят в обработку.","emailSentTo":"monsschogath@gmail.com"}
+{"id":"31cdd860","timestamp":"09.05.2026, 19:27:27","userId":"68cff161-6f8c-466b-a3fa-0b7103f59ca1","type":"system","title":"Подтверждение регистрации","message":"Добро пожаловать в ApexDrive! Подтвердите вашу почту.","emailSentTo":"school7343173@gmail.com"}
