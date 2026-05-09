@@ -47,7 +47,7 @@
         <table class="admin-table">
           <thead>
             <tr>
-              <th class="col-time">Время</th>
+              <th class="col-datetime">Дата/Время</th>
               <th>Пользователь</th>
               <th class="col-method">Действие</th>
               <th>Сообщение</th>
@@ -56,7 +56,7 @@
           </thead>
           <tbody>
             <tr v-for="log in paginatedLogs" :key="log.id" class="log-row">
-              <td class="col-time">{{ formatTime(log.timestamp) }}</td>
+              <td class="col-datetime">{{ log.timestamp || '—' }}</td>
               <td>
                 <div class="user-info">
                   <span class="user-name">{{ log.user?.name || 'Система' }}</span>
@@ -80,7 +80,7 @@
         <table class="admin-table">
           <thead>
             <tr>
-              <th class="col-time">Время</th>
+              <th class="col-datetime">Дата/Время</th>
               <th>Получатель (ID)</th>
               <th>Тип</th>
               <th>Заголовок и текст</th>
@@ -88,7 +88,7 @@
           </thead>
           <tbody>
             <tr v-for="log in paginatedLogs" :key="log.id" class="log-row">
-              <td class="col-time">{{ formatTime(log.timestamp) }}</td>
+              <td class="col-datetime">{{ log.timestamp || '—' }}</td>
               <td><code class="id-code">{{ log.userId || 'Все' }}</code></td>
               <td>
                 <span class="type-badge" :class="log.type">{{ log.type }}</span>
@@ -109,7 +109,7 @@
         <table class="admin-table">
           <thead>
             <tr>
-              <th class="col-time">Время</th>
+              <th class="col-datetime">Дата/Время</th>
               <th>Сообщение</th>
               <th>Локация / URL</th>
               <th class="text-right">Детали</th>
@@ -117,7 +117,7 @@
           </thead>
           <tbody>
             <tr v-for="log in paginatedLogs" :key="log.id" class="row-error">
-              <td class="col-time">{{ formatTime(log.timestamp) }}</td>
+              <td class="col-datetime">{{ log.timestamp || '—' }}</td>
               <td class="error-msg"><b>{{ log.message }}</b></td>
               <td>
                  <code class="url-text">{{ log.url }}</code>
@@ -193,7 +193,7 @@ const fetchLogs = async () => {
   loading.value = true;
   try {
     const res = await axios.get(`/api/admin/system/logs?type=${logType.value}`, config);
-    logs.value = res.data;
+    logs.value = res.data || [];
   } catch (e) {
     console.error('Ошибка загрузки журналов');
   } finally {
@@ -237,12 +237,6 @@ const getMethodClass = (action) => {
     return 'm-get';
 };
 
-const formatTime = (ts) => {
-    if (!ts) return '---';
-    // Если формат "08.05.2026, 15:30:45", берем только время
-    return ts.includes(', ') ? ts.split(', ')[1] : ts;
-};
-
 const openErrorDetail = (log) => { selectedError.value = log; };
 
 onMounted(fetchLogs);
@@ -251,7 +245,7 @@ onUnmounted(() => clearInterval(refreshInterval));
 
 <style scoped>
 /* ==========================================================================
-   АДМИНКА: ЛОГИ (GLASSMORPHISM & DARK MODE)
+   АДМИНКА: ЛОГИ (GLASSMORPHISM & DARK MODE) – с датой
    ========================================================================== */
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -259,7 +253,6 @@ onUnmounted(() => clearInterval(refreshInterval));
 .admin-logs-page { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
 :global(.dark) .admin-logs-page { color: #f8fafc; }
 
-/* ШАПКА */
 .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
 .header-left h1 {
   font-size: 2.2rem; font-weight: 900; margin: 0;
@@ -270,7 +263,6 @@ onUnmounted(() => clearInterval(refreshInterval));
 
 .stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.9rem; }
 
-/* КАРТОЧКИ */
 .glass-card {
   background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
   border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
@@ -281,7 +273,6 @@ onUnmounted(() => clearInterval(refreshInterval));
 .admin-card { padding: 25px; margin-bottom: 30px; }
 .filter-grid { display: grid; grid-template-columns: 1.5fr 2fr 1fr; gap: 25px; align-items: flex-end; }
 
-/* ИНПУТЫ */
 .form-input {
   width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
   background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s;
@@ -289,7 +280,6 @@ onUnmounted(() => clearInterval(refreshInterval));
 :global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
 .form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; }
 
-/* ПЕРЕКЛЮЧАТЕЛЬ ВКЛАДОК */
 .tab-switcher { background: rgba(0,0,0,0.03); padding: 4px; display: flex; gap: 4px; border-radius: 12px; }
 :global(.dark) .tab-switcher { background: rgba(255,255,255,0.05); }
 .tab-switcher button {
@@ -298,7 +288,6 @@ onUnmounted(() => clearInterval(refreshInterval));
 }
 .tab-switcher button.active { background: var(--primary, #2563eb); color: white; box-shadow: 0 4px 10px rgba(37,99,235,0.2); }
 
-/* REFRESH И LIVE */
 .refresh-group { display: flex; align-items: center; gap: 20px; justify-content: flex-end; }
 .live-check { color: var(--success, #10b981) !important; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.8rem; }
 .btn-refresh {
@@ -308,7 +297,7 @@ onUnmounted(() => clearInterval(refreshInterval));
 .btn-refresh:hover { transform: scale(1.1); color: var(--primary, #2563eb); border-color: var(--primary, #2563eb); }
 .spinning { animation: spin 1s linear infinite; display: inline-block; }
 
-/* ТАБЛИЦА */
+.table-container { margin-top: 20px; }
 .admin-table-wrapper { overflow-x: auto; }
 .admin-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
 .admin-table th { padding: 16px 20px; text-align: left; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
@@ -317,11 +306,11 @@ onUnmounted(() => clearInterval(refreshInterval));
 :global(.dark) .admin-table td { border-color: #334155; }
 .log-row:hover td { background: rgba(37, 99, 235, 0.02); }
 
-.col-time { font-family: 'JetBrains Mono', monospace; font-weight: 800; color: var(--primary, #2563eb); width: 100px; }
+.col-datetime { font-family: 'JetBrains Mono', monospace; font-weight: 800; color: var(--primary, #2563eb); width: 130px; white-space: nowrap; }
+
 code { background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; color: var(--text-muted, #64748b); }
 :global(.dark) code { background: rgba(255,255,255,0.05); color: #94a3b8; }
 
-/* Методы и Типы */
 .method-badge { padding: 4px 10px; border-radius: 6px; font-weight: 900; font-family: monospace; font-size: 0.75rem; text-transform: uppercase; }
 .m-get { background: rgba(16, 185, 129, 0.1); color: #10b981; }
 .m-post { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
@@ -336,7 +325,6 @@ code { background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 6px; font-
 .user-name { font-weight: 800; font-size: 0.9rem; }
 .user-id { font-size: 0.7rem; color: var(--text-muted, #94a3b8); }
 
-/* ОШИБКИ */
 .row-error { background: rgba(239, 68, 68, 0.02); }
 .error-msg { color: var(--danger, #ef4444); font-size: 0.95rem; }
 .url-text { color: var(--text-muted, #64748b); font-size: 0.8rem; }
@@ -344,8 +332,7 @@ code { background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 6px; font-
 :global(.dark) .btn-detail { background: rgba(255,255,255,0.05); border-color: #475569; color: #f8fafc; }
 .btn-detail:hover { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); }
 
-/* МОДАЛКА */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 10000; animation: fadeIn 0.2s; }
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 10000; }
 .log-modal { width: 90%; max-width: 900px; padding: 35px; position: relative; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
 .modal-header h3 { font-size: 1.5rem; font-weight: 900; }
@@ -360,14 +347,12 @@ code { background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 6px; font-
 :global(.dark) .terminal-box { background: #020617; }
 .label-tech { font-weight: 800; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted, #64748b); margin-top: 20px; }
 
-/* ПАГИНАЦИЯ */
 .pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 40px; }
 .p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-weight: 900; cursor: pointer; border: 1px solid var(--border-color, #e2e8f0); color: var(--text-main, #0f172a); }
 :global(.dark) .p-btn { color: #f8fafc; }
 .p-numbers button { width: 44px; height: 44px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.2s; color: var(--text-muted, #64748b); }
 .p-numbers button.active { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
 
-/* АДАПТИВНОСТЬ */
 @media (max-width: 1024px) { .filter-grid { grid-template-columns: 1fr; gap: 15px; } .refresh-group { justify-content: space-between; } }
 @media (max-width: 600px) { .admin-logs-page { padding: 20px 15px; } .header-row { flex-direction: column; align-items: flex-start; } .p-numbers { display: none; } }
 </style>

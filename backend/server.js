@@ -95,21 +95,31 @@ const writeLog = (filePath, data) => {
 
 const notifyAndEmail = async ({ userId, type, title, message, email, templateName, templateVars = {} }) => {
     writeLog(NOTIFICATIONS_LOG, { userId, type, title, message, emailSentTo: email });
-    try {
-        if (userId) await supabase.from('notifications').insert([{ user_id: userId, type, title, message }]);
-    } catch (e) { console.error('Ошибка записи уведомления в БД:', e.message); }
 
-    if (email && templateName) {
+    // 1. Сохраняем уведомление в БД
+    try {
+        if (userId) {
+            await supabase.from('notifications').insert([{ user_id: userId, type, title, message }]);
+        }
+    } catch (e) {
+        console.error('Ошибка записи уведомления в БД:', e.message);
+    }
+
+    // 2. Отправляем письмо, если указан email
+    if (email) {
         try {
-            const html = getEmailTemplate(templateName, { title, message, ...templateVars });
+            const html = getEmailTemplate(
+                templateName || 'notification_general.html',  // универсальный шаблон, если нет специального
+                { title, message, ...templateVars }
+            );
             await transporter.sendMail({
-                from: `"ApexDrive" <${process.env.EMAIL_USER}>`, 
+                from: `"ApexDrive" <${process.env.EMAIL_USER}>`,
                 to: email,
                 subject: title,
                 html: html
             });
-        } catch (e) { 
-            console.error("❌ ОШИБКА ПОЧТЫ (SMTP):", e.message); 
+        } catch (e) {
+            console.error("❌ ОШИБКА ПОЧТЫ (SMTP):", e.message);
         }
     }
 };
@@ -815,7 +825,8 @@ app.get('/api/admin/system/logs', verifyAdmin, (req, res) => {
     const file = type === 'errors' ? 'errors.log' : type === 'notifications' ? 'notifications.log' : 'actions.log';
     if (!fs.existsSync(path.join(LOGS_DIR, file))) return res.json([]);
     const lines = fs.readFileSync(path.join(LOGS_DIR, file), 'utf8').trim().split('\n').filter(Boolean);
-    res.json(lines.map(l => JSON.parse(l)).reverse().slice(0, 100));
+    // Возвращаем все записи (от новых к старым)
+    res.json(lines.map(l => JSON.parse(l)).reverse());
 });
 
 // Получение избранного с полными данными о пользователе и товаре

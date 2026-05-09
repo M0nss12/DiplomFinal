@@ -36,8 +36,6 @@
             <select v-model="newNotif.type" class="form-input">
               <option value="system">🛡️ Системное</option>
               <option value="order">📦 По заказу</option>
-              <option value="promo">🔥 Акция / Промо</option>
-              <option value="stock">⚙️ Склад / Наличие</option>
             </select>
           </div>
 
@@ -81,8 +79,6 @@
             <option value="all">Все типы</option>
             <option value="system">Системные</option>
             <option value="order">Заказы</option>
-            <option value="promo">Акции</option>
-            <option value="stock">Склад</option>
           </select>
         </div>
         <div class="input-group">
@@ -200,8 +196,6 @@ const sendNotification = async () => {
   loadingAction.value = true;
   try {
     if (newNotif.user_id === 'all') {
-      // Массовая рассылка (логика: перебор всех пользователей)
-      // Примечание: в крупном проекте это делается на бэкенде одним запросом
       const promises = users.value.map(u => 
         axios.post(`/api/admin/notifications`, { ...newNotif, user_id: u.id }, config)
       );
@@ -254,9 +248,6 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-/* ==========================================================================
-   АДМИНКА: УВЕДОМЛЕНИЯ (GLASSMORPHISM & DARK MODE)
-   ========================================================================== */
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
 .admin-notifs { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
@@ -272,7 +263,6 @@ onMounted(loadData);
 
 .stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
 
-/* КАРТОЧКИ */
 .glass-card {
   background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
   border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
@@ -284,7 +274,6 @@ onMounted(loadData);
 .card-title { font-size: 1.35rem; font-weight: 900; margin: 0; }
 .card-decoration { width: 50px; height: 4px; background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); border-radius: 4px; margin-top: 5px; }
 
-/* ФОРМА */
 .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 28px; }
 .input-group.full-width { grid-column: 1 / -1; }
 .input-group label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); display: block; margin-bottom: 8px; }
@@ -306,12 +295,10 @@ onMounted(loadData);
 }
 .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
 
-/* ФИЛЬТРЫ */
 .filter-section { background: rgba(0,0,0,0.01); border-style: dashed; }
 .filter-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 24px; align-items: flex-end; }
 .btn-text-link { background: none; border: none; color: var(--primary, #2563eb); font-weight: 800; cursor: pointer; text-decoration: underline; }
 
-/* ТАБЛИЦА */
 .table-container { margin-top: 20px; }
 .admin-table-wrapper { overflow-x: auto; }
 .admin-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
@@ -328,12 +315,10 @@ onMounted(loadData);
 :global(.dark) .user-cell strong { color: #f8fafc; }
 .user-cell small { color: var(--text-muted, #94a3b8); font-size: 0.75rem; font-weight: 600; }
 
-/* Бейджи типов */
+/* Бейджи типов – оставлены только два */
 .type-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
 .type-badge.system { background: rgba(16, 185, 129, 0.1); color: #10b981; }
 .type-badge.order { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
-.type-badge.promo { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-.type-badge.stock { background: rgba(245, 158, 11, 0.1); color: #d97706; }
 
 .col-msg { max-width: 400px; }
 .msg-content strong { display: block; margin-bottom: 4px; color: var(--text-main, #0f172a); font-size: 0.9rem; }
@@ -347,15 +332,6 @@ onMounted(loadData);
 .btn-delete-small { background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); padding: 8px 16px; border-radius: 30px; font-weight: 800; font-size: 0.8rem; color: var(--danger, #ef4444); cursor: pointer; transition: 0.2s; }
 .btn-delete-small:hover { background: var(--danger, #ef4444); color: white; transform: translateY(-2px); }
 
-/* ЧЕКБОКСЫ */
-.custom-checkbox { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-weight: 700; font-size: 0.85rem; }
-.custom-checkbox input { display: none; }
-.checkmark { width: 20px; height: 20px; background: transparent; border: 2px solid var(--border-color, #cbd5e1); border-radius: 6px; position: relative; transition: all 0.2s; }
-:global(.dark) .checkmark { border-color: #475569; }
-.custom-checkbox input:checked + .checkmark { background: var(--primary, #2563eb); border-color: var(--primary, #2563eb); }
-.custom-checkbox input:checked + .checkmark::after { content: '✓'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 12px; font-weight: bold; }
-
-/* ПАГИНАЦИЯ */
 .pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 40px; }
 .p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-size: 1.2rem; font-weight: 900; border: 1px solid var(--border-color, #e2e8f0); color: var(--text-main, #0f172a); }
 :global(.dark) .p-btn { color: #f8fafc; }
