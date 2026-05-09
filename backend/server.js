@@ -818,6 +818,25 @@ app.get('/api/admin/system/logs', verifyAdmin, (req, res) => {
     res.json(lines.map(l => JSON.parse(l)).reverse().slice(0, 100));
 });
 
+// Получение избранного с полными данными о пользователе и товаре
+app.get('/api/admin/wishlists', verifyAdmin, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('wishlists')
+            .select(`
+                id, user_id, product_id, added_at,
+                users!inner(first_name, last_name, email, phone_number, avatar_url),
+                products!inner(name, sku, images)
+            `)
+            .order('id', { ascending: false });
+
+        if (error) throw error;
+        res.json(data || []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/admin/:table', verifyAdmin, async (req, res) => {
     try {
         let query = supabase.from(req.params.table).select('*');
