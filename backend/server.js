@@ -276,28 +276,17 @@ app.get('/api/global-search', async (req, res) => {
 });
 
 // Публичный калькулятор доставки (без админки)
+// Публичный калькулятор доставки (до конкретного ПВЗ)
 app.post('/api/shipping-calculator', async (req, res) => {
-    const { city_id, weight_kg, items_cost } = req.body;
+    const { warehouse_id, weight_kg, items_cost } = req.body;
 
-    if (!city_id || !weight_kg) {
-        return res.status(400).json({ error: 'city_id и weight_kg обязательны' });
+    if (!warehouse_id || !weight_kg) {
+        return res.status(400).json({ error: 'warehouse_id и weight_kg обязательны' });
     }
 
     try {
-        // Центральный склад-отправитель (например, Москва, id=1)
+        // Центральный склад-отправитель (id=1 – Москва, при необходимости замените)
         const sourceWarehouseId = 1;
-
-        // Ищем склад в городе назначения
-        const { data: targetWarehouse, error: whError } = await supabase
-            .from('warehouses')
-            .select('id, cities!inner(lat, lon, name)')
-            .eq('city_id', city_id)
-            .limit(1)
-            .maybeSingle();
-
-        if (whError || !targetWarehouse) {
-            return res.status(404).json({ error: 'В выбранном городе нет ПВЗ' });
-        }
 
         // Координаты склада-отправителя
         const { data: sourceWh } = await supabase
@@ -310,6 +299,17 @@ app.post('/api/shipping-calculator', async (req, res) => {
             return res.status(500).json({ error: 'Не удалось получить координаты склада-отправителя' });
         }
 
+        // Координаты выбранного ПВЗ
+        const { data: targetWarehouse, error: whError } = await supabase
+            .from('warehouses')
+            .select('id, address, cities!inner(lat, lon, name)')
+            .eq('id', warehouse_id)
+            .maybeSingle();
+
+        if (whError || !targetWarehouse) {
+            return res.status(404).json({ error: 'Склад не найден' });
+        }
+
         const lat1 = sourceWh.cities.lat;
         const lon1 = sourceWh.cities.lon;
         const lat2 = targetWarehouse.cities.lat;
@@ -319,13 +319,13 @@ app.post('/api/shipping-calculator', async (req, res) => {
             return res.status(500).json({ error: 'Некорректные координаты складов' });
         }
 
-        // Расстояние
+        // Расстояние по гаверсинусам
         const { data: distanceData } = await supabase.rpc('haversine_distance', {
             lat1, lon1, lat2, lon2
         });
         const distanceKm = distanceData || 0;
 
-        // Тариф (такой же, как в calculate_order_shipping)
+        // Тариф (коэффициенты как в общей логике)
         const base = 200;
         let rate;
         if (weight_kg <= 5) rate = 0.35;
@@ -336,7 +336,7 @@ app.post('/api/shipping-calculator', async (req, res) => {
 
         let shipping = distanceKm * weight_kg * rate + base;
 
-        // Ограничение 30%
+        // Ограничение 30% от стоимости
         let maxShipping = null;
         if (items_cost > 0) {
             maxShipping = items_cost * 0.3;
@@ -345,6 +345,7 @@ app.post('/api/shipping-calculator', async (req, res) => {
 
         res.json({
             city: targetWarehouse.cities.name,
+            address: targetWarehouse.address,
             distance_km: Math.round(distanceKm),
             formula_details: {
                 base,

@@ -18,18 +18,27 @@
       </div>
     </section>
 
-    <!-- 2. КАЛЬКУЛЯТОР ДОСТАВКИ -->
+        <!-- 2. КАЛЬКУЛЯТОР ДОСТАВКИ -->
     <section class="calculator-section glass-card">
       <h2>🚚 Калькулятор доставки</h2>
-      <p class="calc-subtitle">Узнайте примерную стоимость доставки с центрального склада (Москва) в ваш город</p>
+      <p class="calc-subtitle">Узнайте примерную стоимость доставки с центрального склада (Москва) в выбранный пункт выдачи</p>
 
       <form @submit.prevent="calculateShipping" class="calc-form">
         <div class="calc-row">
           <div class="input-group">
             <label>🏙️ Город получения</label>
-            <select v-model="calcCityId" class="form-input" required>
+            <select v-model="calcCityId" class="form-input" @change="onCityChange">
               <option :value="null" disabled>-- Выберите город --</option>
               <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>📍 Пункт выдачи (ПВЗ)</label>
+            <select v-model="calcWarehouseId" class="form-input" :disabled="!calcCityId">
+              <option :value="null" disabled>-- Выберите ПВЗ --</option>
+              <option v-for="w in filteredWarehouses" :key="w.id" :value="w.id">
+                {{ w.address }} ({{ w.cities?.name || '' }})
+              </option>
             </select>
           </div>
           <div class="input-group">
@@ -41,7 +50,7 @@
             <input v-model.number="calcItemsCost" type="number" min="0" class="form-input" placeholder="Необязательно" />
           </div>
         </div>
-        <button type="submit" class="btn-primary" :disabled="calcLoading">
+        <button type="submit" class="btn-primary" :disabled="calcLoading || !calcWarehouseId">
           <span v-if="calcLoading" class="spinner-small"></span>
           <span v-else>Рассчитать стоимость</span>
         </button>
@@ -54,6 +63,10 @@
             <div class="r-item">
               <span class="r-label">Город</span>
               <strong>{{ calcResult.city }}</strong>
+            </div>
+            <div class="r-item">
+              <span class="r-label">Адрес ПВЗ</span>
+              <strong>{{ calcResult.address }}</strong>
             </div>
             <div class="r-item">
               <span class="r-label">Расстояние</span>
@@ -232,55 +245,10 @@ import { useAppStore } from '@/stores/appStore';
 
 const appStore = useAppStore();
 
+// ---------- СТАТИСТИКА ----------
 const loadingStats = ref(true);
 const stats = ref({ totalProducts: 0, totalBrands: 0, brandsList: [] });
-const currencyData = ref(null);
-const loadingCurrency = ref(true);
 
-// FAQ
-const faqs = ref([
-  { question: 'Что делать, если деталь мне не подошла?', answer: 'Мы понимаем, что подбор автозапчастей — сложный процесс. Если деталь не подошла к вашему авто, вы можете вернуть ее в любой из наших ПВЗ в течение 14 дней без объяснения причин. Средства вернутся на вашу карту.' },
-  { question: 'Как работает гарантия на запчасти?', answer: 'Мы предоставляем официальную гарантию от 6 до 24 месяцев (в зависимости от производителя). При выявлении заводского брака мы бесплатно обменяем деталь или вернем деньги.' },
-  { question: 'Как рассчитывается стоимость доставки из другого города?', answer: 'Если товара нет в вашем городе, стоимость доставки составит 800 рублей. Однако, если общий вес вашего заказа превышает 10 кг, система автоматически добавит по 50 рублей за каждый килограмм перевеса.' },
-  { question: 'Могу ли я оплатить заказ при получении?', answer: 'Да. При оформлении заказа выберите способ "Наличными" или "Картой в ПВЗ". Вы сможете осмотреть товар перед оплатой.' }
-]);
-const activeFaq = ref(null);
-const toggleFaq = (index) => { activeFaq.value = activeFaq.value === index ? null : index; };
-
-// Калькулятор
-const cities = ref([]);
-const calcCityId = ref(null);
-const calcWeight = ref(5);
-const calcItemsCost = ref(0);
-const calcLoading = ref(false);
-const calcResult = ref(null);
-
-const loadCities = async () => {
-  try {
-    const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/cities`);
-    cities.value = res.data || [];
-  } catch (e) { console.warn('Не удалось загрузить города'); }
-};
-
-const calculateShipping = async () => {
-  if (!calcCityId.value || !calcWeight.value) return;
-  calcLoading.value = true;
-  calcResult.value = null;
-  try {
-    const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/shipping-calculator`, {
-      city_id: calcCityId.value,
-      weight_kg: calcWeight.value,
-      items_cost: calcItemsCost.value || 0
-    });
-    calcResult.value = res.data;
-  } catch (e) {
-    alert('Ошибка расчёта: ' + (e.response?.data?.error || e.message));
-  } finally {
-    calcLoading.value = false;
-  }
-};
-
-// Остальные данные
 const loadAboutData = async () => {
   loadingStats.value = true;
   try {
@@ -290,12 +258,16 @@ const loadAboutData = async () => {
       totalBrands: res.data.totalBrands || 0,
       brandsList: res.data.brandsList || []
     };
-  } catch (e) { 
+  } catch (e) {
     console.error('Ошибка загрузки статистики из БД:', e.message);
   } finally {
     loadingStats.value = false;
   }
 };
+
+// ---------- ВАЛЮТНЫЙ РАДАР ----------
+const currencyData = ref(null);
+const loadingCurrency = ref(true);
 
 const fetchCurrency = async () => {
   loadingCurrency.value = true;
@@ -310,13 +282,80 @@ const fetchCurrency = async () => {
 };
 
 const priceIndex = computed(() => {
-    if (!currencyData.value) return { status: 'normal', icon: '🛡️', title: 'Ожидание данных', desc: 'Связь с ЦБ РФ...' };
-    const usd = Number(currencyData.value.usd);
-    if (usd > 105) return { status: 'danger', icon: '📈', title: 'Ожидается повышение', desc: 'В связи с высоким курсом закупки, новые партии деталей могут подорожать. Рекомендуем покупать из наличия.' };
-    if (usd < 85) return { status: 'success', icon: '📉', title: 'Благоприятный фон', desc: 'Курс валют снижается. Мы ожидаем падение цен на аналоги в ближайшие недели.' };
-    return { status: 'normal', icon: '🛡️', title: 'Цены заморожены', desc: 'Мы зафиксировали цены на складские остатки. Текущий курс не влияет на детали в наличии.' };
+  if (!currencyData.value) return { status: 'normal', icon: '🛡️', title: 'Ожидание данных', desc: 'Связь с ЦБ РФ...' };
+  const usd = Number(currencyData.value.usd);
+  if (usd > 105) return { status: 'danger', icon: '📈', title: 'Ожидается повышение', desc: 'В связи с высоким курсом закупки, новые партии деталей могут подорожать. Рекомендуем покупать из наличия.' };
+  if (usd < 85) return { status: 'success', icon: '📉', title: 'Благоприятный фон', desc: 'Курс валют снижается. Мы ожидаем падение цен на аналоги в ближайшие недели.' };
+  return { status: 'normal', icon: '🛡️', title: 'Цены заморожены', desc: 'Мы зафиксировали цены на складские остатки. Текущий курс не влияет на детали в наличии.' };
 });
 
+// ---------- FAQ ----------
+const faqs = ref([
+  { question: 'Что делать, если деталь мне не подошла?', answer: 'Мы понимаем, что подбор автозапчастей — сложный процесс. Если деталь не подошла к вашему авто, вы можете вернуть ее в любой из наших ПВЗ в течение 14 дней без объяснения причин. Средства вернутся на вашу карту.' },
+  { question: 'Как работает гарантия на запчасти?', answer: 'Мы предоставляем официальную гарантию от 6 до 24 месяцев (в зависимости от производителя). При выявлении заводского брака мы бесплатно обменяем деталь или вернем деньги.' },
+  { question: 'Как рассчитывается стоимость доставки из другого города?', answer: 'Если товара нет в вашем городе, стоимость доставки составит 800 рублей. Однако, если общий вес вашего заказа превышает 10 кг, система автоматически добавит по 50 рублей за каждый килограмм перевеса.' },
+  { question: 'Могу ли я оплатить заказ при получении?', answer: 'Да. При оформлении заказа выберите способ "Наличными" или "Картой в ПВЗ". Вы сможете осмотреть товар перед оплатой.' }
+]);
+const activeFaq = ref(null);
+const toggleFaq = (index) => { activeFaq.value = activeFaq.value === index ? null : index; };
+
+// ---------- КАЛЬКУЛЯТОР ДОСТАВКИ ----------
+const cities = ref([]);
+const warehouses = ref([]);
+const calcCityId = ref(null);
+const calcWarehouseId = ref(null);
+const calcWeight = ref(5);
+const calcItemsCost = ref(0);
+const calcLoading = ref(false);
+const calcResult = ref(null);
+
+// Загрузка городов
+const loadCities = async () => {
+  try {
+    const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/cities`);
+    cities.value = res.data || [];
+  } catch (e) { console.warn('Не удалось загрузить города'); }
+};
+
+// Загрузка всех складов (можно было бы фильтровать на сервере, но загрузим все для простоты)
+const loadWarehouses = async () => {
+  try {
+    const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/warehouses`);
+    warehouses.value = res.data || [];
+  } catch (e) { console.warn('Не удалось загрузить склады'); }
+};
+
+// Фильтрация складов по выбранному городу
+const filteredWarehouses = computed(() => {
+  if (!calcCityId.value) return [];
+  return warehouses.value.filter(w => w.city_id === calcCityId.value);
+});
+
+// При смене города сбрасываем выбранный склад
+const onCityChange = () => {
+  calcWarehouseId.value = null;
+};
+
+// Основная функция расчёта
+const calculateShipping = async () => {
+  if (!calcWarehouseId.value || !calcWeight.value) return;
+  calcLoading.value = true;
+  calcResult.value = null;
+  try {
+    const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/shipping-calculator`, {
+      warehouse_id: calcWarehouseId.value,
+      weight_kg: calcWeight.value,
+      items_cost: calcItemsCost.value || 0
+    });
+    calcResult.value = res.data;
+  } catch (e) {
+    alert('Ошибка расчёта: ' + (e.response?.data?.error || e.message));
+  } finally {
+    calcLoading.value = false;
+  }
+};
+
+// ---------- ЯНДЕКС-КАРТА ----------
 const initMap = () => {
   if (window.ymaps) {
     window.ymaps.ready(() => {
@@ -337,11 +376,13 @@ const initMap = () => {
   }
 };
 
+// ---------- ЖИЗНЕННЫЙ ЦИКЛ ----------
 onMounted(() => {
   loadAboutData();
   fetchCurrency();
   initMap();
   loadCities();
+  loadWarehouses();
 });
 </script>
 
