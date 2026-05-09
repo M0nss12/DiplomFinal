@@ -20,7 +20,7 @@
           
           <!-- ВЫБОР ГОРОДА -->
           <div class="input-group full-width-group">
-             <label>📍 Ваш Город (населенный пункт) *</label>
+             <label>📍 Ваш Город (населённый пункт) *</label>
              <div class="city-input-wrap">
                <input 
                  v-model="checkoutCity" 
@@ -39,7 +39,7 @@
             </div>
             <div class="input-group">
               <label>Телефон *</label>
-              <input v-model="form.phone" type="tel" placeholder="+7 (999) 000-00-00" required />
+              <input v-model="form.phone" type="tel" placeholder="+7 (999) 000-00-00" required @input="formatPhone" />
             </div>
             <div class="input-group">
               <label>Email *</label>
@@ -53,7 +53,7 @@
           <h3><span class="section-icon">📍</span> Пункт выдачи в г. {{ appStore.city }}</h3>
           
           <div v-if="localWarehouses.length > 0">
-            <select v-model="selectedWarehouseId" class="warehouse-select">
+            <select v-model="selectedWarehouseId" class="warehouse-select" @change="refreshShipping">
               <option :value="null">-- Выберите адрес --</option>
               <option v-for="w in localWarehouses" :key="w.id" :value="w.id">
                 {{ w.address }}
@@ -98,50 +98,43 @@
         <div class="summary-card glass-card">
           <h3>Ваш заказ</h3>
           <div class="summary-items">
-            <div v-for="item in cartStore.items" :key="item?.id" class="summary-item">
+            <div v-for="item in cartStore.items" :key="item.id" class="summary-item">
               <div class="item-info">
                 <span class="item-name">{{ item.name }}</span>
                 <small>{{ item.quantity }} шт. × {{ item.discount_price || item.price }} ₽</small>
               </div>
-              <span class="item-total-price">{{ (item.discount_price || item.price) * item.quantity }} ₽</span>
+              <span class="item-total-price">{{ ((item.discount_price || item.price) * item.quantity).toFixed(2) }} ₽</span>
             </div>
           </div>
 
           <div class="summary-totals">
             <div class="total-row">
               <span>Сумма товаров:</span>
-              <span>{{ cartStore.totalPriceFinal }} ₽</span>
+              <span>{{ cartTotalGoods }} ₽</span>
             </div>
 
-            <!-- ДЕТАЛИЗАЦИЯ ДОСТАВКИ -->
-            <div class="delivery-breakdown">
-              <div class="total-row delivery-title">
-                <span>Доставка:</span>
-                <span :class="{ free: shippingBreakdown.cost === 0 }">
-                  {{ shippingBreakdown.cost === 0 ? 'Бесплатно' : shippingBreakdown.cost + ' ₽' }}
-                </span>
-              </div>
+            <div class="total-row delivery-title">
+              <span>Доставка:</span>
+              <span v-if="!selectedWarehouseId">—</span>
+              <span v-else-if="loadingShipping" class="loading-text">Расчёт...</span>
+              <span v-else :class="{ free: shippingData.total === 0 }">
+                {{ shippingData.total === 0 ? 'Бесплатно' : shippingData.total + ' ₽' }}
+              </span>
+            </div>
 
-              <!-- Если есть Межгород -->
-              <div v-if="shippingBreakdown.intercityItems.length > 0" class="intercity-alert">
-                <div class="alert-title">📦 Межгород (доставка со складов других регионов):</div>
-                <ul class="intercity-list">
-                  <li v-for="i in shippingBreakdown.intercityItems" :key="i.id">
-                    {{ i.name }} — <b>{{ i.qty }} шт.</b>
-                  </li>
-                </ul>
-              </div>
-
-              <!-- Предупреждение о весе -->
-              <div v-if="shippingBreakdown.weightSurcharge > 0" class="weight-alert">
-                <span>⚖️ Общий вес межгорода: <b>{{ shippingBreakdown.intercityWeight.toFixed(1) }} кг</b></span>
-                <span class="surcharge">+{{ shippingBreakdown.weightSurcharge }} ₽ (перевес)</span>
-              </div>
+            <!-- Детали межгорода (опционально) -->
+            <div v-if="shippingData.details && shippingData.details.some(d => !d.in_stock)" class="intercity-alert">
+              <div class="alert-title">🚚 Часть товаров поедет межгородом</div>
+              <ul class="intercity-list">
+                <li v-for="d in shippingData.details.filter(x => !x.in_stock)" :key="d.product_id">
+                  {{ getProductName(d.product_id) }} — расстояние {{ d.distance_km }} км, {{ d.shipping_cost }} ₽
+                </li>
+              </ul>
             </div>
 
             <div class="final-price">
-              <span>Итого:</span>
-              <span class="price-val">{{ cartStore.totalPriceFinal + shippingBreakdown.cost }} ₽</span>
+              <span>Итого к оплате:</span>
+              <span class="price-val">{{ finalTotal }} ₽</span>
             </div>
           </div>
         </div>
@@ -151,7 +144,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { useCartStore } from '@/stores/cartStore';
@@ -162,6 +155,7 @@ const cartStore = useCartStore();
 const appStore = useAppStore();
 
 const loading = ref(false);
+const loadingShipping = ref(false);
 const warehouses = ref([]);
 const selectedWarehouseId = ref(null);
 
@@ -175,141 +169,146 @@ const paymentMethods = [
 
 const isSameCity = (c1, c2) => c1?.trim().toLowerCase() === c2?.trim().toLowerCase();
 
+// Обновление города в сторе и профиле пользователя
 const updateGlobalCity = async () => {
-    if (!checkoutCity.value.trim()) return;
-    
-    const newCity = checkoutCity.value.trim();
-    appStore.setCity(newCity);
-    
-    const uid = localStorage.getItem('user_id');
-    if (uid) {
-        try {
-            await axios.put(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${uid}`, { city: newCity });
-        } catch (e) { console.error("Ошибка сохранения города", e); }
-    }
-    selectedWarehouseId.value = null;
+  if (!checkoutCity.value.trim()) return;
+  const newCity = checkoutCity.value.trim();
+  appStore.setCity(newCity);
+  const uid = localStorage.getItem('user_id');
+  if (uid) {
+    try {
+      await axios.put(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${uid}`, { city: newCity });
+    } catch (e) { console.error("Ошибка сохранения города", e); }
+  }
+  selectedWarehouseId.value = null;
 };
 
-// Фильтрация ПВЗ по городу (Новая структура БД: warehouses.cities.name)
+// Фильтр ПВЗ в городе пользователя
 const localWarehouses = computed(() => {
-    return warehouses.value.filter(w => {
-        const wCity = w.cities?.name || w.city_name; // Поддержка обоих вариантов
-        return isSameCity(wCity, appStore.city) && w.is_pickup_point;
-    });
+  return warehouses.value.filter(w => {
+    const wCity = w.cities?.name || w.city_name;
+    return isSameCity(wCity, appStore.city) && w.is_pickup_point;
+  });
 });
 
-// --- ЛОГИКА ОСТАТКОВ (МЕЖГОРОД И ВЕС) ---
-const getStockInCity = (item) => {
-    if (!item?.product_stocks) return 0;
-    let totalInCity = 0;
-    
-    item.product_stocks.forEach(stockRecord => {
-        const wh = warehouses.value.find(hw => hw.id === stockRecord.warehouse_id);
-        const wCity = wh?.cities?.name || wh?.city_name;
-        if (wh && isSameCity(wCity, appStore.city)) {
-            totalInCity += Number(stockRecord.quantity) || 0;
-        }
+// Расчёт доставки через серверный RPC
+const shippingData = ref({ total: 0, details: [] });
+const refreshShipping = async () => {
+  if (!selectedWarehouseId.value || cartStore.items.length === 0) {
+    shippingData.value = { total: 0, details: [] };
+    return;
+  }
+  loadingShipping.value = true;
+  try {
+    const itemsForRequest = cartStore.items.map(i => ({
+      product_id: i.id,
+      quantity: i.quantity
+    }));
+    const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/public/shipping-estimate`, {
+      warehouse_id: selectedWarehouseId.value,
+      items: itemsForRequest
     });
-    return totalInCity;
+    shippingData.value = res.data;
+  } catch (e) {
+    console.error('Ошибка получения расчёта доставки:', e);
+    shippingData.value = { total: 0, details: [] };
+  } finally {
+    loadingShipping.value = false;
+  }
 };
 
-const shippingBreakdown = computed(() => {
-    if (!selectedWarehouseId.value) return { cost: 0, intercityItems: [], weightSurcharge: 0, intercityWeight: 0 };
-    // Если заказ больше 50к - доставка полностью бесплатная
-    if (cartStore.totalPriceFinal > 50000) return { cost: 0, intercityItems: [], weightSurcharge: 0, intercityWeight: 0 };
-    
-    let intercityItems = [];
-    let intercityTotalWeight = 0;
-    
-    cartStore.items.forEach(item => { 
-      const cityStock = getStockInCity(item);
-      const neededQty = item.quantity;
-      
-      if (neededQty > cityStock) {
-        const intercityQty = neededQty - cityStock;
-        intercityItems.push({ name: item.name, id: item.id, qty: intercityQty });
-        const itemWeight = Number(item.weight_kg) || 0;
-        intercityTotalWeight += (itemWeight * intercityQty);
-      }
-    });
-    
-    if (intercityItems.length === 0) {
-      return { cost: 0, intercityItems: [], weightSurcharge: 0, intercityWeight: 0 };
-    }
-
-    const baseCost = 800;
-    let weightSurcharge = 0;
-    const roundedWeight = Math.ceil(intercityTotalWeight);
-    
-    if (roundedWeight > 10) {
-        weightSurcharge = (roundedWeight - 10) * 50;
-    }
-    
-    return { 
-        cost: baseCost + weightSurcharge, 
-        intercityItems, 
-        weightSurcharge, 
-        intercityWeight: intercityTotalWeight
-    };
+// Общая стоимость товаров (без доставки)
+const cartTotalGoods = computed(() => {
+  return cartStore.items.reduce((sum, item) => {
+    return sum + (item.discount_price || item.price) * (item.quantity || 1);
+  }, 0).toFixed(2);
 });
 
+// Итоговая цена (товары + доставка)
+const finalTotal = computed(() => {
+  const goods = parseFloat(cartTotalGoods.value);
+  const shipping = shippingData.value.total || 0;
+  return (goods + shipping).toFixed(2);
+});
+
+// Получение названия товара по ID (для отображения деталей доставки)
+const getProductName = (id) => {
+  const item = cartStore.items.find(i => i.id === id);
+  return item ? item.name : 'Товар';
+};
+
+// Маска телефона
+const formatPhone = (event) => {
+  let value = event.target.value.replace(/[^\d]/g, '');
+  if (value.startsWith('7') || value.startsWith('8')) value = value.substring(1);
+  if (value.length === 0) {
+    form.value.phone = '';
+    return;
+  }
+  let formatted = '+7';
+  if (value.length > 0) formatted += ' (' + value.substring(0, 3);
+  if (value.length >= 4) formatted += ') ' + value.substring(3, 6);
+  if (value.length >= 7) formatted += '-' + value.substring(6, 8);
+  if (value.length >= 9) formatted += '-' + value.substring(8, 10);
+  form.value.phone = formatted;
+  event.target.value = formatted;
+};
+
+// Следим за изменением выбранного склада и состава корзины
+watch([selectedWarehouseId, () => cartStore.items.map(i => i.quantity).join(',')], () => {
+  refreshShipping();
+}, { immediate: true });
+
+// Загрузка складов и профиля
 onMounted(async () => {
-    checkoutCity.value = appStore.city;
-    const uid = localStorage.getItem('user_id');
-    
-    try {
-        const wRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/admin/warehouses`, { 
-            headers: {'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123'} 
-        });
-        warehouses.value = wRes.data;
+  checkoutCity.value = appStore.city;
+  const uid = localStorage.getItem('user_id');
+  
+  try {
+    const wRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/admin/warehouses`, { 
+      headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' } 
+    });
+    warehouses.value = wRes.data;
 
-        if (uid) {
-            const u = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${uid}`);
-            // Собираем имя из новой БД (first_name + last_name)
-            const firstName = u.data.first_name || '';
-            const lastName = u.data.last_name || '';
-            form.value.name = `${firstName} ${lastName}`.trim();
-            form.value.phone = u.data.phone_number || '';
-            form.value.email = u.data.email || '';
-        }
-    } catch (e) { console.error("Ошибка инициализации чекаута", e); }
+    if (uid) {
+      const u = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${uid}`);
+      form.value.name = [u.data.first_name, u.data.last_name].filter(Boolean).join(' ') || '';
+      form.value.phone = u.data.phone_number || '';
+      form.value.email = u.data.email || '';
+    }
+  } catch (e) { console.error("Ошибка инициализации чекаута", e); }
 });
 
+// Обработка оформления заказа
 const handleOrderProcess = async () => {
-    loading.value = true;
-    try {
-        // 1. Создаем заказ в БД (статус unpaid)
-        const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/orders`, {
-            ...form.value, 
-            customer_name: form.value.name, 
-            customer_phone: form.value.phone,
-            customer_email: form.value.email, 
-            customer_city: appStore.city,
-            warehouse_id: selectedWarehouseId.value,
-            delivery_type: 'pickup', // Согласно новой БД
-            payment_method: form.value.payment_method, // card или cash
-            shipping_cost: shippingBreakdown.value.cost, 
-            items: cartStore.items.map(i => ({ product_id: i.id, quantity: i.quantity }))
-        });
+  loading.value = true;
+  try {
+    const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/orders`, {
+      ...form.value, 
+      customer_name: form.value.name, 
+      customer_phone: form.value.phone,
+      customer_email: form.value.email, 
+      customer_city: appStore.city,
+      warehouse_id: selectedWarehouseId.value,
+      payment_method: form.value.payment_method,
+      shipping_cost: shippingData.value.total,
+      items: cartStore.items.map(i => ({ product_id: i.id, quantity: i.quantity }))
+    });
 
-        const orderId = res.data.orderId;
+    const orderId = res.data.orderId;
 
-        // 2. Логика оплаты
-        if (form.value.payment_method === 'card') {
-            // Тестовая инициализация оплаты
-            const payRes = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/payment/tinkoff-init`, { orderId });
-            // Сервер вернет ссылку на вебхук, который переведет статус в paid и вернет на фронт
-            cartStore.clearCart(); 
-            window.location.href = payRes.data.confirmation_url; 
-        } else {
-            // Оплата при получении
-            cartStore.clearCart();
-            router.push(`/order-success?orderId=${orderId}`);
-        }
-    } catch (e) { 
-        alert(e.response?.data?.error || "Ошибка при оформлении заказа"); 
-        loading.value = false;
-    } 
+    if (form.value.payment_method === 'card') {
+      const payRes = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/payment/tinkoff-init`, { orderId });
+      cartStore.clearCart(); 
+      window.location.href = payRes.data.confirmation_url; 
+    } else {
+      cartStore.clearCart();
+      router.push(`/order-success?orderId=${orderId}`);
+    }
+  } catch (e) { 
+    alert(e.response?.data?.error || "Ошибка при оформлении заказа"); 
+    loading.value = false;
+  } 
 };
 
 const cancelOrder = () => router.push('/cart');

@@ -870,6 +870,25 @@ app.post('/api/feedback/send', async (req, res) => {
     }
 });
 
+// Предварительный расчёт доставки (публичный, без verifyAdmin)
+app.post('/api/public/shipping-estimate', async (req, res) => {
+    const { warehouse_id, items } = req.body;  // items: [{ product_id, quantity }]
+    if (!warehouse_id || !items || !items.length) {
+        return res.status(400).json({ error: 'warehouse_id и items обязательны' });
+    }
+    try {
+        const { data, error } = await supabase.rpc('calculate_order_shipping', {
+            target_warehouse_id: warehouse_id,
+            items_json: items
+        });
+        if (error) throw error;
+        res.json(data);
+    } catch (e) {
+        console.error('Ошибка расчёта доставки:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // =====================================================================
 // API: АДМИНКА
 // =====================================================================

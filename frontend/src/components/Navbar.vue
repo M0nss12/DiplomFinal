@@ -1,30 +1,30 @@
 <template>
-  <nav class="main-navbar">
+  <nav class="main-navbar" aria-label="Основная навигация">
     <div class="nav-container">
       
-      <!-- ЛЕВАЯ ЧАСТЬ: ЛОГО, ГОРОД, МЕНЮ -->
+      <!-- ЛЕВАЯ ЧАСТЬ -->
       <div class="nav-section left-section">
-        <router-link to="/" class="logo">
+        <router-link to="/" class="logo" aria-label="Главная страница ApexDrive">
           <strong>ApexDrive</strong>
         </router-link>
         
         <div class="city-selector-container" ref="cityMenu">
-          <button @click="toggleCityDropdown" class="city-btn glass-btn">
+          <button @click="toggleCityDropdown" class="city-btn glass-btn" aria-haspopup="listbox" :aria-expanded="isCityDropdownOpen">
             <span class="city-icon">📍</span>
             <span class="city-name">{{ appStore.city || 'Выберите город' }}</span>
             <span class="dropdown-arrow" :class="{ rotate: isCityDropdownOpen }">▼</span>
           </button>
           
-          <transition name="fade">
-            <div v-if="isCityDropdownOpen" class="dropdown-menu city-menu glass-card">
+          <transition name="dropdown-fade">
+            <div v-if="isCityDropdownOpen" class="dropdown-menu city-menu glass-card" role="listbox">
               <div class="city-search">
-                <input v-model="citySearch" placeholder="Поиск города..." @keyup.enter="selectCustomCity" @click.stop />
+                <input v-model="citySearch" placeholder="Поиск города..." @keyup.enter="selectCustomCity" @click.stop aria-label="Поиск города" />
               </div>
               <div class="city-list">
-                <button v-if="citySearch && !exactMatch" @click="selectCustomCity" class="dropdown-item custom-option">
+                <button v-if="citySearch && !exactMatch" @click="selectCustomCity" class="dropdown-item custom-option" role="option">
                   ✨ Использовать: <b>"{{ citySearch }}"</b>
                 </button>
-                <button v-for="city in filteredCities" :key="city" @click="selectCity(city)" class="dropdown-item" :class="{ active: city === appStore.city }">
+                <button v-for="city in filteredCities" :key="city" @click="selectCity(city)" class="dropdown-item" :class="{ active: city === appStore.city }" role="option">
                   {{ city }}
                 </button>
               </div>
@@ -33,56 +33,48 @@
         </div>
 
         <div class="menu-links desktop-only">
-          <router-link to="/catalog">Каталог</router-link>
-          <router-link to="/about">О нас</router-link>
-          <router-link to="/contacts">Контакты</router-link>
+          <router-link to="/catalog" active-class="active-link">Каталог</router-link>
+          <router-link to="/about" active-class="active-link">О нас</router-link>
+          <router-link to="/contacts" active-class="active-link">Контакты</router-link>
         </div>
       </div>
 
-      <!-- ЦЕНТРАЛЬНАЯ ЧАСТЬ: УЛУЧШЕННЫЙ ПОИСК -->
+      <!-- ЦЕНТР: ПОИСК -->
       <div class="search-bar-container" ref="searchRef">
         <div class="search-input-wrapper glass-card" :class="{ 'is-focused': isSearchOpen }">
           <span v-if="!isSearching" class="search-icon">🔍</span>
           <span v-else class="search-icon loading-spinner">⏳</span>
-          
           <input 
             v-model="searchQuery" 
             type="text" 
             placeholder="Поиск деталей, категорий (от 2 букв)..." 
             @focus="isSearchOpen = true"
             @input="handleGlobalSearch"
+            aria-label="Поиск по сайту"
           />
-          <button v-if="searchQuery" @click="clearSearch" class="search-clear-btn">&times;</button>
+          <button v-if="searchQuery" @click="clearSearch" class="search-clear-btn" aria-label="Очистить поиск">&times;</button>
         </div>
 
-        <transition name="fade">
+        <transition name="dropdown-fade">
           <div v-if="isSearchOpen && searchQuery.length >= 2" class="search-dropdown glass-card">
-            
             <div v-if="isSearching" class="s-none">Ищем лучшие совпадения...</div>
-            
             <template v-else>
-              <!-- Разделы сайта -->
               <div v-if="filteredPages.length" class="s-group">
                 <div class="s-label">Разделы сайта</div>
                 <router-link v-for="p in filteredPages" :key="p.path" :to="p.path" class="s-item" @click="closeSearch">
                   <span class="s-icon">{{ p.icon }}</span> {{ p.name }}
                 </router-link>
               </div>
-
-              <!-- Категории -->
               <div v-if="searchResults.categories.length" class="s-group">
                 <div class="s-label">Категории</div>
                 <router-link v-for="c in searchResults.categories" :key="c.id" :to="`/category/${c.id}`" class="s-item" @click="closeSearch">
                   <span class="s-icon">📂</span> {{ c.name }}
                 </router-link>
               </div>
-
-              <!-- Товары -->
               <div v-if="searchResults.products.length" class="s-group">
                 <div class="s-label">Товары</div>
                 <router-link v-for="prod in searchResults.products" :key="prod.id" :to="`/product/${prod.id}`" class="s-item prod-flex" @click="closeSearch">
-                  <!-- Берем первую картинку из массива новой БД -->
-                  <img :src="prod.images && prod.images[0] ? prod.images[0] : '/assets/images/no-image.png'" class="s-img" />
+                  <img :src="prod.images?.[0] || '/assets/images/no-image.png'" class="s-img" />
                   <div class="s-info">
                     <div class="s-name">{{ prod.name }}</div>
                     <div class="s-meta">
@@ -92,7 +84,6 @@
                   </div>
                 </router-link>
               </div>
-
               <div v-if="noResults" class="s-none">Ничего не найдено по запросу "{{ searchQuery }}"</div>
             </template>
           </div>
@@ -102,7 +93,7 @@
       <!-- ПРАВАЯ ЧАСТЬ -->
       <div class="nav-section right-section">
         
-        <!-- ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ (Интегрирован с appStore) -->
+        <!-- ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ -->
         <label class="theme-switch" title="Сменить тему">
           <input type="checkbox" :checked="appStore.theme === 'dark'" @change="appStore.toggleTheme" />
           <span class="slider">
@@ -111,14 +102,16 @@
           </span>
         </label>
 
-        <!-- УВЕДОМЛЕНИЯ (НОВОЕ) -->
+        <!-- УВЕДОМЛЕНИЯ -->
         <div v-if="userId" class="nav-icon-container" ref="notifMenu">
-          <div class="icon-with-badge" @click="toggleNotifDropdown">
+          <div class="icon-with-badge" @click="toggleNotifDropdown" aria-label="Уведомления" role="button">
             <span class="nav-icon-btn">🔔</span>
-            <span v-if="unreadNotifsCount > 0" class="badge notif-badge">{{ unreadNotifsCount }}</span>
+            <transition name="badge-pop">
+              <span v-if="unreadNotifsCount > 0" class="badge notif-badge">{{ unreadNotifsCount }}</span>
+            </transition>
           </div>
           
-          <transition name="fade">
+          <transition name="dropdown-fade">
             <div v-if="isNotifDropdownOpen" class="dropdown-menu notif-menu glass-card">
               <div class="notif-header">
                 <b>Уведомления</b>
@@ -137,7 +130,7 @@
                   <div class="notif-time">{{ new Date(n.created_at).toLocaleDateString() }}</div>
                 </div>
               </div>
-              <router-link to="/profile?tab=notifications" class="notif-footer" @click="isNotifDropdownOpen = false">
+              <router-link to="/notifications" class="notif-footer" @click="isNotifDropdownOpen = false">
                 Все уведомления →
               </router-link>
             </div>
@@ -145,30 +138,31 @@
         </div>
 
         <!-- ИЗБРАННОЕ -->
-        <router-link to="/wishlist" class="nav-icon-link wishlist-link" title="Избранное">
+        <router-link to="/wishlist" class="nav-icon-link" title="Избранное" aria-label="Избранное">
           <div class="icon-with-badge">
             <span class="heart-icon">❤️</span>
-            <span v-if="wishlistCount > 0" class="badge wishlist-badge">{{ wishlistCount }}</span>
+            <transition name="badge-pop">
+              <span v-if="wishlistCount > 0" class="badge wishlist-badge">{{ wishlistCount }}</span>
+            </transition>
           </div>
         </router-link>
 
         <div class="divider desktop-only"></div>
 
-        <!-- ПРОФИЛЬ / АВТОРИЗАЦИЯ -->
+        <!-- АВТОРИЗАЦИЯ -->
         <div v-if="!userId" class="auth-links desktop-only">
           <router-link to="/login" class="auth-link">Войти</router-link>
           <router-link to="/register" class="auth-link reg-btn">Регистрация</router-link>
         </div>
 
         <div v-else class="user-profile-container" ref="profileMenu">
-          <div class="profile-trigger" @click="toggleProfileDropdown">
-            <!-- Дефолтная аватарка из новой БД -->
-            <img :src="userAvatar || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png'" class="nav-avatar" />
+          <div class="profile-trigger" @click="toggleProfileDropdown" aria-haspopup="true" :aria-expanded="isProfileDropdownOpen">
+            <img :src="userAvatar || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png'" class="nav-avatar" alt="Аватар" />
             <span class="user-display-name desktop-only">{{ userName || 'Профиль' }}</span>
             <span class="dropdown-arrow desktop-only" :class="{ rotate: isProfileDropdownOpen }">▼</span>
           </div>
           
-          <transition name="fade">
+          <transition name="dropdown-fade">
             <div v-if="isProfileDropdownOpen" class="dropdown-menu profile-menu glass-card">
               <router-link v-if="userRole === 'admin'" to="/admin" class="dropdown-item admin-item" @click="isProfileDropdownOpen = false">
                 <span class="menu-icon">🛡️</span> <b>Админ-панель</b>
@@ -186,12 +180,14 @@
         </div>
 
         <!-- КОРЗИНА -->
-        <div class="cart-card" @click="router.push('/cart')">
+        <div class="cart-card" @click="router.push('/cart')" aria-label="Корзина">
           <div class="cart-icon-wrapper">
             <svg xmlns="http://www.w3.org/2000/svg" height="22" width="22" viewBox="0 0 576 512">
               <path fill="currentColor" d="M0 24C0 10.7 10.7 0 24 0H69.5c22 0 41.5 12.8 50.6 32h411c26.3 0 45.5 25 38.6 50.4l-41 152.3c-8.5 31.4-37 53.3-69.5 53.3H170.7l5.4 28.5c2.2 11.3 12.1 19.5 23.6 19.5H488c13.3 0 24 10.7 24 24s-10.7 24-24 24H199.7c-34.6 0-64.3-24.6-70.7-58.5L77.4 54.5c-.7-3.8-4-6.5-7.9-6.5H24C10.7 48 0 37.3 0 24zM128 464a48 48 0 1 1 96 0 48 48 0 1 1 -96 0zm336-48a48 48 0 1 1 0 96 48 48 0 1 1 0-96z"/>
             </svg>
-            <span v-if="cartItemsCount > 0" class="badge cart-badge">{{ cartItemsCount }}</span>
+            <transition name="badge-pop">
+              <span v-if="cartItemsCount > 0" class="badge cart-badge">{{ cartItemsCount }}</span>
+            </transition>
           </div>
           <div class="cart-info desktop-only">
             <div class="cart-title">Корзина</div>
@@ -217,7 +213,7 @@ const appStore = useAppStore();
 
 // Настройка заголовков axios
 const storedId = localStorage.getItem('user_id');
-const storedName = localStorage.getItem('user_first_name') || localStorage.getItem('user_name'); // Поддержка нового поля
+const storedName = localStorage.getItem('user_first_name') || localStorage.getItem('user_name');
 const storedRole = localStorage.getItem('role');
 
 if (storedId) axios.defaults.headers.common['x-user-id'] = storedId;
@@ -231,9 +227,10 @@ const userRole = ref(storedRole || '');
 
 // --- СЧЁТЧИКИ ---
 const wishlistCount = ref(0);
+
 const cartItemsCount = computed(() => {
-  if (!cartStore.items?.length) return 0;
-  return cartStore.items.reduce((total, item) => total + (item.quantity || 1), 0);
+  const items = cartStore.items;
+  return Array.isArray(items) ? items.reduce((total, item) => total + (item.quantity || 1), 0) : 0;
 });
 
 // --- ИЗБРАННОЕ ---
@@ -246,7 +243,7 @@ const loadWishlistCount = async () => {
   }
 };
 
-// --- УВЕДОМЛЕНИЯ (НОВОЕ) ---
+// --- УВЕДОМЛЕНИЯ ---
 const notifications = ref([]);
 const isNotifDropdownOpen = ref(false);
 const notifMenu = ref(null);
@@ -257,7 +254,7 @@ const loadNotifications = async () => {
   if (!userId.value) return;
   try {
     const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/notifications/${userId.value}`);
-    notifications.value = res.data.slice(0, 5); // Показываем последние 5 в дропдауне
+    notifications.value = res.data.slice(0, 5);
   } catch (e) { console.error("Ошибка загрузки уведомлений"); }
 };
 
@@ -280,7 +277,7 @@ const markAllAsRead = async () => {
   notifications.value.forEach(n => markAsRead(n));
 };
 
-// --- УМНЫЙ ПОИСК (УЛУЧШЕН) ---
+// --- УМНЫЙ ПОИСК ---
 const searchQuery = ref('');
 const isSearchOpen = ref(false);
 const isSearching = ref(false);
@@ -319,7 +316,7 @@ const handleGlobalSearch = () => {
     } finally {
       isSearching.value = false;
     }
-  }, 400); // Чуть увеличили debounce для плавности
+  }, 400);
 };
 
 const clearSearch = () => { 
@@ -329,7 +326,7 @@ const clearSearch = () => {
 };
 const closeSearch = () => isSearchOpen.value = false;
 
-// --- ГОРОДА (АДАПТИРОВАНО ПОД APPSTORE) ---
+// --- ГОРОДА ---
 const isCityDropdownOpen = ref(false);
 const cityMenu = ref(null);
 const availableCities = ref([]);
@@ -337,11 +334,9 @@ const citySearch = ref('');
 
 const loadCities = async () => {
   try {
-    // В новой БД города забираем из warehouses(cities)
     const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/admin/warehouses`, { 
       headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' } 
     });
-    // Извлекаем названия городов (связь cities(name))
     const citiesNames = res.data.map(w => w.cities?.name).filter(Boolean);
     availableCities.value = Array.from(new Set(citiesNames)).sort();
   } catch (e) { 
@@ -350,7 +345,7 @@ const loadCities = async () => {
 };
 
 const selectCity = async (city) => {
-  await appStore.setCity(city); // Внутри appStore уже есть axios.put в БД!
+  await appStore.setCity(city);
   isCityDropdownOpen.value = false;
   citySearch.value = '';
 };
@@ -390,7 +385,6 @@ const handleClickOutside = (event) => {
   if (searchRef.value && !searchRef.value.contains(event.target)) isSearchOpen.value = false;
 };
 
-// --- ВЫХОД ---
 const handleLogout = () => {
   if (confirm('Выйти из системы?')) {
     localStorage.clear();
@@ -400,15 +394,12 @@ const handleLogout = () => {
 };
 
 onMounted(() => {
-  // Тема теперь инициализируется в appStore.initTheme() (вызывается в App.vue)
   loadCities();
   loadWishlistCount();
   loadNotifications();
   
   window.addEventListener('wishlist-updated', loadWishlistCount);
   window.addEventListener('click', handleClickOutside);
-  
-  // Каждые 30 секунд проверяем новые уведомления
   setInterval(loadNotifications, 30000);
 });
 
@@ -420,7 +411,7 @@ onUnmounted(() => {
 
 <style scoped>
 /* ==========================================================================
-   ГЛАВНАЯ НАВИГАЦИЯ – СТИЛЬ В ЕДИНОЙ СТЕКЛЯННОЙ ЭСТЕТИКЕ
+   ГЛАВНАЯ НАВИГАЦИЯ – УЛУЧШЕННАЯ ВЕРСИЯ
    ========================================================================== */
 
 .main-navbar {
@@ -436,7 +427,6 @@ onUnmounted(() => {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
-/* Поддержка темной темы (через класс .dark на body/html) */
 :global(.dark) .main-navbar {
   background: rgba(15, 23, 42, 0.9);
   border-bottom-color: #1e293b;
@@ -513,9 +503,9 @@ onUnmounted(() => {
   background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
   transition: width 0.3s ease; border-radius: 3px;
 }
-.menu-links a:hover::after, .menu-links a.router-link-active::after { width: 100%; }
-.menu-links a:hover { color: var(--text-main, #0f172a); }
-:global(.dark) .menu-links a:hover { color: #fff; }
+.menu-links a:hover::after, .menu-links a.active-link::after { width: 100%; }
+.menu-links a:hover, .menu-links a.active-link { color: var(--text-main, #0f172a); }
+:global(.dark) .menu-links a:hover, :global(.dark) .menu-links a.active-link { color: #fff; }
 
 /* ПОИСК */
 .search-bar-container { flex: 1; max-width: 500px; position: relative; }
@@ -596,10 +586,25 @@ onUnmounted(() => {
   position: absolute; top: -4px; right: -6px;
   color: white; font-size: 0.65rem; font-weight: 800; padding: 2px 5px;
   border-radius: 20px; border: 2px solid var(--bg-card, #fff); min-width: 18px; text-align: center;
+  line-height: 1.2;
 }
 :global(.dark) .badge { border-color: #0f172a; }
 .notif-badge { background: var(--primary, #2563eb); }
 .wishlist-badge { background: #ef4444; }
+.cart-badge { background: var(--success, #10b981); }
+
+/* Анимация появления бейджа */
+.badge-pop-enter-active { animation: pop-in 0.3s ease-out; }
+.badge-pop-leave-active { animation: pop-out 0.2s ease-in; }
+@keyframes pop-in {
+  0% { transform: scale(0); opacity: 0; }
+  80% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes pop-out {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0); opacity: 0; }
+}
 
 /* ДРОПДАУН УВЕДОМЛЕНИЙ */
 .notif-menu { width: 320px; right: -60px; padding: 0; overflow: hidden; }
@@ -672,9 +677,9 @@ onUnmounted(() => {
 .cart-total { font-size: 0.95rem; font-weight: 800; color: var(--text-main, #0f172a); }
 :global(.dark) .cart-total { color: #f8fafc; }
 
-/* АНИМАЦИИ */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-10px); }
+/* АНИМАЦИИ ДРОПДАУНОВ */
+.dropdown-fade-enter-active, .dropdown-fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.dropdown-fade-enter-from, .dropdown-fade-leave-to { opacity: 0; transform: translateY(-10px); }
 
 /* АДАПТИВНОСТЬ */
 @media (max-width: 1100px) {

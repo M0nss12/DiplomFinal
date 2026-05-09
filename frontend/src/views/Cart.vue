@@ -16,17 +16,17 @@
               <th class="col-action"></th>
             </tr>
           </thead>
-          <tbody>
+          <transition-group name="row" tag="tbody">
             <tr v-for="item in cartStore.items" :key="item.id">
               <td class="col-product">
                 <div class="product-info">
                   <div class="img-wrap">
-                    <!-- Адаптировано: используем item.image вместо item.image_url -->
-                    <img :src="item.image || '/assets/images/no-image.png'" :alt="item.name" loading="lazy" />
+                    <img :src="getImageUrl(item)" :alt="item.name" loading="lazy" />
                   </div>
                   <div>
                     <strong class="product-name">{{ item.name }}</strong>
                     <small class="product-sku">Арт: {{ item.sku }}</small>
+                    <div class="weight-hint">⚖️ {{ (item.weight_kg || 0) * (item.quantity || 1) }} кг</div>
                   </div>
                 </div>
               </td>
@@ -44,24 +44,27 @@
 
               <td class="col-qty">
                 <div class="qty-control">
-                  <button @click="cartStore.updateQuantity(item.id, -1)" class="qty-btn" aria-label="Уменьшить">-</button>
+                  <button @click="updateQuantity(item, -1)" class="qty-btn" aria-label="Уменьшить">-</button>
                   <span class="qty-value">{{ item.quantity }}</span>
-                  <button @click="cartStore.updateQuantity(item.id, 1)" class="qty-btn" aria-label="Увеличить">+</button>
+                  <button @click="updateQuantity(item, 1)" class="qty-btn" aria-label="Увеличить">+</button>
                 </div>
-                <div class="stock-info" :class="{ 'local': getSourcingInfo(item).includes(appStore.city) }">
-                   {{ getSourcingInfo(item) }}
+                <div class="stock-info" :class="{ 'local': isLocalAvailable(item) }">
+                   {{ isLocalAvailable(item) ? '✅ В городе (' + appStore.city + ')' : '🚚 Межгород' }}
+                </div>
+                <div v-if="item.stock_quantity != null" class="max-hint">
+                  Доступно: {{ item.stock_quantity }} шт.
                 </div>
               </td>
 
               <td class="col-total">
-                <strong class="total-price">{{ (item.discount_price || item.price) * item.quantity }} ₽</strong>
+                <strong class="total-price">{{ lineTotal(item) }} ₽</strong>
               </td>
 
               <td class="col-action">
                 <button @click="cartStore.removeFromCart(item.id)" class="remove-btn" title="Удалить">&times;</button>
               </td>
             </tr>
-          </tbody>
+          </transition-group>
         </table>
       </div>
 
@@ -72,30 +75,32 @@
           <div class="summary-list">
             <div v-for="item in cartStore.items" :key="item.id" class="summary-item">
                <span class="s-name">{{ item.name }} <span class="s-qty">x{{ item.quantity }}</span></span>
-               <span class="s-price">{{ (item.discount_price || item.price) * item.quantity }} ₽</span>
+               <span class="s-price">{{ lineTotal(item) }} ₽</span>
             </div>
           </div>
           <div class="total-weight">
-            Общий вес: <b>{{ cartStore.totalWeight }} кг</b>
+            Общий вес: <b>{{ totalWeight }} кг</b>
           </div>
         </div>
 
         <div class="summary-total">
           <div class="price-row">
-            <span>Товары:</span> 
-            <strong>{{ cartStore.totalPriceOriginal }} ₽</strong>
+            <span>Товары (без скидки):</span> 
+            <strong>{{ totalOriginal }} ₽</strong>
           </div>
 
-          <div v-if="cartStore.totalDiscount > 0" class="price-row discount-row">
-            <span>Скидка:</span>
-            <strong>- {{ cartStore.totalDiscount }} ₽</strong>
-          </div>
+          <transition name="discount-fade">
+            <div v-if="totalDiscount > 0" class="price-row discount-row">
+              <span>Скидка:</span>
+              <strong>- {{ totalDiscount }} ₽</strong>
+            </div>
+          </transition>
 
           <hr class="divider" />
 
           <div class="final-total">
-             <span>Итого:</span>
-             <h1 class="total-h1">{{ cartStore.totalPriceFinal }} ₽</h1>
+             <span>Итого к оплате:</span>
+             <h1 class="total-h1">{{ totalFinal }} ₽</h1>
           </div>
           
           <div class="summary-actions">
@@ -124,33 +129,82 @@ import { useAppStore } from '@/stores/appStore';
 const cartStore = useCartStore();
 const appStore = useAppStore();
 
+// Получение картинки
+const getImageUrl = (item) => {
+  if (item.images && Array.isArray(item.images) && item.images.length > 0) {
+    return item.images[0];
+  }
+  if (item.image) return item.image;
+  return '/assets/images/no-image.png';
+};
+
+// Процент скидки
 const calculatePercent = (item) => {
-    if (!item.discount_price) return 0;
-    return Math.round(((item.price - item.discount_price) / item.price) * 100);
+  if (!item.discount_price) return 0;
+  return Math.round(((item.price - item.discount_price) / item.price) * 100);
 };
 
-const isSameCity = (city1, city2) => {
-    if (!city1 || !city2) return false;
-    return city1.trim().toLowerCase() === city2.trim().toLowerCase();
+// Стоимость конкретной строки
+const lineTotal = (item) => {
+  return ((item.discount_price || item.price) * (item.quantity || 1)).toFixed(2);
 };
 
-const getSourcingInfo = (item) => {
-    if (!item || !item.product_stocks) return "Наличие уточняется";
-    
-    // В новой БД связь идет: warehouses.cities.name, но мы оставили алиас city_name в старом варианте, 
-    // поэтому проверяем и так, и так для надежности.
-    const localStock = item.product_stocks
-        .filter(s => {
-            const wCity = s.warehouses?.cities?.name || s.warehouses?.city_name;
-            return isSameCity(wCity, appStore.city);
-        })
-        .reduce((sum, s) => sum + s.quantity, 0);
+// Полная стоимость без скидки (по обычной цене)
+const totalOriginal = computed(() => {
+  return cartStore.items.reduce((sum, item) => {
+    return sum + (item.price || 0) * (item.quantity || 1);
+  }, 0).toFixed(2);
+});
 
-    if (localStock >= item.quantity) {
-        return `В г. ${appStore.city}`;
-    } else {
-        return "Межгород";
+// Общая сумма скидки
+const totalDiscount = computed(() => {
+  return cartStore.items.reduce((sum, item) => {
+    if (item.discount_price && item.price > item.discount_price) {
+      return sum + (item.price - item.discount_price) * (item.quantity || 1);
     }
+    return sum;
+  }, 0).toFixed(2);
+});
+
+// Итоговая цена (со скидкой)
+const totalFinal = computed(() => {
+  return cartStore.items.reduce((sum, item) => {
+    return sum + (item.discount_price || item.price) * (item.quantity || 1);
+  }, 0).toFixed(2);
+});
+
+// Общий вес
+const totalWeight = computed(() => {
+  return cartStore.items.reduce((sum, item) => {
+    return sum + (item.weight_kg || 0) * (item.quantity || 1);
+  }, 0).toFixed(1);
+});
+
+// Проверка локации
+const isSameCity = (city1, city2) => {
+  if (!city1 || !city2) return false;
+  return city1.trim().toLowerCase() === city2.trim().toLowerCase();
+};
+
+const isLocalAvailable = (item) => {
+  if (!item.product_stocks || !appStore.city) return false;
+  return item.product_stocks.some(s => {
+    const wCity = s.warehouses?.cities?.name || s.warehouses?.city_name;
+    return isSameCity(wCity, appStore.city);
+  });
+};
+
+// Контроль изменения количества
+const updateQuantity = (item, delta) => {
+  const currentQty = item.quantity || 1;
+  const newQty = currentQty + delta;
+  if (newQty < 1) return;
+
+  if (delta > 0 && item.stock_quantity != null && newQty > item.stock_quantity) {
+    alert(`Нельзя добавить больше ${item.stock_quantity} шт. (столько всего в наличии).`);
+    return;
+  }
+  cartStore.updateQuantity(item.id, delta);
 };
 </script>
 
@@ -221,6 +275,13 @@ h1 {
 :global(.dark) .cart-table td { border-color: #334155; }
 .cart-table tr:last-child td { border-bottom: none; }
 
+/* Анимация удаления */
+.row-leave-active {
+  transition: all 0.3s ease;
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
 /* Колонки */
 .col-product { width: 45%; }
 .col-price, .col-qty, .col-total { width: 15%; text-align: center; }
@@ -239,6 +300,7 @@ h1 {
 .product-name { font-size: 1rem; color: var(--text-main, #0f172a); display: block; line-height: 1.3; margin-bottom: 5px; }
 :global(.dark) .product-name { color: #f8fafc; }
 .product-sku { color: var(--text-muted, #64748b); font-size: 0.85rem; }
+.weight-hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
 
 /* Цена */
 .price-discount { display: flex; flex-direction: column; align-items: center; }
@@ -270,6 +332,7 @@ h1 {
 
 .stock-info { margin-top: 8px; font-size: 0.75rem; color: #f59e0b; font-weight: 600; }
 .stock-info.local { color: var(--success, #10b981); }
+.max-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; }
 
 /* Итого в строке */
 .total-price { font-size: 1.2rem; font-weight: 700; color: var(--text-main, #0f172a); }
@@ -303,6 +366,16 @@ h1 {
 .price-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.1rem; color: var(--text-main, #0f172a); }
 :global(.dark) .price-row { color: #f8fafc; }
 .discount-row { color: var(--danger, #ef4444); }
+
+/* Анимация появления/исчезновения скидки */
+.discount-fade-enter-active, .discount-fade-leave-active {
+  transition: all 0.3s ease;
+}
+.discount-fade-enter-from, .discount-fade-leave-to {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+}
 
 .divider { border: none; border-top: 1px solid var(--border-color, #cbd5e1); margin: 15px 0; }
 :global(.dark) .divider { border-color: #475569; }
@@ -348,7 +421,6 @@ h1 {
 }
 
 @media (max-width: 768px) {
-  /* Мобильная таблица (превращение в карточки) */
   .cart-table thead { display: none; }
   .cart-table tbody tr {
     display: flex; flex-direction: column; border: 1px solid var(--border-color, #e2e8f0);
@@ -363,7 +435,6 @@ h1 {
 
   .col-price, .col-qty, .col-total { display: flex; justify-content: space-between; align-items: center; }
 
-  /* Добавляем заголовки для мобильной версии через CSS */
   .col-price::before { content: 'Цена:'; color: var(--text-muted, #64748b); font-size: 0.85rem; font-weight: 600; }
   .col-qty::before { content: 'Количество:'; color: var(--text-muted, #64748b); font-size: 0.85rem; font-weight: 600; }
   .col-total::before { content: 'Итого:'; color: var(--text-muted, #64748b); font-size: 0.85rem; font-weight: 600; }
