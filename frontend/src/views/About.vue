@@ -18,7 +18,66 @@
       </div>
     </section>
 
-    <!-- 2. СТАТИСТИКА ПЛАТФОРМЫ (Реальные данные) -->
+    <!-- 2. КАЛЬКУЛЯТОР ДОСТАВКИ -->
+    <section class="calculator-section glass-card">
+      <h2>🚚 Калькулятор доставки</h2>
+      <p class="calc-subtitle">Узнайте примерную стоимость доставки с центрального склада (Москва) в ваш город</p>
+
+      <form @submit.prevent="calculateShipping" class="calc-form">
+        <div class="calc-row">
+          <div class="input-group">
+            <label>🏙️ Город получения</label>
+            <select v-model="calcCityId" class="form-input" required>
+              <option :value="null" disabled>-- Выберите город --</option>
+              <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>⚖️ Вес заказа (кг)</label>
+            <input v-model.number="calcWeight" type="number" step="0.1" min="0.1" class="form-input" required placeholder="Например, 4.5" />
+          </div>
+          <div class="input-group">
+            <label>💰 Стоимость товаров (₽, для ограничения 30%)</label>
+            <input v-model.number="calcItemsCost" type="number" min="0" class="form-input" placeholder="Необязательно" />
+          </div>
+        </div>
+        <button type="submit" class="btn-primary" :disabled="calcLoading">
+          <span v-if="calcLoading" class="spinner-small"></span>
+          <span v-else>Рассчитать стоимость</span>
+        </button>
+      </form>
+
+      <transition name="fade">
+        <div v-if="calcResult" class="calc-result glass-card">
+          <h3>📊 Результат расчёта</h3>
+          <div class="result-grid">
+            <div class="r-item">
+              <span class="r-label">Город</span>
+              <strong>{{ calcResult.city }}</strong>
+            </div>
+            <div class="r-item">
+              <span class="r-label">Расстояние</span>
+              <strong>{{ calcResult.distance_km }} км</strong>
+            </div>
+            <div class="r-item">
+              <span class="r-label">Тариф</span>
+              <strong>{{ calcResult.formula_details.weight_kg }} кг × {{ calcResult.formula_details.distance_km }} км × {{ calcResult.formula_details.rate }} + {{ calcResult.formula_details.base }}₽</strong>
+            </div>
+            <div class="r-item" v-if="calcResult.max_shipping !== null">
+              <span class="r-label">Ограничение (30%)</span>
+              <strong>{{ calcResult.max_shipping }} ₽</strong>
+            </div>
+            <div class="r-item total">
+              <span class="r-label">Итого к оплате</span>
+              <strong class="total-price">{{ calcResult.total_shipping }} ₽</strong>
+            </div>
+          </div>
+          <p class="calc-note">* Бесплатная доставка внутри города (если товар есть на локальном складе). Тариф применяется при межгороде.</p>
+        </div>
+      </transition>
+    </section>
+
+    <!-- 3. СТАТИСТИКА ПЛАТФОРМЫ -->
     <section class="stats-section">
       <div class="stat-card glass-card">
         <div class="stat-value">12+</div>
@@ -42,7 +101,7 @@
       </div>
     </section>
 
-    <!-- 3. УМНАЯ ЛОГИСТИКА -->
+    <!-- 4. УМНАЯ ЛОГИСТИКА -->
     <section class="logistics-section glass-card">
       <div class="logistics-info">
         <h2>📦 Умная логистика ApexDrive</h2>
@@ -61,7 +120,7 @@
             <span class="logistics-icon">🚚</span>
             <div>
               <strong>Межгород (до ПВЗ)</strong>
-              <p>Если товара нет в вашем регионе, мы привезем его с центрального хаба по фиксированному тарифу (800 ₽).</p>
+              <p>Если товара нет в вашем регионе, мы привезем его с ближайшего хаба. Стоимость рассчитывается по прозрачной формуле: <b>расстояние (км) × вес (кг) × коэффициент + базовая ставка</b>.</p>
             </div>
           </div>
           
@@ -69,7 +128,7 @@
             <span class="logistics-icon">⚖️</span>
             <div>
               <strong>Тяжёлые грузы</strong>
-              <p>При весе заказа более 10 кг добавляется символическая плата: 50 ₽ за каждый килограмм перевеса.</p>
+              <p>Чем тяжелее заказ, тем ниже коэффициент за килограмм‑километр. Мы не берём заоблачных сумм за крупногабарит.</p>
             </div>
           </div>
         </div>
@@ -81,7 +140,7 @@
       </div>
     </section>
 
-    <!-- 4. ИНТЕГРАЦИЯ API: ФИНАНСОВЫЙ РАДАР -->
+    <!-- 5. ИНТЕГРАЦИЯ API: ФИНАНСОВЫЙ РАДАР -->
     <section class="currency-radar-section glass-card">
       <div class="currency-content">
         <h2>Финансовый радар закупок</h2>
@@ -121,7 +180,7 @@
       </div>
     </section>
 
-    <!-- 5. НАШИ ПАРТНЕРЫ (Реальные данные) -->
+    <!-- 6. НАШИ ПАРТНЕРЫ (Реальные данные) -->
     <section v-if="stats.brandsList && stats.brandsList.length" class="brands-section">
       <h2>С нами работают</h2>
       <div class="brands-grid">
@@ -137,7 +196,7 @@
       <h2>Загрузка партнеров...</h2>
     </section>
 
-    <!-- 6. ЧАСТЫЕ ВОПРОСЫ (FAQ) -->
+    <!-- 7. ЧАСТЫЕ ВОПРОСЫ (FAQ) -->
     <section class="faq-section">
       <div class="section-header text-center">
         <h2>❓ Ответы на частые вопросы</h2>
@@ -156,7 +215,7 @@
       </div>
     </section>
 
-    <!-- 7. КАРТА -->
+    <!-- 8. КАРТА -->
     <section class="map-section glass-card">
       <h2>Наш главный распределительный центр</h2>
       <p class="map-subtitle">Центральный хаб: г. Москва, ул. Тверская, д. 1. Отсюда осуществляются все межрегиональные отправки.</p>
@@ -174,26 +233,54 @@ import { useAppStore } from '@/stores/appStore';
 const appStore = useAppStore();
 
 const loadingStats = ref(true);
-const stats = ref({
-  totalProducts: 0,
-  totalBrands: 0,
-  brandsList: []
-});
-
+const stats = ref({ totalProducts: 0, totalBrands: 0, brandsList: [] });
 const currencyData = ref(null);
 const loadingCurrency = ref(true);
 
+// FAQ
 const faqs = ref([
   { question: 'Что делать, если деталь мне не подошла?', answer: 'Мы понимаем, что подбор автозапчастей — сложный процесс. Если деталь не подошла к вашему авто, вы можете вернуть ее в любой из наших ПВЗ в течение 14 дней без объяснения причин. Средства вернутся на вашу карту.' },
   { question: 'Как работает гарантия на запчасти?', answer: 'Мы предоставляем официальную гарантию от 6 до 24 месяцев (в зависимости от производителя). При выявлении заводского брака мы бесплатно обменяем деталь или вернем деньги.' },
   { question: 'Как рассчитывается стоимость доставки из другого города?', answer: 'Если товара нет в вашем городе, стоимость доставки составит 800 рублей. Однако, если общий вес вашего заказа превышает 10 кг, система автоматически добавит по 50 рублей за каждый килограмм перевеса.' },
   { question: 'Могу ли я оплатить заказ при получении?', answer: 'Да. При оформлении заказа выберите способ "Наличными" или "Картой в ПВЗ". Вы сможете осмотреть товар перед оплатой.' }
 ]);
-
 const activeFaq = ref(null);
 const toggleFaq = (index) => { activeFaq.value = activeFaq.value === index ? null : index; };
 
-// ЗАГРУЗКА РЕАЛЬНЫХ ДАННЫХ ИЗ БАЗЫ
+// Калькулятор
+const cities = ref([]);
+const calcCityId = ref(null);
+const calcWeight = ref(5);
+const calcItemsCost = ref(0);
+const calcLoading = ref(false);
+const calcResult = ref(null);
+
+const loadCities = async () => {
+  try {
+    const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/cities`);
+    cities.value = res.data || [];
+  } catch (e) { console.warn('Не удалось загрузить города'); }
+};
+
+const calculateShipping = async () => {
+  if (!calcCityId.value || !calcWeight.value) return;
+  calcLoading.value = true;
+  calcResult.value = null;
+  try {
+    const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/shipping-calculator`, {
+      city_id: calcCityId.value,
+      weight_kg: calcWeight.value,
+      items_cost: calcItemsCost.value || 0
+    });
+    calcResult.value = res.data;
+  } catch (e) {
+    alert('Ошибка расчёта: ' + (e.response?.data?.error || e.message));
+  } finally {
+    calcLoading.value = false;
+  }
+};
+
+// Остальные данные
 const loadAboutData = async () => {
   loadingStats.value = true;
   try {
@@ -254,13 +341,123 @@ onMounted(() => {
   loadAboutData();
   fetchCurrency();
   initMap();
+  loadCities();
 });
 </script>
 
 <style scoped>
-/* ==========================================================================
-   ОБЩИЕ СТИЛИ (ПОДДЕРЖКА СВЕТЛОЙ/ТЕМНОЙ ТЕМЫ)
-   ========================================================================== */
+/* Весь предыдущий CSS без изменений, добавлены стили для калькулятора */
+
+/* КАЛЬКУЛЯТОР */
+.calculator-section {
+  margin: 4rem 0;
+  padding: 3rem;
+  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(37, 99, 235, 0.02) 100%);
+}
+:global(.dark) .calculator-section {
+  background: linear-gradient(135deg, #1e293b 0%, rgba(37, 99, 235, 0.05) 100%);
+}
+.calculator-section h2 {
+  margin-bottom: 0.5rem;
+  font-size: 2.2rem;
+  color: var(--text-main);
+}
+:global(.dark) .calculator-section h2 { color: #f8fafc; }
+.calc-subtitle {
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+}
+
+.calc-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-main);
+}
+:global(.dark) .form-input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+.btn-primary {
+  background: var(--primary, #2563eb);
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.2s;
+}
+.btn-primary:hover { transform: translateY(-2px); }
+
+.calc-result {
+  margin-top: 30px;
+  padding: 20px;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 12px;
+}
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+.r-item {
+  background: rgba(0,0,0,0.02);
+  padding: 12px;
+  border-radius: 8px;
+}
+:global(.dark) .r-item { background: rgba(255,255,255,0.03); }
+.r-item.total {
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid var(--primary);
+}
+.r-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 5px;
+}
+.total-price {
+  font-size: 1.8rem;
+  color: var(--primary);
+}
+.calc-note {
+  margin-top: 15px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.spinner-small {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
 .about-page {
   animation: fadeIn 0.5s ease-out;
   padding: 20px 0 60px 0;
