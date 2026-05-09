@@ -95,21 +95,14 @@ const writeLog = (filePath, data) => {
 
 const notifyAndEmail = async ({ userId, type, title, message, email, templateName, templateVars = {} }) => {
     writeLog(NOTIFICATIONS_LOG, { userId, type, title, message, emailSentTo: email });
-
-    // 1. Сохраняем уведомление в БД
     try {
-        if (userId) {
-            await supabase.from('notifications').insert([{ user_id: userId, type, title, message }]);
-        }
-    } catch (e) {
-        console.error('Ошибка записи уведомления в БД:', e.message);
-    }
+        if (userId) await supabase.from('notifications').insert([{ user_id: userId, type, title, message }]);
+    } catch (e) { console.error('Ошибка записи уведомления в БД:', e.message); }
 
-    // 2. Отправляем письмо, если указан email
     if (email) {
         try {
             const html = getEmailTemplate(
-                templateName || 'notification_general.html',  // универсальный шаблон, если нет специального
+                templateName || 'notification_general.html',
                 { title, message, ...templateVars }
             );
             await transporter.sendMail({
@@ -118,8 +111,8 @@ const notifyAndEmail = async ({ userId, type, title, message, email, templateNam
                 subject: title,
                 html: html
             });
-        } catch (e) {
-            console.error("❌ ОШИБКА ПОЧТЫ (SMTP):", e.message);
+        } catch (e) { 
+            console.error("❌ ОШИБКА ПОЧТЫ (SMTP):", e.message); 
         }
     }
 };
@@ -178,7 +171,6 @@ const verifyYandexCaptcha = (token, ip) => {
 // =====================================================================
 // API: КАТАЛОГ И МАРКЕТИНГ
 // =====================================================================
-
 app.get('/api/categories', async (req, res) => {
     try {
         const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
@@ -187,18 +179,21 @@ app.get('/api/categories', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Получить список всех городов
 app.get('/api/cities', async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from('cities')
-            .select('*')
-            .order('name', { ascending: true });
+        const { data, error } = await supabase.from('cities').select('*').order('name', { ascending: true });
         if (error) throw error;
         res.json(data || []);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/warehouses', async (req, res) => {
+    const { city_id } = req.query;
+    let query = supabase.from('warehouses').select('id, address, phone, working_hours, city_id, cities(name)');
+    if (city_id) query = query.eq('city_id', city_id);
+    const { data, error } = await query.order('id');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
 });
 
 app.get('/api/brands', async (req, res) => {
@@ -275,37 +270,32 @@ app.get('/api/global-search', async (req, res) => {
     res.json({ products: products || [], categories: categories || [] });
 });
 
-// Публичный калькулятор доставки (без админки)
-// Публичный калькулятор доставки (до конкретного ПВЗ)
+// =====================================================================
+// API: КАЛЬКУЛЯТОР ДОСТАВКИ
+// =====================================================================
 app.post('/api/shipping-calculator', async (req, res) => {
     const { warehouse_id, weight_kg, items_cost } = req.body;
-
     if (!warehouse_id || !weight_kg) {
         return res.status(400).json({ error: 'warehouse_id и weight_kg обязательны' });
     }
-
     try {
-        // Центральный склад-отправитель (id=1 – Москва, при необходимости замените)
+        // Центральный склад-отправитель (Москва, id=1 – замените при необходимости)
         const sourceWarehouseId = 1;
 
-        // Координаты склада-отправителя
         const { data: sourceWh } = await supabase
             .from('warehouses')
             .select('cities!inner(lat, lon)')
             .eq('id', sourceWarehouseId)
             .maybeSingle();
-
         if (!sourceWh || !sourceWh.cities) {
             return res.status(500).json({ error: 'Не удалось получить координаты склада-отправителя' });
         }
 
-        // Координаты выбранного ПВЗ
         const { data: targetWarehouse, error: whError } = await supabase
             .from('warehouses')
             .select('id, address, cities!inner(lat, lon, name)')
             .eq('id', warehouse_id)
             .maybeSingle();
-
         if (whError || !targetWarehouse) {
             return res.status(404).json({ error: 'Склад не найден' });
         }
@@ -319,13 +309,9 @@ app.post('/api/shipping-calculator', async (req, res) => {
             return res.status(500).json({ error: 'Некорректные координаты складов' });
         }
 
-        // Расстояние по гаверсинусам
-        const { data: distanceData } = await supabase.rpc('haversine_distance', {
-            lat1, lon1, lat2, lon2
-        });
+        const { data: distanceData } = await supabase.rpc('haversine_distance', { lat1, lon1, lat2, lon2 });
         const distanceKm = distanceData || 0;
 
-        // Тариф (коэффициенты как в общей логике)
         const base = 200;
         let rate;
         if (weight_kg <= 5) rate = 0.35;
@@ -336,7 +322,6 @@ app.post('/api/shipping-calculator', async (req, res) => {
 
         let shipping = distanceKm * weight_kg * rate + base;
 
-        // Ограничение 30% от стоимости
         let maxShipping = null;
         if (items_cost > 0) {
             maxShipping = items_cost * 0.3;
@@ -366,29 +351,6 @@ app.post('/api/shipping-calculator', async (req, res) => {
 // =====================================================================
 // API: ИЗБРАННОЕ И ОТЗЫВЫ
 // =====================================================================
-
-// Добавление в избранное администратором
-app.post('/api/admin/wishlists', verifyAdmin, async (req, res) => {
-    try {
-        const { user_id, product_id } = req.body;
-        if (!user_id || !product_id) return res.status(400).json({ error: 'user_id и product_id обязательны' });
-
-        const { data, error } = await supabase
-            .from('wishlists')
-            .insert([{ user_id, product_id }])
-            .select('*, users(*), products(*)')
-            .single();
-
-        if (error) {
-            // вероятно, дубликат (уникальное ограничение)
-            return res.status(409).json({ error: 'Этот товар уже в избранном у пользователя' });
-        }
-        res.json(data);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
 app.get('/api/wishlist/:userId', async (req, res) => {
     try {
         const { data, error } = await supabase.from('wishlists').select('*, products(*)').eq('user_id', req.params.userId);
@@ -504,7 +466,6 @@ app.post('/api/admin/users', verifyAdmin, async (req, res) => {
         const newUserId = crypto.randomUUID();
         const cityId = await getOrCreateCity(city);
 
-        // Фильтр по email или телефону
         let filter = email ? `email.eq.${email}` : `phone_number.eq.${phone_number}`;
         const { data: existing } = await supabase.from('users').select('*').or(filter).maybeSingle();
 
@@ -523,12 +484,10 @@ app.post('/api/admin/users', verifyAdmin, async (req, res) => {
 
             if (updateErr) throw updateErr;
 
-            // Отправляем письмо с подтверждением, если указан email
             if (email) {
                 const token = crypto.randomBytes(32).toString('hex');
                 const expiresAt = new Date(Date.now() + 3600000).toISOString();
                 await supabase.from('password_reset_tokens').insert([{ user_id: existing.id, token, expires_at: expiresAt }]);
-                
                 const verifyLink = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/users/verify-email?token=${token}`;
                 await notifyAndEmail({
                     userId: existing.id,
@@ -544,7 +503,6 @@ app.post('/api/admin/users', verifyAdmin, async (req, res) => {
             return res.json(updatedUser);
         }
 
-        // Создаём нового пользователя
         const { data: newUser, error: createErr } = await supabase.from('users').insert([{
             id: newUserId,
             role: role || 'user',
@@ -561,12 +519,10 @@ app.post('/api/admin/users', verifyAdmin, async (req, res) => {
 
         if (createErr) throw createErr;
 
-        // Отправляем письмо с подтверждением, если email указан
         if (email) {
             const token = crypto.randomBytes(32).toString('hex');
             const expiresAt = new Date(Date.now() + 3600000).toISOString();
             await supabase.from('password_reset_tokens').insert([{ user_id: newUser.id, token, expires_at: expiresAt }]);
-            
             const verifyLink = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/users/verify-email?token=${token}`;
             await notifyAndEmail({
                 userId: newUser.id,
@@ -664,7 +620,7 @@ app.post('/api/users/reset-password', async (req, res) => {
 });
 
 // =====================================================================
-// ⚡️ API: ЗАКАЗЫ
+// API: ЗАКАЗЫ
 // =====================================================================
 app.post('/api/orders', async (req, res) => {
     const { customer_name, customer_email, customer_phone, items, warehouse_id, payment_method } = req.body;
@@ -672,7 +628,6 @@ app.post('/api/orders', async (req, res) => {
     try {
         console.log('Создание заказа: данные получены', { customer_name, customer_email, items, warehouse_id });
 
-        // 1. Данные о ПВЗ и его городе
         const { data: targetWh, error: whError } = await supabase
             .from('warehouses')
             .select('*, cities(id, name, lat, lon)')
@@ -684,7 +639,6 @@ app.post('/api/orders', async (req, res) => {
         }
         const targetCityId = targetWh.cities.id;
 
-        // 2. Расчёт стоимости доставки (RPC)
         const { data: shippingData, error: shipErr } = await supabase.rpc('calculate_order_shipping', {
             target_warehouse_id: warehouse_id,
             items_json: items
@@ -695,12 +649,10 @@ app.post('/api/orders', async (req, res) => {
         }
         const totalShipping = shippingData.total;
 
-        // 3. Определение складов-отправителей, цен и списание
         let totalPrice = 0;
         const itemsData = [];
 
         for (let item of items) {
-            // Цена товара
             const { data: product, error: productErr } = await supabase
                 .from('products')
                 .select('price, discount_price')
@@ -713,10 +665,8 @@ app.post('/api/orders', async (req, res) => {
             const price = product.discount_price || product.price;
             totalPrice += price * item.quantity;
 
-            // --- Поиск склада-отправителя ---
             let sourceWarehouseId = null;
 
-            // а) Локальный склад (город ПВЗ, достаточно остатков)
             const { data: warehousesInCity } = await supabase
                 .from('warehouses')
                 .select('id')
@@ -738,7 +688,6 @@ app.post('/api/orders', async (req, res) => {
             }
 
             if (!sourceWarehouseId) {
-                // б) Межгородской склад (другой город, достаточно остатков)
                 const { data: intercityStock } = await supabase
                     .from('product_stocks')
                     .select('warehouse_id, warehouses!inner(city_id)')
@@ -756,7 +705,6 @@ app.post('/api/orders', async (req, res) => {
                 }
             }
 
-            // --- Списание остатков (безопасное, без raw) ---
             const { data: currentStock } = await supabase
                 .from('product_stocks')
                 .select('quantity')
@@ -789,7 +737,6 @@ app.post('/api/orders', async (req, res) => {
 
         const finalTotal = totalPrice + totalShipping;
 
-        // 4. Создание заказа
         const { data: order, error: oErr } = await supabase.from('orders').insert([{ 
             user_id: req.headers['x-user-id'] || crypto.randomUUID(),
             warehouse_id, 
@@ -807,7 +754,6 @@ app.post('/api/orders', async (req, res) => {
             return res.status(500).json({ error: 'Не удалось создать заказ' });
         }
 
-        // Вставка позиций с указанием склада-отправителя
         const { error: itemsErr } = await supabase.from('order_items').insert(
             itemsData.map(i => ({ ...i, order_id: order[0].id }))
         );
@@ -816,7 +762,6 @@ app.post('/api/orders', async (req, res) => {
             return res.status(500).json({ error: 'Не удалось сохранить позиции заказа' });
         }
 
-        // 5. Уведомление (email + сайт)
         if (order && order[0]) {
             const newOrder = order[0];
             try {
@@ -915,11 +860,9 @@ app.get('/api/admin/system/logs', verifyAdmin, (req, res) => {
     const file = type === 'errors' ? 'errors.log' : type === 'notifications' ? 'notifications.log' : 'actions.log';
     if (!fs.existsSync(path.join(LOGS_DIR, file))) return res.json([]);
     const lines = fs.readFileSync(path.join(LOGS_DIR, file), 'utf8').trim().split('\n').filter(Boolean);
-    // Возвращаем все записи (от новых к старым)
     res.json(lines.map(l => JSON.parse(l)).reverse());
 });
 
-// Получение избранного с полными данными о пользователе и товаре
 app.get('/api/admin/wishlists', verifyAdmin, async (req, res) => {
     try {
         const { data, error } = await supabase
@@ -974,7 +917,6 @@ app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
     const orderId = req.params.id;
 
     try {
-        // Получаем позиции заказа (вместе со складом-отправителем)
         const { data: items, error: itemsErr } = await supabase
             .from('order_items')
             .select('product_id, quantity, warehouse_id')
@@ -982,11 +924,9 @@ app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
 
         if (itemsErr) throw itemsErr;
 
-        // Возвращаем остатки на склады (если склад указан)
         if (items && items.length > 0) {
             for (const item of items) {
                 if (item.warehouse_id) {
-                    // Получаем текущий остаток
                     const { data: stockData, error: stockErr } = await supabase
                         .from('product_stocks')
                         .select('quantity')
@@ -1011,7 +951,6 @@ app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
             }
         }
 
-        // Удаляем заказ (каскадно удалятся order_items, status_history и т.д.)
         const { error: deleteErr } = await supabase.from('orders').delete().eq('id', orderId);
         if (deleteErr) throw deleteErr;
 
@@ -1022,7 +961,6 @@ app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
     }
 });
 
-// Общий обработчик удаления для остальных таблиц
 app.delete('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
     try {
         const { error } = await supabase.from(req.params.table).delete().eq('id', req.params.id);
@@ -1036,7 +974,6 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
     const orderId = req.params.id;
 
     try {
-        // Текущий заказ
         const { data: oldOrder, error: fetchErr } = await supabase
             .from('orders')
             .select('*')
@@ -1044,12 +981,10 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
             .single();
         if (fetchErr) return res.status(404).json({ error: 'Заказ не найден' });
 
-        // Нужно ли возвращать остатки
         const needReturn = 
             (delivery_status === 'cancelled' || delivery_status === 'returned') &&
             oldOrder.delivery_status !== delivery_status;
 
-        // Обновляем статус
         const { data: updatedOrder, error: updateErr } = await supabase
             .from('orders')
             .update({ delivery_status, payment_status })
@@ -1058,7 +993,6 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
             .single();
         if (updateErr) throw updateErr;
 
-        // Возврат остатков на склады
         if (needReturn) {
             const { data: orderItems } = await supabase
                 .from('order_items')
@@ -1085,7 +1019,6 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
             }
         }
 
-        // Уведомления
         if (delivery_status === 'ready_for_pickup') {
             await notifyAndEmail({
                 userId: updatedOrder.user_id,

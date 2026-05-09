@@ -18,7 +18,7 @@
       </div>
     </section>
 
-        <!-- 2. КАЛЬКУЛЯТОР ДОСТАВКИ -->
+    <!-- 2. КАЛЬКУЛЯТОР ДОСТАВКИ -->
     <section class="calculator-section glass-card">
       <h2>🚚 Калькулятор доставки</h2>
       <p class="calc-subtitle">Узнайте примерную стоимость доставки с центрального склада (Москва) в выбранный пункт выдачи</p>
@@ -309,7 +309,6 @@ const calcItemsCost = ref(0);
 const calcLoading = ref(false);
 const calcResult = ref(null);
 
-// Загрузка городов
 const loadCities = async () => {
   try {
     const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/cities`);
@@ -317,7 +316,6 @@ const loadCities = async () => {
   } catch (e) { console.warn('Не удалось загрузить города'); }
 };
 
-// Загрузка всех складов (можно было бы фильтровать на сервере, но загрузим все для простоты)
 const loadWarehouses = async () => {
   try {
     const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/warehouses`);
@@ -325,18 +323,15 @@ const loadWarehouses = async () => {
   } catch (e) { console.warn('Не удалось загрузить склады'); }
 };
 
-// Фильтрация складов по выбранному городу
 const filteredWarehouses = computed(() => {
   if (!calcCityId.value) return [];
   return warehouses.value.filter(w => w.city_id === calcCityId.value);
 });
 
-// При смене города сбрасываем выбранный склад
 const onCityChange = () => {
   calcWarehouseId.value = null;
 };
 
-// Основная функция расчёта
 const calculateShipping = async () => {
   if (!calcWarehouseId.value || !calcWeight.value) return;
   calcLoading.value = true;
