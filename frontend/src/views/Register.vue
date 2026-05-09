@@ -85,7 +85,7 @@
       <!-- GOOGLE РЕГИСТРАЦИЯ -->
       <button @click="socialRegister('google')" class="social-btn glass-btn">
         <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" alt="Google">
-        <span>Регистрация через Google Account</span>
+        <span>Быстрая регистрация через Google</span>
       </button>
 
       <p class="auth-footer">
@@ -120,14 +120,13 @@ const form = reactive({
   captchaToken: ''
 });
 
-// Рекурсивная инициализация капчи (ждет загрузки скрипта Яндекса)
 const initCaptcha = () => {
   if (window.smartCaptcha) {
     window.smartCaptcha.render('yandex-captcha', {
       sitekey: captchaSiteKey,
       callback: (token) => { 
         form.captchaToken = token; 
-        error.value = ''; // Убираем ошибку, если пользователь прошел капчу
+        error.value = ''; 
       }
     });
   } else {
@@ -135,9 +134,33 @@ const initCaptcha = () => {
   }
 };
 
-onMounted(() => { 
+onMounted(async () => { 
   if (appStore.city) form.city = appStore.city; 
   initCaptcha();
+
+  // --- ЛОГИКА АВТОВХОДА ПОСЛЕ GOOGLE ---
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session && !localStorage.getItem('user_id')) {
+    const sbUser = session.user;
+    
+    // Пытаемся получить профиль из нашей БД
+    try {
+      const res = await axios.get('/api/users/profile/' + sbUser.id);
+      saveSession(res.data);
+    } catch (e) {
+      // Если профиля еще нет (первая регистрация через Google), 
+      // создаем объект пользователя на лету (триггер в БД сам создаст запись)
+      const newUserObj = {
+        id: sbUser.id,
+        email: sbUser.email,
+        first_name: sbUser.user_metadata?.full_name?.split(' ')[0] || sbUser.user_metadata?.first_name || 'Пользователь',
+        last_name: sbUser.user_metadata?.full_name?.split(' ')[1] || '',
+        avatar_url: sbUser.user_metadata?.avatar_url || DEFAULT_AVATARS[0],
+        role: 'user'
+      };
+      saveSession(newUserObj);
+    }
+  }
 });
 
 const handleRegister = async () => {
@@ -154,17 +177,15 @@ const handleRegister = async () => {
   successMessage.value = '';
 
   try {
-    // ВАЖНО: Используем относительный путь, так как baseURL в main.js пустой
     const res = await axios.post('/api/users/register', form);
-    
     if (form.email) {
-      successMessage.value = 'Регистрация успешна! Мы отправили письмо для подтверждения на вашу почту.';
+      successMessage.value = 'Регистрация успешна! Проверьте почту для подтверждения.';
       setTimeout(() => router.push('/login'), 5000);
     } else {
       saveSession(res.data.user || res.data);
     }
   } catch (err) {
-    error.value = err.response?.data?.error || 'Ошибка регистрации. Проверьте данные.';
+    error.value = err.response?.data?.error || 'Ошибка регистрации.';
     if (window.smartCaptcha) window.smartCaptcha.reset();
   } finally {
     loading.value = false;
@@ -173,12 +194,17 @@ const handleRegister = async () => {
 
 const socialRegister = async (provider) => {
     loading.value = true;
-    const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider: provider,
-        options: { redirectTo: window.location.origin + '/login' }
-    });
-    if (authError) {
-        error.value = authError.message;
+    try {
+        const { error: authError } = await supabase.auth.signInWithOAuth({
+            provider: provider,
+            options: { 
+                // Указываем редирект сразу в профиль
+                redirectTo: window.location.origin + '/profile' 
+            }
+        });
+        if (authError) throw authError;
+    } catch (err) {
+        error.value = "Ошибка Google: " + err.message;
         loading.value = false;
     }
 };
@@ -190,7 +216,7 @@ const saveSession = (user) => {
     localStorage.setItem('user_first_name', user.first_name || '');
     localStorage.setItem('user_avatar', user.avatar_url || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png');
     
-    router.push('/');
+    router.push('/profile'); // Сразу в профиль
     setTimeout(() => window.location.reload(), 100);
 };
 </script>

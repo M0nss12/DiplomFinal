@@ -485,7 +485,13 @@ app.post('/api/users/reset-password', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
     const { customer_name, customer_email, customer_phone, customer_city, items, warehouse_id, payment_method, shipping_cost, delivery_type } = req.body;
     try {
-        const { data: wh } = await supabase.from('warehouses').select('*, cities(name)').eq('id', warehouse_id).single();
+        // 1. Проверяем, существует ли склад и город
+        const { data: wh, error: whErr } = await supabase.from('warehouses').select('*, cities(name)').eq('id', warehouse_id).maybeSingle();
+        
+        if (!wh || whErr) {
+            return res.status(400).json({ error: 'Склад не найден. Сначала создайте город и склад в админке!' });
+        }
+
         const cityId = await getOrCreateCity(customer_city);
         let { data: user } = await supabase.from('users').select('id').or(`email.eq.${customer_email},phone_number.eq.${customer_phone}`).maybeSingle();
         
@@ -497,17 +503,24 @@ app.post('/api/orders', async (req, res) => {
         let totalPrice = 0; let itemsData = [];
         for (let item of items) {
             const { data: p } = await supabase.from('products').select('price, discount_price').eq('id', item.product_id).single();
+            if (!p) continue;
             const price = p.discount_price || p.price;
             totalPrice += price * item.quantity;
             itemsData.push({ product_id: item.product_id, quantity: item.quantity, unit_price: price });
+            
+            // Уменьшаем остаток (убедись, что функция decrement_stock создана в SQL)
             await supabase.rpc('decrement_stock', { p_product_id: item.product_id, p_warehouse_id: warehouse_id, p_quantity: item.quantity });
         }
         
         const finalTotal = Math.round(totalPrice + (Number(shipping_cost) || 0));
+        
+        // Безопасное формирование адреса
+        const deliveryAddress = wh.cities ? `${wh.cities.name}, ${wh.address}` : wh.address;
+
         const { data: order, error: oErr } = await supabase.from('orders').insert([{ 
             user_id: userId, warehouse_id, payment_method, delivery_type: delivery_type || 'pickup',
             payment_status: 'unpaid', delivery_status: 'processing',
-            shipping_cost: shipping_cost || 0, total_price: finalTotal, delivery_address: `${wh.cities.name}, ${wh.address}`,
+            shipping_cost: shipping_cost || 0, total_price: finalTotal, delivery_address: deliveryAddress,
             customer_name, customer_phone, customer_email
         }]).select();
 
@@ -516,14 +529,17 @@ app.post('/api/orders', async (req, res) => {
         
         await notifyAndEmail({
             userId: userId, type: 'order', email: customer_email,
-            title: `Заказ №${order[0].id} успешно оформлен!`,
-            message: `Сумма к оплате: ${finalTotal} руб.`,
+            title: `Заказ №${order[0].id} принят!`,
+            message: `Сумма: ${finalTotal} руб.`,
             templateName: 'order_created.html',
             templateVars: { order_id: order[0].id, total: finalTotal, name: customer_name }
         });
 
         res.json({ orderId: order[0].id, total: finalTotal });
-    } catch (err) { logError(err, req); res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        logError(err, req); 
+        res.status(500).json({ error: 'Ошибка создания заказа: ' + err.message }); 
+    }
 });
 
 app.get('/api/orders/:userId', async (req, res) => {

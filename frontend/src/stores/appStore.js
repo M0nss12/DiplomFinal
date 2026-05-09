@@ -71,33 +71,28 @@ export const useAppStore = defineStore('app', {
 
     // 5. Синхронизация при входе (Умное извлечение из новой БД)
 async syncCity() {
-  const userId = localStorage.getItem('user_id');
-  if (userId) {
-    try {
-      const res = await axios.get(`/api/users/profile/${userId}`);
-      if (res.data.cities?.name) {
-        this.city = res.data.cities.name;
-        this.isCityConfirmed = true;
-        localStorage.setItem('user_city', this.city);
-        return;
+      const userId = localStorage.getItem('user_id');
+      
+      // 1. Пытаемся взять город из профиля
+      if (userId) {
+        try {
+          const res = await axios.get('/api/users/profile/' + userId);
+          const dbCityName = res.data.cities?.name;
+          if (dbCityName) {
+            this.city = dbCityName;
+            this.isCityConfirmed = true;
+            localStorage.setItem('user_city', dbCityName);
+            return;
+          }
+        } catch (e) { console.warn('Профиль недоступен'); }
       }
-    } catch (e) { console.error('Профиль пока недоступен'); }
-  }
-
-  // Если не авторизован или ошибка профиля - ставим дефолт
-  if (!this.isCityConfirmed) {
-    try {
-      const res = await fetch('https://ipwho.is/');
-      const data = await res.json();
-      if (data && data.success) {
-        this.city = data.city || 'Москва';
-      } else {
-        this.city = 'Москва'; // Фолбэк если лимит исчерпан
+      
+      // 2. Если города нет в профиле, берем из памяти или ставим Москву
+      if (!this.isCityConfirmed) {
+        this.city = localStorage.getItem('user_city') || 'Москва';
+        // Больше не делаем fetch к ipwho.is, чтобы не ловить 403 ошибки
       }
-    } catch (e) {
-      this.city = 'Москва'; // Фолбэк при 403 или ошибке сети
-    }
-  }
+    
 }
   }
 });

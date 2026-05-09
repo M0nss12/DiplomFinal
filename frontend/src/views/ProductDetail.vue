@@ -245,10 +245,6 @@ import axios from 'axios';
 import { useCartStore } from '@/stores/cartStore';
 import { useAppStore } from '@/stores/appStore';
 
-// Секретный ключ для загрузки файлов/админки, если требуется
-const ADMIN_KEY = import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123';
-const uploadConfig = { headers: { 'x-admin-key': ADMIN_KEY } };
-
 const route = useRoute();
 const cartStore = useCartStore();
 const appStore = useAppStore();
@@ -277,12 +273,22 @@ const newReview = reactive({
     images: []
 });
 
-const getFilenameFromUrl = (url) => {
-  if (!url) return null;
-  const parts = url.split('/');
-  return parts.pop();
-};
+// ЕДИНЫЙ СЛЕДЫТЬ ЗА ID (Исправляет баг пустых страниц)
+watch(
+  () => route.params.id, 
+  async (newId) => {
+    // Срабатывает только если мы на странице товара
+    if (newId && route.name === 'product-detail') {
+      await loadData();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+);
 
+const ADMIN_KEY = import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123';
+const uploadConfig = { headers: { 'x-admin-key': ADMIN_KEY } };
+
+const getFilenameFromUrl = (url) => url ? url.split('/').pop() : null;
 const previewImage = (url) => { if (url) fullscreenImage.value = url; };
 
 const isSameCity = (city1) => {
@@ -290,7 +296,7 @@ const isSameCity = (city1) => {
     return city1.trim().toLowerCase() === appStore.city.trim().toLowerCase();
 };
 
-// --- ЛОГИКА СКЛАДОВ ---
+// --- ВЫЧИСЛЯЕМЫЕ СВОЙСТВА ---
 const localStocks = computed(() => {
     if (!product.value?.product_stocks) return [];
     return product.value.product_stocks.filter(s => {
@@ -321,40 +327,32 @@ const isFavorite = computed(() => wishlistId.value !== null);
 // --- ЗАГРУЗКА ДАННЫХ ---
 const loadData = async () => {
   const pId = route.params.id;
-  const uId = currentUserId.value;
+  if (!pId) return;
 
   try {
-    const pRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/products/${pId}`);
+    const pRes = await axios.get(`/api/products/${pId}`);
     product.value = pRes.data;
-    
-    // Установка активной картинки
-    if (product.value.images && product.value.images.length > 0) {
-      activeImage.value = product.value.images[0];
-    } else {
-      activeImage.value = '/assets/images/no-image.png';
-    }
+    activeImage.value = (product.value.images && product.value.images.length > 0) ? product.value.images[0] : '/assets/images/no-image.png';
 
     saveToHistory(pId);
 
-    const rRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/reviews/${pId}`);
+    const rRes = await axios.get(`/api/reviews/${pId}`);
     reviews.value = rRes.data.map(r => ({ ...r, images: Array.isArray(r.images) ? r.images : [] }));
 
+    const uId = localStorage.getItem('user_id');
     if (uId) {
       userExistingReview.value = reviews.value.find(r => r.user_id == uId) || null;
-
-      const wRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/wishlist/${uId}`);
+      const wRes = await axios.get(`/api/wishlist/${uId}`);
       const found = wRes.data.find(item => item.product_id == pId);
       wishlistId.value = found ? found.id : null;
 
-      const orderRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/orders/${uId}`);
+      const orderRes = await axios.get(`/api/orders/${uId}`);
       canUserLeaveReview.value = orderRes.data.some(order => 
         order.delivery_status === 'delivered' && 
         order.order_items.some(item => Number(item.product_id) === Number(pId))
       );
     }
-  } catch (e) { 
-    console.error("Ошибка загрузки товара:", e); 
-  }
+  } catch (e) { console.error("Ошибка загрузки:", e); }
 };
 
 const saveToHistory = (id) => {
@@ -370,20 +368,19 @@ const handleAddToCart = () => {
     cartStore.addToCart(product.value);
 };
 
-// --- ИЗБРАННОЕ ---
 const toggleWishlist = async () => {
-  const uId = currentUserId.value;
-  if (!uId) return alert("Пожалуйста, войдите в аккаунт.");
+  const uId = localStorage.getItem('user_id');
+  if (!uId) return alert("Войдите в аккаунт.");
   try {
       if (isFavorite.value) {
-        await axios.delete(`${import.meta.env.VITE_API_URL || ''}/api/wishlist/${uId}/${product.value.id}`);
+        await axios.delete(`/api/wishlist/${uId}/${product.value.id}`);
         wishlistId.value = null;
       } else {
-        const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/wishlist`, { user_id: uId, product_id: product.value.id });
+        const res = await axios.post('/api/wishlist', { user_id: uId, product_id: product.value.id });
         wishlistId.value = res.data.id;
       }
       window.dispatchEvent(new Event('wishlist-updated'));
-  } catch (e) { console.error("Ошибка избранного", e); }
+  } catch (e) { console.error(e); }
 };
 
 // --- ОТЗЫВЫ ---
@@ -396,12 +393,8 @@ const prepareCreate = () => {
 const prepareEdit = (review) => {
     isEditing.value = true;
     Object.assign(newReview, { 
-        id: review.id, 
-        rating: review.rating, 
-        comment: review.comment, 
-        pros: review.pros, 
-        cons: review.cons,
-        images: [...(review.images || [])] 
+        id: review.id, rating: review.rating, comment: review.comment, 
+        pros: review.pros, cons: review.cons, images: [...(review.images || [])] 
     });
     showReviewForm.value = true;
 };
@@ -411,70 +404,41 @@ const cancelReviewForm = () => { showReviewForm.value = false; };
 const handlePhotoUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
     const formData = new FormData();
     formData.append('file', file);
     isUploadingPhoto.value = true;
-
     try {
-        const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/upload/reviews`, formData, uploadConfig);
+        const res = await axios.post('/api/upload/reviews', formData, uploadConfig);
         newReview.images.push(res.data.url);
-    } catch (e) {
-        alert('Ошибка при загрузке фото');
-    } finally {
-        isUploadingPhoto.value = false;
-    }
+    } catch (e) { alert('Ошибка загрузки фото'); } 
+    finally { isUploadingPhoto.value = false; }
 };
 
-const removePhotoFromForm = async (index) => {
-    const url = newReview.images[index];
-    if (!confirm('Удалить это фото?')) return;
-    newReview.images.splice(index, 1);
-};
+const removePhotoFromForm = (index) => { newReview.images.splice(index, 1); };
 
 const submitReview = async () => {
     if (!newReview.comment.trim()) return alert("Напишите комментарий");
     submittingReview.value = true;
-    
     try {
-        const reviewData = {
-            product_id: product.value.id,
-            user_id: currentUserId.value,
-            rating: newReview.rating,
-            comment: newReview.comment,
-            pros: newReview.pros,
-            cons: newReview.cons,
-            images: newReview.images
-        };
-
-        if (isEditing.value) {
-            await axios.patch(`${import.meta.env.VITE_API_URL || ''}/api/reviews/${newReview.id}`, reviewData);
-            alert("Отзыв обновлен!");
-        } else {
-            await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/reviews`, reviewData);
-            alert("Спасибо за отзыв!");
-        }
-        
+        const reviewData = { product_id: product.value.id, user_id: currentUserId.value, rating: newReview.rating, comment: newReview.comment, pros: newReview.pros, cons: newReview.cons, images: newReview.images };
+        if (isEditing.value) await axios.patch(`/api/reviews/${newReview.id}`, reviewData);
+        else await axios.post(`/api/reviews`, reviewData);
         showReviewForm.value = false;
         await loadData(); 
-    } catch (e) { 
-        alert("Ошибка: " + (e.response?.data?.error || "не удалось сохранить отзыв")); 
-    } finally { 
-        submittingReview.value = false; 
-    }
+    } catch (e) { alert("Ошибка сохранения отзыва"); } 
+    finally { submittingReview.value = false; }
 };
 
 const deleteMyReview = async (review) => {
-    if (!confirm('Вы уверены, что хотите удалить свой отзыв навсегда?')) return;
+    if (!confirm('Удалить отзыв?')) return;
     try {
-        await axios.delete(`${import.meta.env.VITE_API_URL || ''}/api/admin/reviews/${review.id}`, uploadConfig);
+        await axios.delete(`/api/admin/reviews/${review.id}`, uploadConfig);
         reviews.value = reviews.value.filter(r => r.id !== review.id);
         userExistingReview.value = null;
-    } catch (e) { alert('Ошибка при удалении отзыва'); }
+    } catch (e) { alert('Ошибка удаления'); }
 };
 
 onMounted(loadData);
-watch(() => route.params.id, (newId) => { if(newId) loadData(); });
 </script>
 
 <style scoped>
@@ -623,7 +587,7 @@ watch(() => route.params.id, (newId) => { if(newId) loadData(); });
 
 .review-inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
 .form-input, .form-textarea {
-  width: 100%; padding: 14px 18px; border-radius: var(--radius-sm, 8px); border: 1px solid var(--border-color, #cbd5e1);
+  width: 100%; padding: 14px 18px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
   background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-family: inherit; font-size: 1rem; transition: all 0.3s; box-sizing: border-box;
 }
 :global(.dark) .form-input, :global(.dark) .form-textarea { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }

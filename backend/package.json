@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-  "test": "jest --coverage"
+    "test": "jest --coverage"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +20,6 @@
     "morgan": "^1.10.1",
     "multer": "^2.1.0",
     "nodemailer": "^8.0.1",
-    "pg": "^8.19.0"
+    "pg": "^8.20.0"
   }
 }
