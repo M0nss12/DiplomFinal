@@ -494,6 +494,21 @@ app.get('/api/orders/:userId', async (req, res) => {
     res.json(data || []);
 });
 
+
+app.post('/api/calculate-shipping', verifyAdmin, async (req, res) => {
+    const { warehouse_id, items } = req.body;
+    try {
+        const { data, error } = await supabase.rpc('calculate_order_shipping', {
+            target_warehouse_id: warehouse_id,
+            items_json: items
+        });
+        if (error) throw error;
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post('/api/payment/tinkoff-init', async (req, res) => {
     const { orderId } = req.body;
     const mockPaymentUrl = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/test-webhook?orderId=${orderId}&status=paid`;

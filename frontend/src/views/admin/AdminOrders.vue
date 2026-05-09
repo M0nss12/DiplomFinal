@@ -227,6 +227,8 @@ import { supabase } from '@/supabase';
 
 const appStore = useAppStore();
 
+const API_URL = import.meta.env.VITE_API_URL || ''; 
+
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123';
 const config = { headers: { 'x-admin-key': ADMIN_SECRET } };
 
@@ -265,47 +267,49 @@ const updateItemData = (index) => {
 
 // ---- Функция расчёта доставки через RPC с обновлением isLocal/distance ----
 const autoCalcShipping = async () => {
-  if (!newOrder.warehouse_id || selectedProducts.value.length === 0) {
-    newOrder.shipping_cost = 0;
-    return;
-  }
+    if (!newOrder.warehouse_id || selectedProducts.value.length === 0) {
+        newOrder.shipping_cost = 0;
+        return;
+    }
 
-  const itemsForRpc = selectedProducts.value
-    .filter(item => item.product_id)
-    .map(item => ({
-      product_id: item.product_id,
-      quantity: item.quantity
-    }));
+    const itemsForRpc = selectedProducts.value
+        .filter(item => item.product_id)
+        .map(item => ({
+            product_id: item.product_id,
+            quantity: item.quantity
+        }));
 
-  if (itemsForRpc.length === 0) {
-    newOrder.shipping_cost = 0;
-    return;
-  }
+    if (itemsForRpc.length === 0) {
+        newOrder.shipping_cost = 0;
+        return;
+    }
 
-  try {
-    const { data, error } = await supabase.rpc('calculate_order_shipping', {
-      target_warehouse_id: newOrder.warehouse_id,
-      items_json: itemsForRpc
-    });
-    if (error) throw error;
+    try {
+        // Вызов через сервер, чтобы обойти права анонимного ключа
+        const res = await axios.post(`${API_URL}/api/calculate-shipping`, {
+            warehouse_id: newOrder.warehouse_id,
+            items: itemsForRpc
+        }, config);
 
-    newOrder.shipping_cost = data.total;
+        const result = res.data;   // { total: 6780.2, details: [...] }
 
-    // Обновляем флаги и дистанции для каждой выбранной позиции
-    let detailIndex = 0;
-    selectedProducts.value.forEach(item => {
-      if (!item.product_id) return;
-      const detail = data.details[detailIndex];
-      if (detail) {
-        item.distance = detail.distance_km || 0;
-        item.isLocal = item.distance === 0;  // всё, что 0 км — локально
-      }
-      detailIndex++;
-    });
-  } catch (e) {
-    console.error('Ошибка расчёта доставки:', e);
-    newOrder.shipping_cost = 0;
-  }
+        newOrder.shipping_cost = result.total;
+
+        // Обновляем флаги и дистанции позиций
+        let detailIndex = 0;
+        selectedProducts.value.forEach(item => {
+            if (!item.product_id) return;
+            const detail = result.details[detailIndex];
+            if (detail) {
+                item.distance = detail.distance_km || 0;
+                item.isLocal = item.distance === 0;
+            }
+            detailIndex++;
+        });
+    } catch (e) {
+        console.error('Ошибка расчёта доставки:', e);
+        newOrder.shipping_cost = 0;
+    }
 };
 
 const updateAddressFromWarehouse = () => {
