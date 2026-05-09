@@ -2,7 +2,7 @@
   <div class="checkout-page">
     <h1 class="page-title">Оформление заказа</h1>
 
-    <!-- СОСТОЯНИЕ ПУСТОЙ КОРЗИНЫ -->
+    <!-- ПУСТАЯ КОРЗИНА -->
     <div v-if="cartStore.items.length === 0" class="empty-cart-state glass-card">
       <div class="empty-icon">🛒</div>
       <h2>Ваша корзина пуста</h2>
@@ -18,39 +18,55 @@
         <section class="checkout-section glass-card">
           <h3><span class="section-icon">👤</span> Контактные данные</h3>
           
-          <!-- ВЫБОР ГОРОДА -->
+          <!-- ГОРОД (автодополнение) -->
           <div class="input-group full-width-group">
              <label>📍 Ваш Город (населённый пункт) *</label>
-             <div class="city-input-wrap">
-               <input 
-                 v-model="checkoutCity" 
-                 @blur="updateGlobalCity"
-                 @keyup.enter="updateGlobalCity"
-                 placeholder="Введите ваш город для обновления списка ПВЗ..." 
+             <div class="city-autocomplete">
+               <input
+                 :value="cityInput"
+                 @input="onCityInput"
+                 @focus="showCitySuggestions = true"
+                 @blur="onCityBlur"
+                 placeholder="Введите название города..."
+                 autocomplete="off"
                />
-               <span class="city-hint">Нажмите Enter или кликните вне поля для обновления</span>
+               <transition name="dropdown-fade">
+                 <ul v-if="showCitySuggestions && filteredCities.length" class="city-suggestions glass-card">
+                   <li
+                     v-for="c in filteredCities"
+                     :key="c.id"
+                     @mousedown.prevent="selectCity(c)"
+                     :class="{ active: appStore.city === c.name }"
+                   >
+                     {{ c.name }}
+                   </li>
+                 </ul>
+               </transition>
              </div>
+             <span class="city-hint">Выберите город из списка</span>
           </div>
 
           <div class="form-grid">
             <div class="input-group">
-              <label>Имя и Фамилия *</label>
-              <input v-model="form.name" placeholder="Иван Иванов" required />
+              <label>Имя *</label>
+              <input v-model="form.name" placeholder="Иван" required />
             </div>
             <div class="input-group">
-              <label>Телефон *</label>
-              <input v-model="form.phone" type="tel" placeholder="+7 (999) 000-00-00" required @input="formatPhone" />
+              <label>Телефон</label>
+              <input :value="form.phone" type="tel" placeholder="+7 (999) 000-00-00" @input="onPhoneInput" />
             </div>
             <div class="input-group">
-              <label>Email *</label>
-              <input v-model="form.email" type="email" placeholder="mail@example.com" required />
+              <label>Email</label>
+              <input v-model="form.email" type="email" placeholder="mail@example.com" @blur="validateEmail" />
+              <small v-if="!emailValid && form.email.length > 0" class="error-hint">Введите корректный email</small>
             </div>
           </div>
+          <p class="hint-note">* Телефон или email должны быть заполнены (хотя бы одно)</p>
         </section>
 
         <!-- 2. ПВЗ -->
         <section class="checkout-section glass-card">
-          <h3><span class="section-icon">📍</span> Пункт выдачи в г. {{ appStore.city }}</h3>
+          <h3><span class="section-icon">📍</span> Пункт выдачи в г. {{ appStore.city || '…' }}</h3>
           
           <div v-if="localWarehouses.length > 0">
             <select v-model="selectedWarehouseId" class="warehouse-select" @change="refreshShipping">
@@ -61,7 +77,7 @@
             </select>
           </div>
           <div v-else class="no-warehouses-alert">
-            <p>В г. <b>{{ appStore.city }}</b> нет доступных ПВЗ. Пожалуйста, укажите другой город.</p>
+            <p><b>В г. {{ appStore.city || '…' }}</b> нет доступных ПВЗ. Пожалуйста, укажите другой город.</p>
           </div>
         </section>
 
@@ -84,9 +100,9 @@
         <div class="action-footer">
           <button @click="cancelOrder" class="btn-cancel">ОТМЕНИТЬ</button>
           <button @click="handleOrderProcess" 
-                  :disabled="loading || !selectedWarehouseId || !form.name || !form.phone" 
+                  :disabled="isSubmitDisabled" 
                   class="btn-submit"
-                  :style="{ opacity: (loading || !selectedWarehouseId || !form.name || !form.phone) ? 0.5 : 1 }">
+                  :style="{ opacity: isSubmitDisabled ? 0.5 : 1 }">
             <span v-if="loading" class="spinner-inline">⏳</span>
             {{ loading ? 'ОБРАБОТКА...' : (form.payment_method === 'card' ? '✔ ПЕРЕЙТИ К ОПЛАТЕ' : '✔ ПОДТВЕРДИТЬ ЗАКАЗ') }}
           </button>
@@ -122,7 +138,6 @@
               </span>
             </div>
 
-            <!-- Детали межгорода (опционально) -->
             <div v-if="shippingData.details && shippingData.details.some(d => !d.in_stock)" class="intercity-alert">
               <div class="alert-title">🚚 Часть товаров поедет межгородом</div>
               <ul class="intercity-list">
@@ -159,8 +174,73 @@ const loadingShipping = ref(false);
 const warehouses = ref([]);
 const selectedWarehouseId = ref(null);
 
-const checkoutCity = ref('');
+// ---- ГОРОД (автодополнение) ----
+const cities = ref([]);
+const cityInput = ref('');
+const showCitySuggestions = ref(false);
+const filteredCities = computed(() => {
+  const q = cityInput.value.trim().toLowerCase();
+  if (!q) return [];
+  return cities.value.filter(c => c.name.toLowerCase().includes(q));
+});
+
+const onCityInput = (event) => {
+  cityInput.value = event.target.value;
+  showCitySuggestions.value = true;
+};
+
+const selectCity = async (city) => {
+  cityInput.value = city.name;
+  showCitySuggestions.value = false;
+  await appStore.setCity(city.name);   // обновляем глобально
+  selectedWarehouseId.value = null;    // сбрасываем ПВЗ
+  const uid = localStorage.getItem('user_id');
+  if (uid) {
+    try {
+      await axios.put(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${uid}`, { city: city.name });
+    } catch (e) { console.error("Ошибка сохранения города", e); }
+  }
+};
+
+const onCityBlur = () => {
+  // Если пользователь ввёл текст, но не выбрал город из списка – сбрасываем на текущий
+  setTimeout(() => {
+    if (!cities.value.some(c => c.name === cityInput.value)) {
+      cityInput.value = appStore.city || '';
+    }
+    showCitySuggestions.value = false;
+  }, 150);
+};
+
+// ---- КОНТАКТЫ ----
 const form = ref({ name: '', phone: '', email: '', payment_method: 'card' });
+const emailValid = ref(true);
+
+const validateEmail = () => {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (form.value.email.length === 0) {
+    emailValid.value = true;
+    return;
+  }
+  emailValid.value = re.test(form.value.email);
+};
+
+const onPhoneInput = (event) => {
+  let value = event.target.value.replace(/[^\d]/g, '');
+  if (value.startsWith('7') || value.startsWith('8')) value = value.substring(1);
+  if (value.length === 0) {
+    form.value.phone = '';
+    event.target.value = '';
+    return;
+  }
+  let formatted = '+7';
+  if (value.length > 0) formatted += ' (' + value.substring(0, 3);
+  if (value.length >= 4) formatted += ') ' + value.substring(3, 6);
+  if (value.length >= 7) formatted += '-' + value.substring(6, 8);
+  if (value.length >= 9) formatted += '-' + value.substring(8, 10);
+  form.value.phone = formatted;
+  event.target.value = formatted;
+};
 
 const paymentMethods = [
   { id: 'card', label: 'Оплата онлайн', icon: '💳' },
@@ -169,21 +249,13 @@ const paymentMethods = [
 
 const isSameCity = (c1, c2) => c1?.trim().toLowerCase() === c2?.trim().toLowerCase();
 
-// Обновление города в сторе и профиле пользователя
-const updateGlobalCity = async () => {
-  if (!checkoutCity.value.trim()) return;
-  const newCity = checkoutCity.value.trim();
-  appStore.setCity(newCity);
-  const uid = localStorage.getItem('user_id');
-  if (uid) {
-    try {
-      await axios.put(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${uid}`, { city: newCity });
-    } catch (e) { console.error("Ошибка сохранения города", e); }
-  }
-  selectedWarehouseId.value = null;
-};
+const isSubmitDisabled = computed(() => {
+  const hasContact = form.value.phone.trim() || form.value.email.trim();
+  const hasCity = appStore.city && selectedWarehouseId.value;
+  return !form.value.name.trim() || !hasContact || !hasCity || loading.value || !emailValid.value;
+});
 
-// Фильтр ПВЗ в городе пользователя
+// ---- ПВЗ ----
 const localWarehouses = computed(() => {
   return warehouses.value.filter(w => {
     const wCity = w.cities?.name || w.city_name;
@@ -191,7 +263,7 @@ const localWarehouses = computed(() => {
   });
 });
 
-// Расчёт доставки через серверный RPC
+// ---- ДОСТАВКА ----
 const shippingData = ref({ total: 0, details: [] });
 const refreshShipping = async () => {
   if (!selectedWarehouseId.value || cartStore.items.length === 0) {
@@ -210,77 +282,33 @@ const refreshShipping = async () => {
     });
     shippingData.value = res.data;
   } catch (e) {
-    console.error('Ошибка получения расчёта доставки:', e);
+    console.error('Ошибка расчёта доставки:', e);
     shippingData.value = { total: 0, details: [] };
   } finally {
     loadingShipping.value = false;
   }
 };
 
-// Общая стоимость товаров (без доставки)
 const cartTotalGoods = computed(() => {
   return cartStore.items.reduce((sum, item) => {
     return sum + (item.discount_price || item.price) * (item.quantity || 1);
   }, 0).toFixed(2);
 });
 
-// Итоговая цена (товары + доставка)
 const finalTotal = computed(() => {
   const goods = parseFloat(cartTotalGoods.value);
   const shipping = shippingData.value.total || 0;
   return (goods + shipping).toFixed(2);
 });
 
-// Получение названия товара по ID (для отображения деталей доставки)
 const getProductName = (id) => {
   const item = cartStore.items.find(i => i.id === id);
   return item ? item.name : 'Товар';
 };
 
-// Маска телефона
-const formatPhone = (event) => {
-  let value = event.target.value.replace(/[^\d]/g, '');
-  if (value.startsWith('7') || value.startsWith('8')) value = value.substring(1);
-  if (value.length === 0) {
-    form.value.phone = '';
-    return;
-  }
-  let formatted = '+7';
-  if (value.length > 0) formatted += ' (' + value.substring(0, 3);
-  if (value.length >= 4) formatted += ') ' + value.substring(3, 6);
-  if (value.length >= 7) formatted += '-' + value.substring(6, 8);
-  if (value.length >= 9) formatted += '-' + value.substring(8, 10);
-  form.value.phone = formatted;
-  event.target.value = formatted;
-};
-
-// Следим за изменением выбранного склада и состава корзины
-watch([selectedWarehouseId, () => cartStore.items.map(i => i.quantity).join(',')], () => {
-  refreshShipping();
-}, { immediate: true });
-
-// Загрузка складов и профиля
-onMounted(async () => {
-  checkoutCity.value = appStore.city;
-  const uid = localStorage.getItem('user_id');
-  
-  try {
-    const wRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/admin/warehouses`, { 
-      headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' } 
-    });
-    warehouses.value = wRes.data;
-
-    if (uid) {
-      const u = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${uid}`);
-      form.value.name = [u.data.first_name, u.data.last_name].filter(Boolean).join(' ') || '';
-      form.value.phone = u.data.phone_number || '';
-      form.value.email = u.data.email || '';
-    }
-  } catch (e) { console.error("Ошибка инициализации чекаута", e); }
-});
-
-// Обработка оформления заказа
+// ---- ОФОРМЛЕНИЕ ----
 const handleOrderProcess = async () => {
+  if (isSubmitDisabled.value) return;
   loading.value = true;
   try {
     const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/orders`, {
@@ -312,12 +340,74 @@ const handleOrderProcess = async () => {
 };
 
 const cancelOrder = () => router.push('/cart');
+
+// ---- ИНИЦИАЛИЗАЦИЯ ----
+onMounted(async () => {
+  // Загружаем список городов
+  try {
+    const cRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/cities`);
+    cities.value = cRes.data || [];
+  } catch (e) { console.warn('Не удалось загрузить города'); }
+
+  cityInput.value = appStore.city || '';
+  const uid = localStorage.getItem('user_id');
+  
+  try {
+    const wRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/admin/warehouses`, { 
+      headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' } 
+    });
+    warehouses.value = wRes.data;
+
+    if (uid) {
+      const u = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${uid}`);
+      form.value.name = [u.data.first_name, u.data.last_name].filter(Boolean).join(' ') || '';
+      form.value.phone = u.data.phone_number || '';
+      form.value.email = u.data.email || '';
+    }
+  } catch (e) { console.error("Ошибка инициализации чекаута", e); }
+});
+
+watch([selectedWarehouseId, () => cartStore.items.map(i => i.quantity).join(',')], () => {
+  refreshShipping();
+}, { immediate: true });
 </script>
 
 <style scoped>
-/* ==========================================================================
-   ОБЩИЕ СТИЛИ И АНИМАЦИИ
-   ========================================================================== */
+/* Все стили из предыдущей версии без изменений, добавляется только автодополнение */
+/* Полный CSS скопируйте из предыдущего ответа */
+/* ... (весь блок <style scoped> из предыдущего сообщения) ... */
+
+/* ДОБАВЛЕННЫЕ СТИЛИ ДЛЯ АВТОДОПОЛНЕНИЯ */
+.city-autocomplete { position: relative; }
+.city-autocomplete input {
+  width: 100%; padding: 14px 18px; font-size: 1.1rem; font-weight: 600;
+  border-radius: var(--radius-sm, 8px); border: 2px solid var(--border-color, #cbd5e1);
+  background: var(--bg-card, #fff); color: var(--text-main, #0f172a); transition: all 0.3s;
+}
+:global(.dark) .city-autocomplete input { background: #0f172a; border-color: #475569; color: #f8fafc; }
+.city-autocomplete input:focus { border-color: var(--primary, #2563eb); outline: none; }
+
+.city-suggestions {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+  max-height: 220px; overflow-y: auto; list-style: none; padding: 0; margin-top: 4px;
+  border-radius: var(--radius-md, 12px); background: var(--bg-card, #fff);
+  border: 1px solid var(--border-color, #e2e8f0); box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+:global(.dark) .city-suggestions { background: #1e293b; border-color: #334155; }
+.city-suggestions li {
+  padding: 12px 18px; cursor: pointer; font-size: 0.95rem; color: var(--text-main, #0f172a);
+  border-bottom: 1px solid var(--border-color, #e2e8f0); transition: background 0.2s;
+}
+:global(.dark) .city-suggestions li { color: #f8fafc; border-color: #334155; }
+.city-suggestions li:hover, .city-suggestions li.active {
+  background: rgba(37, 99, 235, 0.05); color: var(--primary, #2563eb);
+}
+:global(.dark) .city-suggestions li:hover, :global(.dark) .city-suggestions li.active { background: rgba(37, 99, 235, 0.15); }
+
+/* Анимация появления/скрытия */
+.dropdown-fade-enter-active, .dropdown-fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.dropdown-fade-enter-from, .dropdown-fade-leave-to { opacity: 0; transform: translateY(-8px); }
+
 @keyframes fadeSlideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
