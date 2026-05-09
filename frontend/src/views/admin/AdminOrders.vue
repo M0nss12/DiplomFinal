@@ -387,11 +387,14 @@ const updateOrderStatus = async (order) => {
 };
 
 const deleteOrder = async (id) => {
-  if (confirm('Удалить заказ?')) {
+  if (confirm('Удалить заказ? Остатки вернутся на склады.')) {
     try {
         await axios.delete(`/api/admin/orders/${id}`, config);
         orders.value = orders.value.filter(o => o.id !== id);
-    } catch (e) { alert("Ошибка при удалении"); }
+        alert('Заказ удалён, остатки возвращены.');
+    } catch (e) {
+        alert('Ошибка при удалении: ' + (e.response?.data?.error || e.message));
+    }
   }
 };
 

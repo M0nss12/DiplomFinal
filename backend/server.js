@@ -722,6 +722,53 @@ app.put('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Специальный обработчик удаления заказа (с возвратом остатков)
+app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
+    const orderId = req.params.id;
+
+    try {
+        // Получаем позиции заказа (вместе со складом-отправителем)
+        const { data: items, error: itemsErr } = await supabase
+            .from('order_items')
+            .select('product_id, quantity, warehouse_id')
+            .eq('order_id', orderId);
+
+        if (itemsErr) throw itemsErr;
+
+        // Возвращаем остатки на склады
+        if (items && items.length > 0) {
+            for (const item of items) {
+                if (item.warehouse_id) {
+                    // Увеличиваем количество на складе
+                    const { error: updateErr } = await supabase
+                        .from('product_stocks')
+                        .update({ quantity: supabase.raw(`quantity + ${item.quantity}`) })
+                        .eq('product_id', item.product_id)
+                        .eq('warehouse_id', item.warehouse_id);
+                    if (updateErr) {
+                        console.error('Ошибка возврата остатков при удалении заказа:', updateErr);
+                        // Ошибка возврата не должна блокировать удаление, но логируем
+                    }
+                }
+            }
+        }
+
+        // Удаляем заказ (каскадно удалятся order_items, status_history и т.д.)
+        const { error: deleteErr } = await supabase
+            .from('orders')
+            .delete()
+            .eq('id', orderId);
+
+        if (deleteErr) throw deleteErr;
+
+        res.json({ success: true, message: 'Заказ удалён, остатки возвращены' });
+    } catch (e) {
+        console.error('Ошибка удаления заказа:', e);
+        res.status(500).json({ error: 'Ошибка при удалении заказа' });
+    }
+});
+
+
 app.delete('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
     try {
         const { error } = await supabase.from(req.params.table).delete().eq('id', req.params.id);
