@@ -29,12 +29,11 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // 3. Настройка приложения
 const app = express();
-app.set('trust proxy', true); // КРИТИЧЕСКИ ВАЖНО для Render (получение реального IP)
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 3000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'my_super_secret_admin_123';
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Усиленный CORS (разрешаем заголовки для логов и админки)
 app.use(cors({
     origin: [
         'https://diplomfinal.onrender.com', 
@@ -49,16 +48,13 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Дефолтные аватарки
 const DEFAULT_AVATARS = [
     `https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png`,
     `https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/2.png`,
     `https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/3.png`
 ];
 
-// =====================================================================
-// 📧 БЛОК: ПОЧТА И ШАБЛОНЫ УВЕДОМЛЕНИЙ
-// =====================================================================
+// --- Почта и шаблоны ---
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com', port: 587, secure: false,
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
@@ -79,9 +75,7 @@ const getEmailTemplate = (templateName, variables = {}) => {
     return html;
 };
 
-// =====================================================================
-// 📝 БЛОК: СИСТЕМНОЕ ЛОГИРОВАНИЕ
-// =====================================================================
+// --- Логирование ---
 const LOGS_DIR = path.join(__dirname, 'logs');
 const ERROR_LOG = path.join(LOGS_DIR, 'errors.log');
 const ACTIONS_LOG = path.join(LOGS_DIR, 'actions.log');
@@ -105,20 +99,19 @@ const notifyAndEmail = async ({ userId, type, title, message, email, templateNam
         if (userId) await supabase.from('notifications').insert([{ user_id: userId, type, title, message }]);
     } catch (e) { console.error('Ошибка записи уведомления в БД:', e.message); }
 
-if (email && templateName) {
-    try {
-        const html = getEmailTemplate(templateName, { title, message, ...templateVars });
-        const info = await transporter.sendMail({
-            from: `"ApexDrive" <${process.env.EMAIL_USER}>`, 
-            to: email,
-            subject: title,
-            html: html
-        });
-        console.log("📧 Письмо успешно отправлено:", info.messageId);
-    } catch (e) { 
-        console.error("❌ ОШИБКА ПОЧТЫ (SMTP):", e.message); 
+    if (email && templateName) {
+        try {
+            const html = getEmailTemplate(templateName, { title, message, ...templateVars });
+            await transporter.sendMail({
+                from: `"ApexDrive" <${process.env.EMAIL_USER}>`, 
+                to: email,
+                subject: title,
+                html: html
+            });
+        } catch (e) { 
+            console.error("❌ ОШИБКА ПОЧТЫ (SMTP):", e.message); 
+        }
     }
-}
 };
 
 const logError = (err, req = null) => {
@@ -129,16 +122,13 @@ const logError = (err, req = null) => {
     });
 };
 
-// =====================================================================
-// 🛡️ БЛОК: УТИЛИТЫ И КАПЧА
-// =====================================================================
+// --- Утилиты ---
 async function getOrCreateCity(cityName) {
     if (!cityName) return null;
     const name = cityName.trim();
     try {
         const { data: existing } = await supabase.from('cities').select('id').ilike('name', name).maybeSingle();
         if (existing) return existing.id;
-
         const { data: created, error } = await supabase.from('cities').insert([{ name }]).select('id').single();
         if (error) return null;
         return created.id;
@@ -153,16 +143,12 @@ const verifyAdmin = (req, res, next) => {
 const verifyYandexCaptcha = (token, ip) => {
     return new Promise((resolve) => {
         const secret = process.env.YANDEX_API_KEY;
-
-        // Фикс для локальной разработки (Яндекс не понимает IPv6 ::1)
         let userIp = ip;
         if (ip === '::1' || ip === '::ffff:127.0.0.1') userIp = '127.0.0.1';
-
         const options = {
             hostname: 'smartcaptcha.yandexcloud.net', port: 443, method: 'GET',
             path: '/validate?' + querystring.stringify({ secret, token, ip: userIp }),
         };
-
         const req = https.request(options, (res) => {
             let body = '';
             res.on('data', (chunk) => { body += chunk; });
@@ -170,7 +156,6 @@ const verifyYandexCaptcha = (token, ip) => {
                 if (res.statusCode !== 200) return resolve(false);
                 try {
                     const parsed = JSON.parse(body);
-                    console.log(`[Captcha] Результат для IP ${userIp}:`, parsed);
                     resolve(parsed.status === 'ok');
                 } catch (e) { resolve(false); }
             });
@@ -181,35 +166,23 @@ const verifyYandexCaptcha = (token, ip) => {
 };
 
 // =====================================================================
-// 🏠 API: КАТАЛОГ И МАРКЕТИНГ
+// API: КАТАЛОГ И МАРКЕТИНГ
 // =====================================================================
 
-// Получить все категории (публичный роут для каталога)
 app.get('/api/categories', async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from('categories')
-            .select('*')
-            .order('name', { ascending: true });
+        const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
         if (error) throw error;
         res.json(data || []);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Получить все бренды (публичный роут)
 app.get('/api/brands', async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from('brands')
-            .select('*')
-            .order('name', { ascending: true });
+        const { data, error } = await supabase.from('brands').select('*').order('name', { ascending: true });
         if (error) throw error;
         res.json(data || []);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/marketing/currency', async (req, res) => {
@@ -276,7 +249,7 @@ app.get('/api/global-search', async (req, res) => {
 });
 
 // =====================================================================
-// 💬 API: ИЗБРАННОЕ И ОТЗЫВЫ
+// API: ИЗБРАННОЕ И ОТЗЫВЫ
 // =====================================================================
 app.get('/api/wishlist/:userId', async (req, res) => {
     try {
@@ -313,45 +286,26 @@ app.get('/api/reviews/:productId', async (req, res) => {
 });
 
 // =====================================================================
-// 👤 API: ПОЛЬЗОВАТЕЛИ И АВТОРИЗАЦИЯ
+// API: ПОЛЬЗОВАТЕЛИ И АВТОРИЗАЦИЯ
 // =====================================================================
-
-// Смена пароля из настроек профиля
 app.post('/api/users/change-password/:id', async (req, res) => {
     const { oldPassword, newPassword } = req.body;
     const userId = req.params.id;
-
     try {
-        // 1. Проверяем старый пароль через нашу RPC функцию в базе
         const { data: isValid } = await supabase.rpc('verify_user_password', { 
             user_id_param: userId, 
             pass_param: oldPassword 
         });
-
-        if (!isValid) {
-            return res.status(401).json({ error: 'Текущий пароль введен неверно' });
-        }
-
-        // 2. Если верный — обновляем на новый
-        // Триггер в БД сам захеширует новый пароль при обновлении
-        const { error } = await supabase
-            .from('users')
-            .update({ password_hash: newPassword })
-            .eq('id', userId);
-
+        if (!isValid) return res.status(401).json({ error: 'Текущий пароль введен неверно' });
+        const { error } = await supabase.from('users').update({ password_hash: newPassword }).eq('id', userId);
         if (error) throw error;
-
         res.json({ success: true, message: 'Пароль успешно изменен' });
-    } catch (e) {
-        res.status(500).json({ error: 'Ошибка сервера при смене пароля' });
-    }
+    } catch (e) { res.status(500).json({ error: 'Ошибка сервера при смене пароля' }); }
 });
 
 app.post('/api/users/register', async (req, res) => {
     try {
         const { email, phone, password, first_name, last_name, otchestvo, city, captchaToken } = req.body;
-        
-        // Яндекс SmartCaptcha
         const isHuman = await verifyYandexCaptcha(captchaToken, req.ip);
         if (!isHuman) return res.status(400).json({ error: 'Проверка на робота не пройдена' });
 
@@ -377,12 +331,10 @@ app.post('/api/users/register', async (req, res) => {
 
         if (error) throw error;
 
-        // Письмо-подтверждение
         if (email) {
             const token = crypto.randomBytes(32).toString('hex');
             const expiresAt = new Date(Date.now() + 3600000).toISOString();
             await supabase.from('password_reset_tokens').insert([{ user_id: newUserId, token, expires_at: expiresAt }]);
-            
             const verifyLink = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/users/verify-email?token=${token}`;
             await notifyAndEmail({
                 userId: newUserId, type: 'system', email: email,
@@ -401,7 +353,6 @@ app.get('/api/users/verify-email', async (req, res) => {
     try {
         const { data: tData } = await supabase.from('password_reset_tokens').select('*').eq('token', token).eq('used', false).gt('expires_at', new Date().toISOString()).maybeSingle();
         if (!tData) return res.status(400).send('Ссылка недействительна или устарела');
-        
         await supabase.from('users').update({ is_email_verified: true }).eq('id', tData.user_id);
         await supabase.from('password_reset_tokens').update({ used: true }).eq('id', tData.id);
         res.redirect('/login?verified=true'); 
@@ -431,7 +382,7 @@ app.put('/api/users/profile/:id', async (req, res) => {
 });
 
 // =====================================================================
-// 🔔 API: УВЕДОМЛЕНИЯ И СБРОС ПАРОЛЯ
+// API: УВЕДОМЛЕНИЯ И СБРОС ПАРОЛЯ
 // =====================================================================
 app.get('/api/notifications/:userId', async (req, res) => {
     const { data } = await supabase.from('notifications').select('*').eq('user_id', req.params.userId).order('created_at', { ascending: false });
@@ -448,13 +399,10 @@ app.post('/api/users/request-password-reset', async (req, res) => {
     try {
         const { data: user } = await supabase.from('users').select('id, first_name').eq('email', email).maybeSingle();
         if (!user) return res.status(404).json({ error: 'Пользователь с такой почтой не найден' });
-        
         const token = crypto.randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 3600000).toISOString();
         await supabase.from('password_reset_tokens').insert([{ user_id: user.id, token, expires_at: expiresAt }]);
-        
         const resetLink = `${process.env.VITE_API_URL || 'http://localhost:3000'}/reset-password-confirm?token=${token}`;
-        
         await notifyAndEmail({
             userId: user.id, type: 'system', email: email,
             title: 'Сброс пароля',
@@ -462,7 +410,6 @@ app.post('/api/users/request-password-reset', async (req, res) => {
             templateName: 'password_reset.html',
             templateVars: { link: resetLink, first_name: user.first_name }
         });
-        
         res.json({ success: true });
     } catch (e) { logError(e, req); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
@@ -472,7 +419,6 @@ app.post('/api/users/reset-password', async (req, res) => {
     try {
         const { data: tData } = await supabase.from('password_reset_tokens').select('*').eq('token', token).eq('used', false).gt('expires_at', new Date().toISOString()).maybeSingle();
         if (!tData) return res.status(400).json({ error: 'Ссылка недействительна или устарела' });
-        
         await supabase.from('users').update({ password_hash: newPassword }).eq('id', tData.user_id);
         await supabase.from('password_reset_tokens').update({ used: true }).eq('id', tData.id);
         res.json({ success: true });
@@ -480,65 +426,66 @@ app.post('/api/users/reset-password', async (req, res) => {
 });
 
 // =====================================================================
-// 🛍️ API: ЗАКАЗЫ И ОПЛАТА
+// ⚡️ API: ЗАКАЗЫ (ИСПРАВЛЕННЫЙ)
 // =====================================================================
 app.post('/api/orders', async (req, res) => {
-    const { customer_name, customer_email, customer_phone, customer_city, items, warehouse_id, payment_method, shipping_cost, delivery_type } = req.body;
+    const { customer_name, customer_email, customer_phone, items, warehouse_id, payment_method } = req.body;
+    
     try {
-        // 1. Проверяем, существует ли склад и город
-        const { data: wh, error: whErr } = await supabase.from('warehouses').select('*, cities(name)').eq('id', warehouse_id).maybeSingle();
-        
-        if (!wh || whErr) {
-            return res.status(400).json({ error: 'Склад не найден. Сначала создайте город и склад в админке!' });
-        }
+        // 1. Данные о складе
+        const { data: targetWh } = await supabase
+            .from('warehouses')
+            .select('*, cities(lat, lon, name)')
+            .eq('id', warehouse_id)
+            .single();
 
-        const cityId = await getOrCreateCity(customer_city);
-        let { data: user } = await supabase.from('users').select('id').or(`email.eq.${customer_email},phone_number.eq.${customer_phone}`).maybeSingle();
-        
-        let userId = user ? user.id : crypto.randomUUID();
-        if (!user) {
-            await supabase.from('users').insert([{ id: userId, role: 'guest', first_name: customer_name, email: customer_email, phone_number: customer_phone, saved_city_id: cityId }]);
-        }
+        // 2. Расчёт доставки через RPC
+        const { data: shippingData, error: shipErr } = await supabase.rpc('calculate_order_shipping', {
+            target_warehouse_id: warehouse_id,
+            items_json: items   // формат: [{product_id, quantity}, ...]
+        });
+        if (shipErr) throw shipErr;
+        const totalShipping = shippingData.total;
 
-        let totalPrice = 0; let itemsData = [];
+        // 3. Суммируем цены товаров
+        let totalPrice = 0;
+        let itemsData = [];
         for (let item of items) {
-            const { data: p } = await supabase.from('products').select('price, discount_price').eq('id', item.product_id).single();
-            if (!p) continue;
-            const price = p.discount_price || p.price;
+            const { data: product } = await supabase
+                .from('products')
+                .select('price, discount_price')
+                .eq('id', item.product_id)
+                .single();
+            const price = product.discount_price || product.price;
             totalPrice += price * item.quantity;
-            itemsData.push({ product_id: item.product_id, quantity: item.quantity, unit_price: price });
-            
-            // Уменьшаем остаток (убедись, что функция decrement_stock создана в SQL)
-            await supabase.rpc('decrement_stock', { p_product_id: item.product_id, p_warehouse_id: warehouse_id, p_quantity: item.quantity });
+            itemsData.push({
+                product_id: item.product_id,
+                quantity: item.quantity,
+                unit_price: price
+            });
         }
-        
-        const finalTotal = Math.round(totalPrice + (Number(shipping_cost) || 0));
-        
-        // Безопасное формирование адреса
-        const deliveryAddress = wh.cities ? `${wh.cities.name}, ${wh.address}` : wh.address;
 
+        const finalTotal = totalPrice + totalShipping;
+
+        // 4. Создаём заказ
         const { data: order, error: oErr } = await supabase.from('orders').insert([{ 
-            user_id: userId, warehouse_id, payment_method, delivery_type: delivery_type || 'pickup',
-            payment_status: 'unpaid', delivery_status: 'processing',
-            shipping_cost: shipping_cost || 0, total_price: finalTotal, delivery_address: deliveryAddress,
+            user_id: req.headers['x-user-id'] || crypto.randomUUID(),
+            warehouse_id, 
+            payment_method,
+            payment_status: 'unpaid', 
+            delivery_status: 'processing',
+            shipping_cost: totalShipping, 
+            total_price: finalTotal,
+            delivery_address: `${targetWh.cities.name}, ${targetWh.address}`,
             customer_name, customer_phone, customer_email
         }]).select();
 
         if (oErr) throw oErr;
         await supabase.from('order_items').insert(itemsData.map(i => ({ ...i, order_id: order[0].id })));
         
-        await notifyAndEmail({
-            userId: userId, type: 'order', email: customer_email,
-            title: `Заказ №${order[0].id} принят!`,
-            message: `Сумма: ${finalTotal} руб.`,
-            templateName: 'order_created.html',
-            templateVars: { order_id: order[0].id, total: finalTotal, name: customer_name }
-        });
-
-        res.json({ orderId: order[0].id, total: finalTotal });
-    } catch (err) { 
-        logError(err, req); 
-        res.status(500).json({ error: 'Ошибка создания заказа: ' + err.message }); 
+        res.json({ orderId: order[0].id, total: finalTotal, distance_based_shipping: totalShipping });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -562,7 +509,7 @@ app.get('/api/payment/test-webhook', async (req, res) => {
 });
 
 // =====================================================================
-// 📦 API: УПРАВЛЕНИЕ ФАЙЛАМИ
+// API: УПРАВЛЕНИЕ ФАЙЛАМИ
 // =====================================================================
 app.post('/api/upload/:folder', upload.single('file'), async (req, res) => {
     try {
@@ -586,7 +533,7 @@ app.delete('/api/storage/:bucket/:filename', verifyAdmin, async (req, res) => {
 });
 
 // =====================================================================
-// 👑 API: АДМИНКА
+// API: АДМИНКА
 // =====================================================================
 app.get('/api/admin/system/logs', verifyAdmin, (req, res) => {
     const { type } = req.query;
@@ -596,7 +543,6 @@ app.get('/api/admin/system/logs', verifyAdmin, (req, res) => {
     res.json(lines.map(l => JSON.parse(l)).reverse().slice(0, 100));
 });
 
-// Получение данных таблиц
 app.get('/api/admin/:table', verifyAdmin, async (req, res) => {
     try {
         let query = supabase.from(req.params.table).select('*');
@@ -606,14 +552,12 @@ app.get('/api/admin/:table', verifyAdmin, async (req, res) => {
         if (req.params.table === 'user_vehicles') query = supabase.from('user_vehicles').select('*, users(first_name, last_name)');
         if (req.params.table === 'return_requests') query = supabase.from('return_requests').select('*, users(first_name, last_name)');
         if (req.params.table === 'order_items') query = supabase.from('order_items').select('*, products(name, sku)');
-
         const { data, error } = await query.order('id', { ascending: false });
         if (error) throw error;
         res.json(data || []);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Создание записей (ДОБАВЛЕНО)
 app.post('/api/admin/:table', verifyAdmin, async (req, res) => {
     try {
         const { data, error } = await supabase.from(req.params.table).insert([req.body]).select();
@@ -622,7 +566,6 @@ app.post('/api/admin/:table', verifyAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Обновление записей
 app.put('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
     try {
         const { data, error } = await supabase.from(req.params.table).update(req.body).eq('id', req.params.id).select();
@@ -631,7 +574,6 @@ app.put('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Удаление записей
 app.delete('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
     try {
         const { error } = await supabase.from(req.params.table).delete().eq('id', req.params.id);
@@ -640,14 +582,11 @@ app.delete('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Специальный роут для статусов заказа
 app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
     const { delivery_status, payment_status } = req.body;
     const orderId = req.params.id;
-
     try {
         const { data: order } = await supabase.from('orders').update({ delivery_status, payment_status }).eq('id', orderId).select().single();
-        
         if (delivery_status === 'delivered') {
             await notifyAndEmail({
                 userId: order.user_id, type: 'order', email: order.customer_email,
@@ -669,15 +608,11 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// =====================================================================
-// 🌍 CATCH-ALL ДЛЯ VUE ROUTER (ДОЛЖЕН БЫТЬ В САМОМ КОНЦЕ!)
-// =====================================================================
-// Используем чистый RegExp, чтобы обойти ошибки парсера path-to-regexp v8
+// Catch-all для Vue Router
 app.get(/^(?!\/api).+/, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Для корневого пути /
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
