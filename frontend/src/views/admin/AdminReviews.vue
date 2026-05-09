@@ -4,13 +4,93 @@
     <div class="header-row">
       <div class="header-left">
         <h1>💬 Управление отзывами</h1>
-        <p class="subtitle">Модерация текстов, проверка фотографий и управление рейтингом</p>
+        <p class="subtitle">Модерация текстов, проверка фотографий и создание новых отзывов</p>
       </div>
       <div class="stats-badge glass-card">
         <span class="stats-icon">📊</span>
         Всего: <b>{{ filteredReviews.length }}</b>
       </div>
     </div>
+
+    <!-- 1. ФОРМА СОЗДАНИЯ ОТЗЫВА -->
+    <section class="admin-card create-card glass-card">
+      <div class="card-header">
+        <h3 class="card-title">✨ Создать новый отзыв</h3>
+        <div class="card-decoration"></div>
+      </div>
+      <form @submit.prevent="createReview" class="admin-form">
+        <div class="input-grid">
+          <div class="input-group">
+            <label>📦 Товар *</label>
+            <select v-model="newReview.product_id" required class="form-input">
+              <option :value="null" disabled>-- Выберите товар --</option>
+              <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>👤 Пользователь *</label>
+            <select v-model="newReview.user_id" required class="form-input">
+              <option :value="null" disabled>-- Выберите пользователя --</option>
+              <option v-for="u in users" :key="u.id" :value="u.id">
+                {{ u.last_name || '' }} {{ u.first_name || '' }} ({{ u.email || u.phone_number || 'ID: ' + u.id }})
+              </option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>⭐ Оценка</label>
+            <select v-model="newReview.rating" class="form-input">
+              <option v-for="n in 5" :key="n" :value="n">{{ n }} ★</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>📌 Статус</label>
+            <select v-model="newReview.is_approved" class="form-input">
+              <option :value="true">✅ Опубликован</option>
+              <option :value="false">⏳ На модерации</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="input-group full-width">
+          <label>💬 Комментарий</label>
+          <textarea v-model="newReview.comment" placeholder="Текст отзыва..." class="form-input comment-area" rows="3"></textarea>
+        </div>
+
+        <div class="pros-cons-grid-form">
+          <div class="input-group">
+            <label class="label-pros">➕ Плюсы</label>
+            <input v-model="newReview.pros" placeholder="Что понравилось?" class="form-input" />
+          </div>
+          <div class="input-group">
+            <label class="label-cons">➖ Минусы</label>
+            <input v-model="newReview.cons" placeholder="Что можно улучшить?" class="form-input" />
+          </div>
+        </div>
+
+        <!-- ГАЛЕРЕЯ НОВОГО ОТЗЫВА -->
+        <div class="input-group full-width">
+          <label>🖼️ Фотографии (до 5)</label>
+          <div class="upload-gallery">
+            <div v-for="(img, idx) in newReview.images" :key="idx" class="preview-item glass-card">
+              <img :src="img" @click="previewImage(img)" />
+              <button type="button" @click="newReview.images.splice(idx, 1)" class="btn-clear-img">✕</button>
+            </div>
+            <label v-if="newReview.images.length < 5" class="file-label-big glass-card">
+              <span v-if="!uploading">+ Добавить фото</span>
+              <span v-else class="spinner-small"></span>
+              <input type="file" @change="handleNewReviewImage" accept="image/*" class="hidden-file" :disabled="uploading" />
+            </label>
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="submit" :disabled="uploading" class="btn-primary">
+            <span v-if="uploading" class="spinner-small"></span>
+            <span v-else>✨ Опубликовать отзыв</span>
+          </button>
+        </div>
+      </form>
+    </section>
 
     <!-- ФИЛЬТРЫ -->
     <section class="admin-card filter-section glass-card">
@@ -160,7 +240,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, reactive, computed, watch } from 'vue';
 import axios from 'axios';
 
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123';
@@ -171,6 +251,19 @@ const reviews = ref([]);
 const products = ref([]);
 const users = ref([]);
 const uploadLoadingId = ref(null);
+const uploading = ref(false);
+
+// --- Новый отзыв ---
+const newReview = reactive({
+  product_id: null,
+  user_id: null,
+  rating: 5,
+  comment: '',
+  pros: '',
+  cons: '',
+  images: [],
+  is_approved: true
+});
 
 // Фильтры
 const searchQuery = ref('');
@@ -202,9 +295,10 @@ const loadData = async () => {
 
 const getFilenameFromUrl = (url) => url ? url.split('/').pop() : null;
 
+// --- Работа с существующими отзывами ---
 const saveReview = async (review) => {
   try {
-    const { users, products, ...payload } = review; // Очищаем вложенные объекты
+    const { users, products, ...payload } = review;
     await axios.put(`/api/admin/reviews/${review.id}`, payload, config);
   } catch (e) { console.error('Ошибка сохранения'); }
 };
@@ -261,6 +355,47 @@ const removeReview = async (id) => {
   } catch (e) { alert('Ошибка при удалении'); }
 };
 
+// --- Создание нового отзыва ---
+const handleNewReviewImage = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+  uploading.value = true;
+
+  try {
+    const res = await axios.post(`/api/upload/reviews`, formData, config);
+    newReview.images.push(res.data.url);
+  } catch (e) {
+    alert('Ошибка загрузки фото');
+  } finally {
+    uploading.value = false;
+  }
+};
+
+const createReview = async () => {
+  try {
+    const res = await axios.post(`/api/admin/reviews`, newReview, config);
+    reviews.value.unshift(res.data);
+    // Сброс формы
+    Object.assign(newReview, {
+      product_id: null,
+      user_id: null,
+      rating: 5,
+      comment: '',
+      pros: '',
+      cons: '',
+      images: [],
+      is_approved: true
+    });
+    alert('Отзыв успешно создан!');
+  } catch (e) {
+    alert('Ошибка при создании отзыва');
+  }
+};
+
+// --- Вспомогательные функции ---
 const getProductName = (id) => products.value.find(p => p.id === id)?.name || 'Товар удален';
 const getUserName = (id) => {
   const u = users.value.find(user => user.id === id);
@@ -269,7 +404,7 @@ const getUserName = (id) => {
 const formatDate = (d) => new Date(d).toLocaleDateString('ru-RU');
 const previewImage = (url) => window.open(url, '_blank');
 
-// Фильтрация
+// --- Фильтрация и пагинация ---
 const filteredReviews = computed(() => {
   let res = [...reviews.value];
   if (searchQuery.value.trim()) {
@@ -301,8 +436,75 @@ onMounted(loadData);
 
 <style scoped>
 /* ==========================================================================
-   АДМИНКА: ОТЗЫВЫ (GLASSMORPHISM & DARK MODE)
+   АДМИНКА: ОТЗЫВЫ (GLASSMORPHISM & DARK MODE) – обновлено
    ========================================================================== */
+@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.admin-reviews { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
+:global(.dark) .admin-reviews { color: #f8fafc; }
+
+.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-left h1 {
+  font-size: 2.2rem; font-weight: 900; margin: 0;
+  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; }
+
+.stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
+
+/* КАРТОЧКИ */
+.glass-card {
+  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(8px); transition: all 0.3s ease;
+}
+:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
+
+.admin-card { padding: 25px; margin-bottom: 30px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.card-title { font-size: 1.35rem; font-weight: 900; margin: 0; }
+.card-decoration { width: 50px; height: 4px; background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); border-radius: 4px; margin-top: 5px; }
+
+.filter-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 20px; align-items: flex-end; }
+
+/* ИНПУТЫ */
+.input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; margin-bottom: 24px; }
+.input-group { display: flex; flex-direction: column; gap: 8px; }
+.input-group label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); }
+.input-group.full-width { grid-column: 1 / -1; }
+
+.form-input {
+  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
+  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s; box-sizing: border-box;
+}
+:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
+.form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+.comment-area { resize: vertical; min-height: 100px; }
+.pros-cons-grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+.label-pros { color: var(--success, #10b981); }
+.label-cons { color: var(--danger, #ef4444); }
+
+/* Загрузка фото */
+.upload-gallery { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px; }
+.preview-item { width: 80px; height: 80px; position: relative; padding: 4px; background: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.preview-item img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in; }
+.file-label-big { width: 100px; height: 80px; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--border-color); cursor: pointer; border-radius: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 700; }
+.file-label-big:hover { border-color: var(--primary); color: var(--primary); background: rgba(37,99,235,0.05); }
+.hidden-file { display: none; }
+.btn-clear-img { position: absolute; top: -8px; right: -8px; width: 20px; height: 20px; background: var(--danger, #ef4444); color: white; border: none; border-radius: 50%; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.spinner-small { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
+
+.form-footer { display: flex; justify-content: flex-end; margin-top: 20px; }
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); color: white; border: none;
+  padding: 14px 30px; border-radius: 8px; font-weight: 800; cursor: pointer; transition: 0.3s;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
+
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -412,3 +614,4 @@ input:checked + .toggle-slider:before { transform: translateX(22px); }
 @media (max-width: 1024px) { .filter-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 768px) { .admin-reviews { padding: 24px 16px; } .header-row { flex-direction: column; align-items: flex-start; } .col-content { min-width: 250px; } .p-numbers { display: none; } }
 </style>
+

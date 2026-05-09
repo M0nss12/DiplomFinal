@@ -13,7 +13,7 @@
 
     <!-- 1. ФОРМА ПРИЕМКИ ТОВАРА -->
     <section class="admin-card admission-card glass-card">
-      <h3 class="card-title">📦 Приходовать товар на склад</h3>
+      <h3 class="card-title">📦 Приход товара на склад</h3>
       <form @submit.prevent="createStock" class="admin-form">
         <div class="input-grid">
           <div class="input-group">
@@ -269,7 +269,7 @@ const createStock = async () => {
     const res = await axios.post(`/api/admin/product_stocks`, newStock, config);
     stocks.value.unshift(res.data);
     newStock.quantity = 0; newStock.shelf_location = '';
-    alert('Товар успешно оприходован');
+    alert('Товар успешно оформлен');
   } catch (e) { alert('Ошибка при сохранении'); }
   finally { loadingAction.value = false; }
 };

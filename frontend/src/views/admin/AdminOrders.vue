@@ -143,18 +143,18 @@
                 </td>
                 <td>
                   <div class="price-edit-group">
-                    <div class="edit-row"><span>📦 Т-ры:</span> {{ order.total_price - order.shipping_cost }} ₽</div>
+                    <div class="edit-row"><span>📦 Т-ры:</span> {{ (order.total_price - order.shipping_cost) }} ₽</div>
                     <div class="edit-row shipping"><span>🚚 Дост:</span> {{ order.shipping_cost }} ₽</div>
                   </div>
                 </td>
                 <td>
-<select v-model="order.delivery_status" @change="updateOrderStatus(order)" class="status-select" :class="order.delivery_status">
-    <option value="processing">Обработка</option>
-    <option value="shipping">В пути</option>
-    <option value="ready_for_pickup">Готов к выдаче</option>
-    <option value="delivered">Выдан</option>
-    <option value="cancelled">Отменён</option>
-</select>
+                  <select v-model="order.delivery_status" @change="updateOrderStatus(order)" class="status-select" :class="order.delivery_status">
+                    <option value="processing">Обработка</option>
+                    <option value="shipping">В пути</option>
+                    <option value="ready_for_pickup">Готов к выдаче</option>
+                    <option value="delivered">Выдан</option>
+                    <option value="cancelled">Отменен</option>
+                  </select>
                 </td>
                 <td>
                   <select v-model="order.payment_status" @change="updateOrderStatus(order)" class="status-select" :class="order.payment_status">
@@ -205,6 +205,10 @@
                             <span class="qty-badge">{{ item.quantity }} шт.</span>
                             <span class="price-tag">× {{ item.unit_price }} ₽</span>
                           </div>
+                          <!-- Информация о складе-отправителе -->
+                          <div class="ipro-warehouse" v-if="item.warehouse_id">
+                            📦 Отправлен со склада: <b>{{ getWarehouseAddress(item.warehouse_id) }}</b>
+                          </div>
                         </div>
                         <div class="ipro-sum">{{ (item.quantity * item.unit_price).toLocaleString() }} ₽</div>
                       </div>
@@ -224,13 +228,11 @@
 import { ref, onMounted, reactive, computed } from 'vue';
 import axios from 'axios';
 import { useAppStore } from '@/stores/appStore';
-import { supabase } from '@/supabase';
 
 const appStore = useAppStore();
 
-const API_URL = import.meta.env.VITE_API_URL || ''; 
-
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123';
+const API_URL = import.meta.env.VITE_API_URL || '';
 const config = { headers: { 'x-admin-key': ADMIN_SECRET } };
 
 const orders = ref([]);
@@ -266,7 +268,7 @@ const updateItemData = (index) => {
     autoCalcShipping();
 };
 
-// ---- Функция расчёта доставки через RPC с обновлением isLocal/distance ----
+// Расчет доставки через серверный эндпоинт
 const autoCalcShipping = async () => {
     if (!newOrder.warehouse_id || selectedProducts.value.length === 0) {
         newOrder.shipping_cost = 0;
@@ -275,10 +277,7 @@ const autoCalcShipping = async () => {
 
     const itemsForRpc = selectedProducts.value
         .filter(item => item.product_id)
-        .map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity
-        }));
+        .map(item => ({ product_id: item.product_id, quantity: item.quantity }));
 
     if (itemsForRpc.length === 0) {
         newOrder.shipping_cost = 0;
@@ -286,26 +285,21 @@ const autoCalcShipping = async () => {
     }
 
     try {
-        // Вызов через сервер, чтобы обойти права анонимного ключа
         const res = await axios.post(`${API_URL}/api/calculate-shipping`, {
             warehouse_id: newOrder.warehouse_id,
             items: itemsForRpc
         }, config);
-
-        const result = res.data;   // { total: 6780.2, details: [...] }
-
+        const result = res.data;
         newOrder.shipping_cost = result.total;
 
-        // Обновляем флаги и дистанции позиций
-        let detailIndex = 0;
+        let idx = 0;
         selectedProducts.value.forEach(item => {
             if (!item.product_id) return;
-            const detail = result.details[detailIndex];
-            if (detail) {
-                item.distance = detail.distance_km || 0;
+            const det = result.details[idx++];
+            if (det) {
+                item.distance = det.distance_km || 0;
                 item.isLocal = item.distance === 0;
             }
-            detailIndex++;
         });
     } catch (e) {
         console.error('Ошибка расчёта доставки:', e);
@@ -320,39 +314,55 @@ const updateAddressFromWarehouse = () => {
 
 const totals = computed(() => {
     let itemsPrice = 0; let weight = 0;
-    selectedProducts.value.forEach(item => { itemsPrice += item.price * item.quantity; weight += item.weight * item.quantity; });
+    selectedProducts.value.forEach(item => {
+        itemsPrice += item.price * item.quantity;
+        weight += item.weight * item.quantity;
+    });
     return { itemsPrice, weight };
 });
 
 const loadData = async () => {
   try {
     const [oRes, uRes, pRes, iRes, wRes, sRes] = await Promise.all([
-      axios.get(`/api/admin/orders`, config), 
+      axios.get(`/api/admin/orders`, config),
       axios.get(`/api/admin/users`, config),
-      axios.get(`/api/admin/products`, config), 
+      axios.get(`/api/admin/products`, config),
       axios.get(`/api/admin/order_items`, config),
       axios.get(`/api/admin/warehouses`, config),
       axios.get(`/api/admin/product_stocks`, config)
     ]);
-    orders.value = oRes.data; users.value = uRes.data; products.value = pRes.data;
-    orderItems.value = iRes.data; warehouses.value = wRes.data;
+    orders.value = oRes.data;
+    users.value = uRes.data;
+    products.value = pRes.data;
+    orderItems.value = iRes.data;
+    warehouses.value = wRes.data;
     productStocks.value = sRes.data;
   } catch (e) { console.error("Ошибка загрузки данных"); }
 };
 
 const getUserFullName = (order) => {
     const u = users.value.find(user => user.id === order.user_id);
-    return u ? `${u.last_name || ''} ${u.first_name}`.trim() : (order.customer_name || 'Гость');
+    return u ? `${u.last_name || ''} ${u.first_name || ''}`.trim() : (order.customer_name || 'Гость');
 };
+
 const getProductData = (id) => products.value.find(p => p.id === id) || {};
+
 const getOrderItems = (orderId) => orderItems.value.filter(item => item.order_id === orderId);
+
+const getWarehouseAddress = (whId) => {
+    const wh = warehouses.value.find(w => w.id === whId);
+    return wh ? `${wh.cities?.name || wh.city_name}, ${wh.address}` : `Склад #${whId}`;
+};
 
 const createOrder = async () => {
   try {
     const user = users.value.find(u => u.id === newOrder.user_id) || {};
-    const itemsForServer = selectedProducts.value.map(item => ({ product_id: item.product_id, quantity: item.quantity }));
-    const payload = { 
-        ...newOrder, 
+    const itemsForServer = selectedProducts.value.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity
+    }));
+    const payload = {
+        ...newOrder,
         customer_name: `${user.last_name || ''} ${user.first_name || 'Гость'}`.trim(),
         customer_phone: user.phone_number || 'не указан',
         customer_email: user.email || '',

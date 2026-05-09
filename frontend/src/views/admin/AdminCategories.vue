@@ -4,7 +4,7 @@
     <div class="header-row">
       <div class="header-left">
         <h1>📂 Управление категориями</h1>
-        <p class="subtitle">Структура каталога и автоматическая очистка хранилища иконок</p>
+        <p class="subtitle">Категории и подкатегории (иконки только у корневых разделов)</p>
       </div>
       <div class="stats-badge glass-card">
         <span class="stats-icon">📊</span>
@@ -30,12 +30,13 @@
           </div>
           <div class="input-group">
             <label>📁 Родительская категория</label>
-            <select v-model="newCategory.parent_id" class="form-input">
+            <select v-model="newCategory.parent_id" class="form-input" @change="onParentChangeForNew">
               <option :value="null">-- Корневая (нет родителя) --</option>
               <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
           </div>
-          <div class="input-group">
+          <!-- Иконка только для корневых категорий -->
+          <div class="input-group" v-if="!newCategory.parent_id">
             <label>🖼️ Иконка раздела</label>
             <div class="upload-controls">
               <div v-if="newCategory.image_url" class="preview-new-img glass-card">
@@ -72,11 +73,11 @@
         </div>
 
         <div class="input-group">
-          <label>📂 Фильтр по родителю</label>
-          <select v-model="parentFilter" class="form-input">
-            <option value="all">Все категории</option>
-            <option :value="null">Только корневые</option>
-            <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+          <label>📂 Тип</label>
+          <select v-model="categoryType" class="form-input">
+            <option value="all">Все</option>
+            <option value="root">Только категории (корневые)</option>
+            <option value="sub">Только подкатегории</option>
           </select>
         </div>
       </div>
@@ -102,44 +103,91 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="cat in paginatedCategories" :key="cat.id" class="category-row">
+            <tr
+              v-for="cat in paginatedCategories"
+              :key="cat.id"
+              class="category-row"
+              :class="{ 'is-sub': cat.parent_id }"
+            >
               <td class="col-id">#{{ cat.id }}</td>
-              
+
               <td class="col-photo">
-                <div class="category-img-box glass-card">
-                  <template v-if="cat.image_url">
-                    <img :src="cat.image_url" @click="previewImage(cat.image_url)" title="Клик для просмотра" />
-                    <button @click="removeExistingIcon(cat)" class="btn-img-delete" title="Удалить из облака">✕</button>
-                  </template>
-                  <label v-else class="upload-mini-btn">
-                    <span>+</span>
-                    <input type="file" @change="(e) => handleFileUpload(e, 'edit', cat)" hidden />
-                  </label>
-                </div>
+                <!-- Подкатегориям не показываем иконку -->
+                <template v-if="cat.parent_id">
+                  <span class="no-icon">—</span>
+                </template>
+                <template v-else>
+                  <div class="category-img-box glass-card">
+                    <template v-if="cat.image_url">
+                      <img
+                        :src="cat.image_url"
+                        @click="previewImage(cat.image_url)"
+                        title="Клик для просмотра"
+                      />
+                      <button
+                        @click="removeExistingIcon(cat)"
+                        class="btn-img-delete"
+                        title="Удалить из облака"
+                      >
+                        ✕
+                      </button>
+                    </template>
+                    <label v-else class="upload-mini-btn">
+                      <span>+</span>
+                      <input
+                        type="file"
+                        @change="(e) => handleFileUpload(e, 'edit', cat)"
+                        hidden
+                      />
+                    </label>
+                  </div>
+                </template>
               </td>
 
               <td>
-                <input v-model="cat.name" @change="updateCategory(cat)" class="inline-edit bold" />
+                <div class="name-cell">
+                  <span v-if="cat.parent_id" class="sub-arrow">↳</span>
+                  <input
+                    v-model="cat.name"
+                    @change="updateCategory(cat)"
+                    class="inline-edit bold"
+                  />
+                </div>
               </td>
 
               <td>
                 <div class="slug-wrapper">
                   <span class="slug-prefix">/</span>
-                  <input v-model="cat.slug" @change="updateCategory(cat)" class="inline-edit slug-text" />
+                  <input
+                    v-model="cat.slug"
+                    @change="updateCategory(cat)"
+                    class="inline-edit slug-text"
+                  />
                 </div>
               </td>
 
               <td>
-                <select v-model="cat.parent_id" @change="updateCategory(cat)" class="table-select">
+                <select
+                  v-model="cat.parent_id"
+                  @change="updateCategory(cat)"
+                  class="table-select"
+                >
                   <option :value="null">-- Корневая --</option>
-                  <option v-for="c in categories" :key="c.id" :value="c.id" :disabled="c.id === cat.id">
+                  <option
+                    v-for="c in categories"
+                    :key="c.id"
+                    :value="c.id"
+                    :disabled="c.id === cat.id"
+                  >
                     {{ c.name }}
                   </option>
                 </select>
               </td>
 
               <td class="text-right">
-                <button @click="deleteCategory(cat)" class="btn-delete-small">🗑️ Удалить</button>
+                <button @click="deleteCategory(cat)" class="btn-delete-small">
+                  🗑️ Удалить
+                </button>
               </td>
             </tr>
           </tbody>
@@ -148,11 +196,31 @@
 
       <!-- ПАГИНАЦИЯ -->
       <div v-if="totalPages > 1" class="pagination-wrapper">
-        <button @click="currentPage--" :disabled="currentPage === 1" class="p-btn glass-card">←</button>
+        <button
+          @click="currentPage--"
+          :disabled="currentPage === 1"
+          class="p-btn glass-card"
+        >
+          ←
+        </button>
         <div class="p-numbers">
-          <button v-for="p in totalPages" :key="p" @click="currentPage = p" class="glass-card" :class="{ active: currentPage === p }">{{ p }}</button>
+          <button
+            v-for="p in totalPages"
+            :key="p"
+            @click="currentPage = p"
+            class="glass-card"
+            :class="{ active: currentPage === p }"
+          >
+            {{ p }}
+          </button>
         </div>
-        <button @click="currentPage++" :disabled="currentPage === totalPages" class="p-btn glass-card">→</button>
+        <button
+          @click="currentPage++"
+          :disabled="currentPage === totalPages"
+          class="p-btn glass-card"
+        >
+          →
+        </button>
       </div>
     </div>
   </div>
@@ -168,20 +236,31 @@ const config = { headers: { 'x-admin-key': ADMIN_SECRET } };
 
 const categories = ref([]);
 const searchQuery = ref('');
-const parentFilter = ref('all');
+const categoryType = ref('all'); // 'all', 'root', 'sub'
 const uploading = ref(false);
 const currentPage = ref(1);
 const itemsPerPage = 20;
 
-const newCategory = reactive({ name: '', slug: '', parent_id: null, image_url: '' });
+const newCategory = reactive({
+  name: '',
+  slug: '',
+  parent_id: null,
+  image_url: '',
+});
 
-// Загрузка данных
+// При выборе родителя сбрасываем иконку
+function onParentChangeForNew() {
+  if (newCategory.parent_id) {
+    newCategory.image_url = '';
+  }
+}
+
 const loadData = async () => {
   try {
     const res = await axios.get(`/api/admin/categories`, config);
     categories.value = Array.isArray(res.data) ? res.data : [];
-  } catch (e) { 
-    console.error('Ошибка загрузки данных категорий'); 
+  } catch (e) {
+    console.error('Ошибка загрузки данных категорий');
   }
 };
 
@@ -192,7 +271,9 @@ const getFilenameFromUrl = (url) => {
   return parts.pop();
 };
 
-const previewImage = (url) => { if (url) window.open(url, '_blank'); };
+const previewImage = (url) => {
+  if (url) window.open(url, '_blank');
+};
 
 const removeExistingIcon = async (cat) => {
   if (!confirm('Удалить иконку физически из хранилища?')) return;
@@ -201,8 +282,10 @@ const removeExistingIcon = async (cat) => {
     if (filename) await axios.delete(`/api/storage/categories/${filename}`, config);
     cat.image_url = null;
     await updateCategory(cat);
-  } catch (e) { 
-    alert('Ошибка при удалении файла'); 
+    // Реактивное обновление
+    replaceCategoryInList(cat);
+  } catch (e) {
+    alert('Ошибка при удалении файла');
   }
 };
 
@@ -219,38 +302,52 @@ const handleFileUpload = async (event, mode, target = null) => {
     if (mode === 'new') {
       newCategory.image_url = res.data.url;
     } else {
-      // Очистка старой иконки при замене
+      // Удаляем старую иконку
       if (target.image_url) {
         const oldFile = getFilenameFromUrl(target.image_url);
         await axios.delete(`/api/storage/categories/${oldFile}`, config).catch(() => {});
       }
       target.image_url = res.data.url;
       await updateCategory(target);
+      // Реактивное обновление
+      replaceCategoryInList(target);
     }
-  } catch (e) { 
-    alert('Ошибка загрузки иконки'); 
-  } finally { 
-    uploading.value = false; 
+  } catch (e) {
+    alert('Ошибка загрузки иконки');
+  } finally {
+    uploading.value = false;
   }
 };
 
 // --- CRUD ---
 const createCategory = async () => {
   try {
+    if (newCategory.parent_id) newCategory.image_url = '';
     const res = await axios.post(`/api/admin/categories`, newCategory, config);
     categories.value.unshift(res.data);
-    Object.assign(newCategory, { name: '', slug: '', parent_id: null, image_url: '' });
+    Object.assign(newCategory, {
+      name: '',
+      slug: '',
+      parent_id: null,
+      image_url: '',
+    });
     alert('Категория создана');
-  } catch (e) { 
-    alert('Ошибка создания категории'); 
+  } catch (e) {
+    alert('Ошибка создания категории');
   }
 };
 
 const updateCategory = async (cat) => {
-  try { 
-    await axios.put(`/api/admin/categories/${cat.id}`, cat, config); 
-  } catch (e) { 
-    console.error("Update error", e);
+  try {
+    // Если стала подкатегорией, удаляем иконку
+    if (cat.parent_id && cat.image_url) {
+      cat.image_url = null;
+    }
+    await axios.put(`/api/admin/categories/${cat.id}`, cat, config);
+    // Реактивность: заменяем объект в массиве
+    replaceCategoryInList(cat);
+  } catch (e) {
+    console.error('Update error', e);
   }
 };
 
@@ -262,32 +359,45 @@ const deleteCategory = async (cat) => {
       await axios.delete(`/api/storage/categories/${filename}`, config).catch(() => {});
     }
     await axios.delete(`/api/admin/categories/${cat.id}`, config);
-    categories.value = categories.value.filter(c => c.id !== cat.id);
-  } catch (e) { 
-    alert('Ошибка удаления (возможно, в категории есть товары или подкатегории)'); 
+    categories.value = categories.value.filter((c) => c.id !== cat.id);
+  } catch (e) {
+    alert('Ошибка удаления (возможно, в категории есть товары или подкатегории)');
   }
+};
+
+// Вспомогательная функция для реактивной замены элемента в массиве
+const replaceCategoryInList = (cat) => {
+  categories.value = categories.value.map((c) => (c.id === cat.id ? { ...cat } : c));
 };
 
 // --- ФИЛЬТРАЦИЯ И ПАГИНАЦИЯ ---
 const filteredCategories = computed(() => {
   if (!Array.isArray(categories.value)) return [];
   let res = [...categories.value];
-  
-  if (parentFilter.value !== 'all') {
-    res = res.filter(c => c.parent_id === parentFilter.value);
+
+  // Фильтр по типу
+  if (categoryType.value === 'root') {
+    res = res.filter((c) => !c.parent_id);
+  } else if (categoryType.value === 'sub') {
+    res = res.filter((c) => c.parent_id);
   }
+
+  // Поиск
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase().trim();
-    res = res.filter(c => 
-      (c.name && c.name.toLowerCase().includes(q)) || 
-      (c.slug && c.slug.toLowerCase().includes(q)) ||
-      c.id.toString() === q
+    res = res.filter(
+      (c) =>
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.slug && c.slug.toLowerCase().includes(q)) ||
+        c.id.toString() === q
     );
   }
   return res;
 });
 
-const totalPages = computed(() => Math.ceil(filteredCategories.value.length / itemsPerPage));
+const totalPages = computed(() =>
+  Math.ceil(filteredCategories.value.length / itemsPerPage)
+);
 
 const paginatedCategories = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage;
@@ -296,19 +406,58 @@ const paginatedCategories = computed(() => {
 
 const resetFilters = () => {
   searchQuery.value = '';
-  parentFilter.value = 'all';
+  categoryType.value = 'all';
   currentPage.value = 1;
 };
 
-watch([searchQuery, parentFilter], () => { currentPage.value = 1; });
+watch([searchQuery, categoryType], () => {
+  currentPage.value = 1;
+});
 
 onMounted(loadData);
 </script>
 
 <style scoped>
-/* ==========================================================================
-   АДМИНКА: КАТЕГОРИИ (СВЕТЛАЯ/ТЕМНАЯ ТЕМА И СТЕКЛО)
-   ========================================================================== */
+/* Все предыдущие стили без изменений, добавим только новые */
+/* ... (оставьте все стили из предыдущей версии) ... */
+
+/* Новые / изменённые стили */
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sub-arrow {
+  color: var(--primary, #2563eb);
+  font-weight: 900;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.is-sub td {
+  background-color: rgba(0, 0, 0, 0.02);
+  padding-left: 30px !important;
+}
+:global(.dark) .is-sub td {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.no-icon {
+  color: var(--text-muted, #94a3b8);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+.no-icon {
+  color: var(--text-muted, #94a3b8);
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+.is-sub td {
+  background: rgba(0,0,0,0.01);
+}
+@media (max-width: 768px) {
+  .no-icon { font-size: 1rem; }
+}
 
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }

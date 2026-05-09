@@ -59,14 +59,13 @@
             <textarea v-model="newProduct.description" placeholder="Общее описание товара..." rows="2" class="form-input"></textarea>
           </div>
 
-          <!-- НОВОЕ: УПРАВЛЕНИЕ ХАРАКТЕРИСТИКАМИ (JSONB) -->
+          <!-- ХАРАКТЕРИСТИКИ (JSONB) -->
           <div class="input-group full-width">
             <label>⚙️ Характеристики (Фильтры)</label>
             <div class="char-editor glass-card">
               <div v-for="(val, key) in newProduct.characteristics" :key="key" class="char-row">
                 <input :value="key" readonly class="char-key" />
                 <input v-model="newProduct.characteristics[key]" class="char-val" />
-                <!-- ИСПРАВЛЕНО: Теперь вызывается функция вместо delete -->
                 <button type="button" @click="removeCharFromNew(key)" class="btn-remove-char">×</button>
               </div>
               <div class="char-add-row">
@@ -165,6 +164,7 @@
                 <div class="product-img-box glass-card">
                   <template v-if="p.images && p.images.length > 0">
                     <img :src="p.images[0]" @click="previewImage(p.images[0])" />
+                    <span v-if="p.images.length > 1" class="photo-count">{{ p.images.length }}</span>
                   </template>
                   <label v-else class="upload-mini-btn">
                     <span>+</span>
@@ -243,6 +243,21 @@
                         </div>
                       </div>
                     </div>
+
+                    <!-- 🖼️ ГАЛЕРЕЯ ИЗОБРАЖЕНИЙ ТОВАРА -->
+                    <div class="detail-field full-width">
+                      <label>🖼️ Галерея изображений ({{ p.images?.length || 0 }}/5)</label>
+                      <div class="gallery-editor">
+                        <div v-for="(img, idx) in p.images" :key="idx" class="gallery-item glass-card">
+                          <img :src="img" @click="previewImage(img)" />
+                          <button type="button" @click="deletePhotoFromExisting(p, idx)" class="btn-clear-img">✕</button>
+                        </div>
+                        <label v-if="!p.images || p.images.length < 5" class="add-photo-btn glass-card">
+                          <span>+ Добавить фото</span>
+                          <input type="file" @change="(e) => uploadPhotoToExisting(e, p)" accept="image/*" class="hidden-file" />
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </td>
@@ -270,10 +285,6 @@ import axios from 'axios';
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123';
 const API_URL = import.meta.env.VITE_API_URL || '';
 const config = { headers: { 'x-admin-key': ADMIN_SECRET } };
-
-const removeCharFromNew = (key) => {
-  delete newProduct.characteristics[key];
-};
 
 const products = ref([]);
 const categories = ref([]);
@@ -308,6 +319,10 @@ const loadData = async () => {
 };
 
 // --- ХАРАКТЕРИСТИКИ ---
+const removeCharFromNew = (key) => {
+  delete newProduct.characteristics[key];
+};
+
 const addCharToNew = () => {
     if (!tempChar.key || !tempChar.val) return;
     newProduct.characteristics[tempChar.key] = tempChar.val;
@@ -360,13 +375,26 @@ const uploadPhotoToExisting = async (e, p) => {
   } catch (e) { alert('Ошибка загрузки'); }
 };
 
+const deletePhotoFromExisting = async (p, index) => {
+  const url = p.images[index];
+  const filename = getFilenameFromUrl(url);
+  try {
+    // Удаляем файл из хранилища
+    await axios.delete(`/api/storage/products/${filename}`, config).catch(() => {});
+    // Удаляем из массива
+    p.images.splice(index, 1);
+    await updateProduct(p);
+  } catch (err) {
+    alert('Ошибка удаления фото');
+  }
+};
+
 // --- CRUD ---
 const createProduct = async () => {
   try {
     const res = await axios.post(`/api/admin/products`, newProduct, config);
     products.value.unshift(res.data);
     alert('Товар успешно добавлен!');
-    // Сброс формы
     Object.assign(newProduct, { name: '', sku: '', price: 0, category_id: null, brand_id: null, description: '', images: [], characteristics: {}, discount_price: null, weight_kg: null });
   } catch (e) { alert('Ошибка при создании товара'); }
 };
@@ -430,6 +458,67 @@ onMounted(loadData);
 </script>
 
 <style scoped>
+/* существующие стили без изменений, но нужно добавить стили для галереи и счётчика фото */
+/* ... (вставьте сюда все предыдущие стили) ... */
+
+/* ДОБАВЛЕННЫЕ СТИЛИ */
+.gallery-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 10px;
+}
+.gallery-item {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  padding: 4px;
+  background: #fff;
+  border-radius: 10px;
+}
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  cursor: zoom-in;
+  background: #fff;
+  border-radius: 6px;
+}
+.add-photo-btn {
+  width: 120px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border-color, #cbd5e1);
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+  position: relative;
+}
+.add-photo-btn:hover {
+  border-color: var(--primary, #2563eb);
+  color: var(--primary, #2563eb);
+  background: rgba(37, 99, 235, 0.05);
+}
+.photo-count {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  background: var(--primary, #2563eb);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 800;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid white;
+}
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 

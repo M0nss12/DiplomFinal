@@ -280,6 +280,13 @@ app.post('/api/reviews', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/admin/reviews', verifyAdmin, async (req, res) => {
+  try {
+    const { data } = await supabase.from('reviews').insert([req.body]).select();
+    res.json(data[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/reviews/:productId', async (req, res) => {
     const { data } = await supabase.from('reviews').select(`*, users (first_name, avatar_url)`).eq('product_id', req.params.productId).eq('is_approved', true).order('created_at', { ascending: false });
     res.json(data || []);
@@ -432,25 +439,29 @@ app.post('/api/orders', async (req, res) => {
     const { customer_name, customer_email, customer_phone, items, warehouse_id, payment_method } = req.body;
     
     try {
-        // 1. Данные о складе
+        // 1. Данные о ПВЗ
         const { data: targetWh } = await supabase
             .from('warehouses')
-            .select('*, cities(lat, lon, name)')
+            .select('*, cities(lat, lon, name, id)')
             .eq('id', warehouse_id)
             .single();
 
-        // 2. Расчёт стоимости доставки через RPC
+        const targetCityId = targetWh.cities.id;
+
+        // 2. Расчёт доставки через RPC
         const { data: shippingData, error: shipErr } = await supabase.rpc('calculate_order_shipping', {
             target_warehouse_id: warehouse_id,
-            items_json: items   // формат: [{product_id, quantity}, ...]
+            items_json: items
         });
         if (shipErr) throw shipErr;
         const totalShipping = shippingData.total;
 
-        // 3. Суммируем цены товаров
+        // 3. Список складов-отправителей, списание и подсчёт стоимости
         let totalPrice = 0;
         let itemsData = [];
+
         for (let item of items) {
+            // Цена товара
             const { data: product } = await supabase
                 .from('products')
                 .select('price, discount_price')
@@ -458,32 +469,90 @@ app.post('/api/orders', async (req, res) => {
                 .single();
             const price = product.discount_price || product.price;
             totalPrice += price * item.quantity;
+
+            // Определение склада-отправителя
+            let sourceWarehouseId = null;
+
+            // а) Ищем локальный склад (в городе ПВЗ) с достаточным количеством
+            const { data: localStock } = await supabase
+                .from('product_stocks')
+                .select('warehouse_id')
+                .eq('product_id', item.product_id)
+                .gte('quantity', item.quantity)
+                .in('warehouse_id', 
+                    (await supabase
+                        .from('warehouses')
+                        .select('id')
+                        .eq('city_id', targetCityId)
+                    ).data.map(w => w.id)
+                )
+                .limit(1)
+                .maybeSingle();
+
+            if (localStock) {
+                sourceWarehouseId = localStock.warehouse_id;
+            } else {
+                // б) Ищем межгородской склад (в другом городе) с достаточным количеством
+                const { data: intercityStock } = await supabase
+                    .from('product_stocks')
+                    .select('warehouse_id, warehouses!inner(city_id)')
+                    .eq('product_id', item.product_id)
+                    .gte('quantity', item.quantity)
+                    .neq('warehouses.city_id', targetCityId)
+                    .limit(1)
+                    .maybeSingle();
+
+                if (intercityStock) {
+                    sourceWarehouseId = intercityStock.warehouse_id;
+                } else {
+                    // Частичное наличие – берём любой склад (можно просто отказать)
+                    return res.status(400).json({
+                        error: `Товар "${item.product_id}" недоступен в нужном количестве`
+                    });
+                }
+            }
+
+            // Списание остатка (уменьшаем quantity)
+            const { error: updateErr } = await supabase
+                .from('product_stocks')
+                .update({ quantity: supabase.raw(`quantity - ${item.quantity}`) })
+                .eq('product_id', item.product_id)
+                .eq('warehouse_id', sourceWarehouseId)
+                .gte('quantity', item.quantity);
+
+            if (updateErr) throw updateErr;
+
             itemsData.push({
                 product_id: item.product_id,
                 quantity: item.quantity,
-                unit_price: price
+                unit_price: price,
+                warehouse_id: sourceWarehouseId
             });
         }
 
         const finalTotal = totalPrice + totalShipping;
 
-        // 4. Создаём заказ
-        const { data: order, error: oErr } = await supabase.from('orders').insert([{ 
+        // 4. Создание заказа
+        const { data: order, error: oErr } = await supabase.from('orders').insert([{
             user_id: req.headers['x-user-id'] || crypto.randomUUID(),
-            warehouse_id, 
+            warehouse_id,
             payment_method,
-            payment_status: 'unpaid', 
+            payment_status: 'unpaid',
             delivery_status: 'processing',
-            shipping_cost: totalShipping, 
+            shipping_cost: totalShipping,
             total_price: finalTotal,
             delivery_address: `${targetWh.cities.name}, ${targetWh.address}`,
             customer_name, customer_phone, customer_email
         }]).select();
 
         if (oErr) throw oErr;
-        await supabase.from('order_items').insert(itemsData.map(i => ({ ...i, order_id: order[0].id })));
 
-        // 5. Уведомление о новом заказе (email + сайт)
+        // Вставка позиций с указанием склада-отправителя
+        await supabase.from('order_items').insert(
+            itemsData.map(i => ({ ...i, order_id: order[0].id }))
+        );
+
+        // Уведомление о новом заказе
         if (order && order[0]) {
             const newOrder = order[0];
             await notifyAndEmail({
@@ -509,7 +578,11 @@ app.post('/api/orders', async (req, res) => {
 });
 
 app.get('/api/orders/:userId', async (req, res) => {
-    const { data } = await supabase.from('orders').select(`*, order_items (*, products (*))`).eq('user_id', req.params.userId).order('created_at', { ascending: false });
+    const { data } = await supabase
+        .from('orders')
+        .select(`*, order_items (id, product_id, quantity, unit_price, warehouse_id, products (*))`)
+        .eq('user_id', req.params.userId)
+        .order('created_at', { ascending: false });
     res.json(data || []);
 });
 
@@ -621,61 +694,93 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
     const orderId = req.params.id;
 
     try {
-        const { data: order, error } = await supabase
+        // Получаем текущий заказ
+        const { data: oldOrder } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', orderId)
+            .single();
+
+        if (!oldOrder) return res.status(404).json({ error: 'Заказ не найден' });
+
+        // Проверяем, нужно ли возвращать остатки
+        const needReturn = 
+            (delivery_status === 'cancelled' || delivery_status === 'returned') &&
+            oldOrder.delivery_status !== delivery_status;
+
+        // Обновляем статус
+        const { data: updatedOrder, error: updateErr } = await supabase
             .from('orders')
             .update({ delivery_status, payment_status })
             .eq('id', orderId)
             .select()
             .single();
-        if (error) throw error;
 
-        // Уведомления в зависимости от статуса
+        if (updateErr) throw updateErr;
+
+        // Возврат остатков на склады
+        if (needReturn) {
+            const { data: orderItems } = await supabase
+                .from('order_items')
+                .select('product_id, quantity, warehouse_id')
+                .eq('order_id', orderId);
+
+            for (const item of orderItems) {
+                if (item.warehouse_id) {
+                    await supabase
+                        .from('product_stocks')
+                        .update({ quantity: supabase.raw(`quantity + ${item.quantity}`) })
+                        .eq('product_id', item.product_id)
+                        .eq('warehouse_id', item.warehouse_id);
+                }
+            }
+        }
+
+        // Уведомления
         if (delivery_status === 'ready_for_pickup') {
             await notifyAndEmail({
-                userId: order.user_id,
+                userId: updatedOrder.user_id,
                 type: 'order',
-                email: order.customer_email,
+                email: updatedOrder.customer_email,
                 title: `Заказ №${orderId} готов к выдаче!`,
-                message: `Ваш заказ ожидает вас по адресу: ${order.delivery_address}.`,
+                message: `Ваш заказ ожидает вас по адресу: ${updatedOrder.delivery_address}.`,
                 templateName: 'order_ready_for_pickup.html',
                 templateVars: {
                     order_id: orderId,
-                    address: order.delivery_address,
-                    name: order.customer_name
+                    address: updatedOrder.delivery_address,
+                    name: updatedOrder.customer_name
                 }
             });
         } else if (delivery_status === 'delivered') {
-            // Старое уведомление о выдаче (если нужно)
             await notifyAndEmail({
-                userId: order.user_id,
+                userId: updatedOrder.user_id,
                 type: 'order',
-                email: order.customer_email,
+                email: updatedOrder.customer_email,
                 title: `Заказ №${orderId} выдан`,
                 message: `Ваш заказ был выдан.`,
                 templateName: 'order_delivered.html',
                 templateVars: {
                     order_id: orderId,
-                    name: order.customer_name
+                    name: updatedOrder.customer_name
                 }
             });
         } else if (delivery_status) {
-            // Общее уведомление о смене статуса
             await notifyAndEmail({
-                userId: order.user_id,
+                userId: updatedOrder.user_id,
                 type: 'order',
-                email: order.customer_email,
+                email: updatedOrder.customer_email,
                 title: `Статус заказа №${orderId} изменён`,
                 message: `Новый статус: ${delivery_status}.`,
                 templateName: 'order_status.html',
                 templateVars: {
                     order_id: orderId,
                     status: delivery_status,
-                    name: order.customer_name
+                    name: updatedOrder.customer_name
                 }
             });
         }
 
-        res.json(order);
+        res.json(updatedOrder);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
