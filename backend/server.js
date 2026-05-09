@@ -260,7 +260,10 @@ app.get('/api/products/:id', async (req, res) => {
 app.post('/api/products/recent', async (req, res) => {
     const { ids } = req.body;
     if (!ids || !ids.length) return res.json([]);
-    const { data } = await supabase.from('products').select(`id, name, price, discount_price, images, sku, is_active`).in('id', ids);
+    const { data } = await supabase
+        .from('products')
+        .select(`id, name, price, discount_price, images, sku, is_active, product_stocks (quantity, warehouses (cities (name)))`)
+        .in('id', ids);
     res.json(data || []);
 });
 

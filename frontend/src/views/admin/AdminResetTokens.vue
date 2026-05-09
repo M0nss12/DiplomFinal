@@ -20,8 +20,17 @@
       </div>
       <div class="filter-grid">
         <div class="input-group search-group">
-          <label>🔎 Поиск (User ID или токен)</label>
-          <input v-model="searchQuery" placeholder="Введите часть ID или токена..." class="form-input" />
+          <label>🔎 Поиск (ID, токен или имя пользователя)</label>
+          <input v-model="searchQuery" placeholder="Введите часть ID, токена или имени..." class="form-input" />
+        </div>
+        <div class="input-group">
+          <label>📅 Период создания</label>
+          <select v-model="dateFilter" class="form-input">
+            <option value="all">За всё время</option>
+            <option value="today">Сегодня</option>
+            <option value="week">Последняя неделя</option>
+            <option value="month">Последний месяц</option>
+          </select>
         </div>
         <div class="input-group">
           <label>📌 Статус токена</label>
@@ -87,6 +96,24 @@
               </td>
 
               <td class="text-right">
+                <!-- Кнопка переключения статуса -->
+                <button
+                  v-if="!t.used && !isExpired(t.expires_at)"
+                  @click="toggleTokenStatus(t)"
+                  class="btn-toggle-status glass-card"
+                  title="Отметить как использованный"
+                >
+                  ✔️ Использовать
+                </button>
+                <button
+                  v-else
+                  @click="toggleTokenStatus(t)"
+                  class="btn-toggle-status glass-card"
+                  title="Сбросить статус (сделать активным)"
+                >
+                  🔄 Сбросить
+                </button>
+                <!-- Удаление -->
                 <button @click="deleteToken(t.id)" class="btn-delete-small" title="Аннулировать/Удалить">
                   🗑️ Удалить
                 </button>
@@ -120,6 +147,7 @@ const tokens = ref([]);
 const users = ref([]);
 const searchQuery = ref('');
 const statusFilter = ref('all');
+const dateFilter = ref('all'); // новый фильтр
 const currentPage = ref(1);
 const itemsPerPage = 15;
 
@@ -142,7 +170,7 @@ const getUserName = (id) => {
 };
 
 const formatDateTime = (iso) => {
-  return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 };
 
 const isExpired = (date) => new Date(date) < new Date();
@@ -157,6 +185,18 @@ const getTokenStatusClass = (t) => {
   if (t.used) return 'status-used';
   if (isExpired(t.expires_at)) return 'status-expired';
   return 'status-active';
+};
+
+// Переключение used ↔ false
+const toggleTokenStatus = async (token) => {
+  const newUsed = !token.used;
+  try {
+    await axios.put(`/api/admin/password_reset_tokens/${token.id}`, { used: newUsed }, config);
+    token.used = newUsed;
+    alert(newUsed ? 'Токен помечен как использованный' : 'Токен снова активен');
+  } catch (e) {
+    alert('Ошибка при обновлении статуса');
+  }
 };
 
 const deleteToken = async (id) => {
@@ -177,13 +217,32 @@ const copyToken = (text) => {
 const filteredTokens = computed(() => {
   let res = [...tokens.value];
   
+  // Фильтр по статусу
   if (statusFilter.value === 'active') res = res.filter(t => !t.used && !isExpired(t.expires_at));
   else if (statusFilter.value === 'used') res = res.filter(t => t.used);
   else if (statusFilter.value === 'expired') res = res.filter(t => !t.used && isExpired(t.expires_at));
 
+  // Фильтр по периоду создания
+  if (dateFilter.value !== 'all') {
+    const now = new Date();
+    res = res.filter(t => {
+      const d = new Date(t.created_at);
+      if (dateFilter.value === 'today') return d.toDateString() === now.toDateString();
+      if (dateFilter.value === 'week') return (now - d) < 7 * 24 * 60 * 60 * 1000;
+      if (dateFilter.value === 'month') return (now - d) < 30 * 24 * 60 * 60 * 1000;
+      return true;
+    });
+  }
+
+  // Поиск (ID, токен, имя пользователя)
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase();
-    res = res.filter(t => t.user_id.toLowerCase().includes(q) || t.token.toLowerCase().includes(q));
+    res = res.filter(t => {
+      const userName = getUserName(t.user_id).toLowerCase();
+      return t.user_id.toLowerCase().includes(q) ||
+             t.token.toLowerCase().includes(q) ||
+             userName.includes(q);
+    });
   }
   
   return res.sort((a, b) => b.id - a.id);
@@ -192,15 +251,20 @@ const filteredTokens = computed(() => {
 const totalPages = computed(() => Math.ceil(filteredTokens.value.length / itemsPerPage));
 const paginatedTokens = computed(() => filteredTokens.value.slice((currentPage.value - 1) * itemsPerPage, currentPage.value * itemsPerPage));
 
-const resetFilters = () => { searchQuery.value = ''; statusFilter.value = 'all'; currentPage.value = 1; };
-watch([searchQuery, statusFilter], () => currentPage.value = 1);
+const resetFilters = () => {
+  searchQuery.value = '';
+  statusFilter.value = 'all';
+  dateFilter.value = 'all';
+  currentPage.value = 1;
+};
+watch([searchQuery, statusFilter, dateFilter], () => currentPage.value = 1);
 
 onMounted(loadData);
 </script>
 
 <style scoped>
 /* ==========================================================================
-   АДМИНКА: ТОКЕНЫ (GLASSMORPHISM & DARK MODE)
+   АДМИНКА: ТОКЕНЫ (GLASSMORPHISM & DARK MODE) – улучшено
    ========================================================================== */
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -226,7 +290,7 @@ onMounted(loadData);
 :global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
 
 .admin-card { padding: 25px; margin-bottom: 30px; }
-.filter-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; align-items: flex-end; }
+.filter-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 20px; align-items: flex-end; }
 
 /* ИНПУТЫ */
 .form-input {
@@ -243,7 +307,7 @@ onMounted(loadData);
 .table-meta { margin-bottom: 16px; font-size: 0.85rem; color: var(--text-muted, #64748b); font-weight: 600; }
 
 .admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 900px; }
+.admin-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
 .admin-table th { padding: 16px 20px; text-align: left; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
 :global(.dark) .admin-table th { border-color: #334155; }
 .admin-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; font-size: 0.9rem; }
@@ -264,6 +328,13 @@ onMounted(loadData);
 .status-used { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); }
 .status-expired { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
 
+/* КНОПКИ */
+.btn-toggle-status {
+  background: rgba(0,0,0,0.02); border: 1px solid var(--border-color, #cbd5e1);
+  padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 700;
+  cursor: pointer; transition: 0.2s; margin-right: 8px;
+}
+.btn-toggle-status:hover { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); }
 .btn-delete-small { background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); padding: 8px 16px; border-radius: 30px; font-weight: 800; font-size: 0.8rem; color: var(--danger, #ef4444); cursor: pointer; transition: 0.2s; }
 .btn-delete-small:hover { background: var(--danger, #ef4444); color: white; transform: translateY(-2px); }
 
