@@ -439,7 +439,7 @@ app.post('/api/orders', async (req, res) => {
             .eq('id', warehouse_id)
             .single();
 
-        // 2. Расчёт доставки через RPC
+        // 2. Расчёт стоимости доставки через RPC
         const { data: shippingData, error: shipErr } = await supabase.rpc('calculate_order_shipping', {
             target_warehouse_id: warehouse_id,
             items_json: items   // формат: [{product_id, quantity}, ...]
@@ -482,7 +482,26 @@ app.post('/api/orders', async (req, res) => {
 
         if (oErr) throw oErr;
         await supabase.from('order_items').insert(itemsData.map(i => ({ ...i, order_id: order[0].id })));
-        
+
+        // 5. Уведомление о новом заказе (email + сайт)
+        if (order && order[0]) {
+            const newOrder = order[0];
+            await notifyAndEmail({
+                userId: req.headers['x-user-id'] || null,
+                type: 'order',
+                email: customer_email,
+                title: `Заказ №${newOrder.id} оформлен`,
+                message: `Ваш заказ на сумму ${finalTotal} ₽ принят в обработку.`,
+                templateName: 'order_created.html',
+                templateVars: {
+                    order_id: newOrder.id,
+                    total: finalTotal,
+                    name: customer_name,
+                    address: newOrder.delivery_address
+                }
+            });
+        }
+
         res.json({ orderId: order[0].id, total: finalTotal, distance_based_shipping: totalShipping });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -600,27 +619,66 @@ app.delete('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
 app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
     const { delivery_status, payment_status } = req.body;
     const orderId = req.params.id;
+
     try {
-        const { data: order } = await supabase.from('orders').update({ delivery_status, payment_status }).eq('id', orderId).select().single();
-        if (delivery_status === 'delivered') {
+        const { data: order, error } = await supabase
+            .from('orders')
+            .update({ delivery_status, payment_status })
+            .eq('id', orderId)
+            .select()
+            .single();
+        if (error) throw error;
+
+        // Уведомления в зависимости от статуса
+        if (delivery_status === 'ready_for_pickup') {
             await notifyAndEmail({
-                userId: order.user_id, type: 'order', email: order.customer_email,
+                userId: order.user_id,
+                type: 'order',
+                email: order.customer_email,
                 title: `Заказ №${orderId} готов к выдаче!`,
                 message: `Ваш заказ ожидает вас по адресу: ${order.delivery_address}.`,
-                templateName: 'order_ready.html',
-                templateVars: { order_id: orderId, address: order.delivery_address, name: order.customer_name }
+                templateName: 'order_ready_for_pickup.html',
+                templateVars: {
+                    order_id: orderId,
+                    address: order.delivery_address,
+                    name: order.customer_name
+                }
+            });
+        } else if (delivery_status === 'delivered') {
+            // Старое уведомление о выдаче (если нужно)
+            await notifyAndEmail({
+                userId: order.user_id,
+                type: 'order',
+                email: order.customer_email,
+                title: `Заказ №${orderId} выдан`,
+                message: `Ваш заказ был выдан.`,
+                templateName: 'order_delivered.html',
+                templateVars: {
+                    order_id: orderId,
+                    name: order.customer_name
+                }
             });
         } else if (delivery_status) {
+            // Общее уведомление о смене статуса
             await notifyAndEmail({
-                userId: order.user_id, type: 'order', email: order.customer_email,
-                title: `Статус заказа №${orderId} обновлен`,
+                userId: order.user_id,
+                type: 'order',
+                email: order.customer_email,
+                title: `Статус заказа №${orderId} изменён`,
                 message: `Новый статус: ${delivery_status}.`,
                 templateName: 'order_status.html',
-                templateVars: { order_id: orderId, status: delivery_status, name: order.customer_name }
+                templateVars: {
+                    order_id: orderId,
+                    status: delivery_status,
+                    name: order.customer_name
+                }
             });
         }
+
         res.json(order);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // Catch-all для Vue Router

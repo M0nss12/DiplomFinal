@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Заказ готов к выдаче</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+        .container { max-width: 520px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #2563eb, #0ea5e9); color: white; padding: 30px; text-align: center; }
+        .content { padding: 30px; }
+        .btn { display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 20px; }
+        .details { background: #f8fafc; border-radius: 8px; padding: 15px; margin: 20px 0; }
+        .footer { text-align: center; font-size: 12px; color: #94a3b8; padding: 20px; border-top: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 ApexDrive</h1>
+            <p style="font-size: 18px;">Ваш заказ готов к выдаче!</p>
+        </div>
+        <div class="content">
+            <p>Здравствуйте, {{name}}!</p>
+            <p>Рады сообщить, что ваш заказ <strong>№{{order_id}}</strong> готов к получению в пункте выдачи.</p>
+            <div class="details">
+                <p><strong>📍 Адрес:</strong><br>{{address}}</p>
+                <p><strong>📦 Номер заказа:</strong> {{order_id}}</p>
+            </div>
+            <p>Пожалуйста, возьмите с собой паспорт или удостоверение личности.</p>
+            <p>Если у вас возникли вопросы, свяжитесь с нашей поддержкой.</p>
+            <a href="{{support_link}}" class="btn">Связаться с поддержкой</a>
+        </div>
+        <div class="footer">
+            © 2025 ApexDrive. Все права защищены.<br>
+            Это письмо отправлено автоматически, пожалуйста, не отвечайте на него.
+        </div>
+    </div>
+</body>
+</html>

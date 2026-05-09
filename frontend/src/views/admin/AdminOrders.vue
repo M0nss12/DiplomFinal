@@ -148,12 +148,13 @@
                   </div>
                 </td>
                 <td>
-                  <select v-model="order.delivery_status" @change="updateOrderStatus(order)" class="status-select" :class="order.delivery_status">
-                    <option value="processing">Обработка</option>
-                    <option value="shipping">В пути</option>
-                    <option value="delivered">Выдан</option>
-                    <option value="cancelled">Отменен</option>
-                  </select>
+<select v-model="order.delivery_status" @change="updateOrderStatus(order)" class="status-select" :class="order.delivery_status">
+    <option value="processing">Обработка</option>
+    <option value="shipping">В пути</option>
+    <option value="ready_for_pickup">Готов к выдаче</option>
+    <option value="delivered">Выдан</option>
+    <option value="cancelled">Отменён</option>
+</select>
                 </td>
                 <td>
                   <select v-model="order.payment_status" @change="updateOrderStatus(order)" class="status-select" :class="order.payment_status">
@@ -461,4 +462,9 @@ onMounted(loadData);
 .btn-delete-small { color: var(--danger); background: none; border: none; font-size: 1.2rem; cursor: pointer; }
 
 @media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } .constructor-footer { grid-template-columns: 1fr; } }
+
+.status-select.ready_for_pickup {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
 </style>
