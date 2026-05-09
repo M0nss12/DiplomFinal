@@ -177,6 +177,20 @@ app.get('/api/categories', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Получить список всех городов
+app.get('/api/cities', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('cities')
+            .select('*')
+            .order('name', { ascending: true });
+        if (error) throw error;
+        res.json(data || []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/brands', async (req, res) => {
     try {
         const { data, error } = await supabase.from('brands').select('*').order('name', { ascending: true });

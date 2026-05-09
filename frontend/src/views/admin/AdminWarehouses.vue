@@ -22,19 +22,39 @@
         <div class="input-grid">
           <div class="input-group">
             <label>🏙️ Город</label>
-            <input v-model="newWarehouse.city_name" placeholder="Напр. Москва" required class="form-input" />
+            <select v-model="newWarehouse.city_id" required class="form-input">
+              <option :value="null" disabled>-- Выберите город --</option>
+              <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
           </div>
           <div class="input-group">
             <label>🏠 Точный адрес</label>
-            <input v-model="newWarehouse.address" placeholder="Улица, дом..." required class="form-input" />
+            <input
+              v-model="newWarehouse.address"
+              placeholder="ул. ..., д. ..."
+              required
+              class="form-input"
+            />
           </div>
           <div class="input-group">
             <label>📞 Телефон</label>
-            <input v-model="newWarehouse.phone" placeholder="+7..." class="form-input" />
+            <input
+              v-model="newWarehouse.phone"
+              type="tel"
+              placeholder="+7-___-___-__-__"
+              class="form-input"
+              @input="formatPhone($event, 'new')"
+            />
           </div>
           <div class="input-group">
             <label>🕒 Часы работы</label>
-            <input v-model="newWarehouse.working_hours" placeholder="09:00 - 21:00" class="form-input" />
+            <input
+              v-model="newWarehouse.working_hours"
+              type="text"
+              placeholder="09:00-21:00"
+              class="form-input"
+              @input="formatHours($event, 'new')"
+            />
           </div>
         </div>
 
@@ -58,15 +78,11 @@
         <h3 class="card-title">🔍 Поиск и фильтрация</h3>
         <button @click="resetFilters" class="btn-text-link">Сбросить всё</button>
       </div>
-      
+
       <div class="filter-grid">
         <div class="input-group search-group">
           <label>🔎 Поиск (Город, Адрес, ID)</label>
-          <input 
-            v-model="filters.search" 
-            placeholder="Название или ID..." 
-            class="form-input"
-          />
+          <input v-model="filters.search" placeholder="Название или ID..." class="form-input" />
         </div>
 
         <div class="input-group">
@@ -111,31 +127,64 @@
             <tr v-for="w in filteredWarehouses" :key="w.id" class="warehouse-row">
               <td class="col-id">
                 <span class="id-badge">#{{ w.id }}</span>
-               </td>
+              </td>
 
               <td style="width: 180px;">
-                <input v-model="w.city_display_name" @change="updateWarehouse(w)" class="inline-edit bold-city" />
+                <!-- Выбор города -->
+                <select
+                  v-model="w.city_id"
+                  @change="updateWarehouse(w)"
+                  class="inline-edit bold-city form-input"
+                >
+                  <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
+                </select>
               </td>
 
               <td>
-                <input v-model="w.address" @change="updateWarehouse(w)" class="inline-edit addr-input" />
+                <input
+                  v-model="w.address"
+                  @change="updateWarehouse(w)"
+                  class="inline-edit addr-input"
+                  placeholder="ул. ..., д. ..."
+                />
                 <div class="sub-input-row">
                   <small>🕒</small>
-                  <input v-model="w.working_hours" @change="updateWarehouse(w)" class="inline-edit-sub" placeholder="Укажите часы работы" />
+                  <input
+                    v-model="w.working_hours"
+                    type="text"
+                    class="inline-edit-sub"
+                    placeholder="XX:XX-XX:XX"
+                    @input="formatHours($event, w)"
+                    @change="updateWarehouse(w)"
+                  />
                 </div>
               </td>
 
               <td style="width: 160px;">
-                <input v-model="w.phone" @change="updateWarehouse(w)" class="inline-edit" placeholder="Нет тел." />
+                <input
+                  v-model="w.phone"
+                  type="tel"
+                  class="inline-edit"
+                  placeholder="+7-___-___-__-__"
+                  @input="formatPhone($event, w)"
+                  @change="updateWarehouse(w)"
+                />
               </td>
 
               <td class="text-center" style="width: 140px;">
                 <div class="status-cell">
                   <label class="toggle-switch">
-                    <input type="checkbox" v-model="w.is_pickup_point" @change="updateWarehouse(w)" />
+                    <input
+                      type="checkbox"
+                      v-model="w.is_pickup_point"
+                      @change="updateWarehouse(w)"
+                    />
                     <span class="toggle-slider"></span>
                   </label>
-                  <span class="status-tag" :class="w.is_pickup_point ? 'tag-pickup' : 'tag-storage'">
+                  <span
+                    class="status-tag"
+                    :class="w.is_pickup_point ? 'tag-pickup' : 'tag-storage'"
+                  >
                     {{ w.is_pickup_point ? 'ПВЗ' : 'СКЛАД' }}
                   </span>
                 </div>
@@ -167,20 +216,102 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 const config = { headers: { 'x-admin-key': ADMIN_SECRET } };
 
 const warehouses = ref([]);
+const cities = ref([]);
 const loading = ref(false);
 
 const filters = reactive({ search: '', type: 'all', sort: 'id-desc' });
-const newWarehouse = reactive({ city_name: '', address: '', phone: '', working_hours: '', is_pickup_point: true });
+const newWarehouse = reactive({
+  city_id: null,
+  address: '',
+  phone: '',
+  working_hours: '',
+  is_pickup_point: true
+});
 
+// =======================
+// Маски ввода
+// =======================
+
+// Телефон: +7-XXX-XXX-XX-XX
+const formatPhone = (event, target) => {
+  // target может быть 'new' (новый объект) или объект строки таблицы
+  const input = event.target;
+  let value = input.value.replace(/[^\d]/g, ''); // только цифры
+  if (value.length === 0) {
+    input.value = '';
+    if (target === 'new') newWarehouse.phone = '';
+    else target.phone = '';
+    return;
+  }
+
+  let formatted = '+7';
+  if (value.length > 1) {
+    const part1 = value.substring(1, 4);
+    formatted += '-' + part1;
+  }
+  if (value.length >= 4) {
+    const part2 = value.substring(4, 7);
+    formatted += '-' + part2;
+  }
+  if (value.length >= 7) {
+    const part3 = value.substring(7, 9);
+    formatted += '-' + part3;
+  }
+  if (value.length >= 9) {
+    const part4 = value.substring(9, 11);
+    formatted += '-' + part4;
+  }
+  input.value = formatted;
+
+  // Записываем в модель
+  if (target === 'new') newWarehouse.phone = formatted;
+  else target.phone = formatted;
+};
+
+// Часы работы: XX:XX-XX:XX
+const formatHours = (event, target) => {
+  const input = event.target;
+  let value = input.value.replace(/[^\d]/g, ''); // только цифры
+  if (value.length === 0) {
+    input.value = '';
+    if (target === 'new') newWarehouse.working_hours = '';
+    else target.working_hours = '';
+    return;
+  }
+
+  let formatted = '';
+  if (value.length >= 1) formatted += value.substring(0, 2);
+  if (value.length >= 2) formatted += ':' + value.substring(2, 4);
+  if (value.length > 4) {
+    formatted += '-' + value.substring(4, 6);
+  }
+  if (value.length >= 6) {
+    formatted += ':' + value.substring(6, 8);
+  }
+  input.value = formatted;
+
+  if (target === 'new') newWarehouse.working_hours = formatted;
+  else target.working_hours = formatted;
+};
+
+// =======================
+// Загрузка данных
+// =======================
 const fetchWarehouses = async () => {
   try {
     const res = await axios.get(`/api/admin/warehouses`, config);
-    // Приводим город к строке cityName для удобства инпутов
     warehouses.value = res.data.map(w => ({
-        ...w,
-        city_display_name: w.cities?.name || w.city_name || ''
+      ...w,
+      city_display_name: w.cities?.name || w.city_name || ''
     }));
   } catch (e) { console.error('Ошибка загрузки складов'); }
+};
+
+const fetchCities = async () => {
+  try {
+    const res = await axios.get(`/api/cities`); // публичный эндпоинт
+    cities.value = res.data || [];
+  } catch (e) { console.error('Ошибка загрузки городов'); }
 };
 
 const resetFilters = () => { filters.search = ''; filters.type = 'all'; filters.sort = 'id-desc'; };
@@ -189,8 +320,8 @@ const filteredWarehouses = computed(() => {
   let result = [...warehouses.value];
   if (filters.search.trim()) {
     const q = filters.search.toLowerCase().trim();
-    result = result.filter(w => 
-      w.city_display_name.toLowerCase().includes(q) || 
+    result = result.filter(w =>
+      w.city_display_name.toLowerCase().includes(q) ||
       w.address.toLowerCase().includes(q) ||
       w.id.toString() === q
     );
@@ -204,11 +335,21 @@ const filteredWarehouses = computed(() => {
 });
 
 const createWarehouse = async () => {
+  if (!newWarehouse.city_id) {
+    alert('Пожалуйста, выберите город');
+    return;
+  }
   loading.value = true;
   try {
-    const res = await axios.post(`/api/admin/warehouses`, newWarehouse, config);
-    await fetchWarehouses(); // Обновляем список для синхронизации связей
-    Object.assign(newWarehouse, { city_name: '', address: '', phone: '', working_hours: '', is_pickup_point: true });
+    await axios.post(`/api/admin/warehouses`, newWarehouse, config);
+    await fetchWarehouses();
+    Object.assign(newWarehouse, {
+      city_id: null,
+      address: '',
+      phone: '',
+      working_hours: '',
+      is_pickup_point: true
+    });
     alert('Объект добавлен!');
   } catch (e) { alert('Ошибка при создании'); }
   finally { loading.value = false; }
@@ -216,10 +357,8 @@ const createWarehouse = async () => {
 
 const updateWarehouse = async (w) => {
   try {
-    // Извлекаем cityName обратно в структуру, которую ждет серверный хелпер (если есть)
-    // Либо отправляем как есть, если сервер умеет обрабатывать city_id
+    // Удаляем лишние поля, которые не нужны для PUT
     const { cities, city_display_name, ...payload } = w;
-    payload.city_name = city_display_name; // Передаем имя города для обработки на бэке
     await axios.put(`/api/admin/warehouses/${w.id}`, payload, config);
   } catch (e) { console.error('Ошибка сохранения'); }
 };
@@ -232,13 +371,19 @@ const deleteWarehouse = async (id) => {
   } catch (e) { alert('Ошибка при удалении'); }
 };
 
-onMounted(fetchWarehouses);
+onMounted(() => {
+  fetchWarehouses();
+  fetchCities();
+});
 </script>
 
 <style scoped>
-/* ==========================================================================
-   АДМИНКА: СКЛАДЫ (GLASSMORPHISM & DARK MODE)
-   ========================================================================== */
+/* Все стили остаются как у вас, плюс добавил пару уточнений */
+.bold-city { font-weight: 800; color: var(--primary, #2563eb); }
+.inline-edit { background: transparent; border: 1px solid transparent; padding: 6px 10px; border-radius: 6px; color: var(--text-main, #0f172a); width: 100%; font-weight: 500; transition: 0.2s; }
+:global(.dark) .inline-edit { color: #f8fafc; }
+.inline-edit:hover { background: rgba(0,0,0,0.03); border-color: var(--border-color, #cbd5e1); }
+.inline-edit:focus { border-color: var(--primary, #2563eb); background: var(--bg-card, #fff); outline: none; }
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 
