@@ -433,7 +433,7 @@ app.post('/api/users/reset-password', async (req, res) => {
 });
 
 // =====================================================================
-// ⚡️ API: ЗАКАЗЫ (ИСПРАВЛЕННЫЙ)
+// ⚡️ API: ЗАКАЗЫ
 // =====================================================================
 app.post('/api/orders', async (req, res) => {
     const { customer_name, customer_email, customer_phone, items, warehouse_id, payment_method } = req.body;
@@ -526,7 +526,6 @@ app.post('/api/orders', async (req, res) => {
             }
 
             // --- Списание остатков (безопасное, без raw) ---
-            // Получаем текущий остаток для проверки
             const { data: currentStock } = await supabase
                 .from('product_stocks')
                 .select('quantity')
@@ -539,7 +538,6 @@ app.post('/api/orders', async (req, res) => {
                 });
             }
 
-            // Обновляем: quantity = quantity - требуемое количество
             const { error: updateErr } = await supabase
                 .from('product_stocks')
                 .update({ quantity: currentStock.quantity - item.quantity })
@@ -607,7 +605,6 @@ app.post('/api/orders', async (req, res) => {
                 });
             } catch (notifyErr) {
                 console.error('Ошибка отправки уведомления:', notifyErr);
-                // не фатально
             }
         }
 
@@ -626,7 +623,6 @@ app.get('/api/orders/:userId', async (req, res) => {
         .order('created_at', { ascending: false });
     res.json(data || []);
 });
-
 
 app.post('/api/calculate-shipping', verifyAdmin, async (req, res) => {
     const { warehouse_id, items } = req.body;
@@ -735,30 +731,37 @@ app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
 
         if (itemsErr) throw itemsErr;
 
-        // Возвращаем остатки на склады
+        // Возвращаем остатки на склады (если склад указан)
         if (items && items.length > 0) {
             for (const item of items) {
                 if (item.warehouse_id) {
-                    // Увеличиваем количество на складе
+                    // Получаем текущий остаток
+                    const { data: stockData, error: stockErr } = await supabase
+                        .from('product_stocks')
+                        .select('quantity')
+                        .eq('product_id', item.product_id)
+                        .eq('warehouse_id', item.warehouse_id)
+                        .maybeSingle();
+
+                    if (stockErr) {
+                        console.error('Ошибка получения остатка при возврате:', stockErr);
+                        continue;
+                    }
+                    const newQty = (stockData?.quantity || 0) + item.quantity;
                     const { error: updateErr } = await supabase
                         .from('product_stocks')
-                        .update({ quantity: supabase.raw(`quantity + ${item.quantity}`) })
+                        .update({ quantity: newQty })
                         .eq('product_id', item.product_id)
                         .eq('warehouse_id', item.warehouse_id);
                     if (updateErr) {
                         console.error('Ошибка возврата остатков при удалении заказа:', updateErr);
-                        // Ошибка возврата не должна блокировать удаление, но логируем
                     }
                 }
             }
         }
 
         // Удаляем заказ (каскадно удалятся order_items, status_history и т.д.)
-        const { error: deleteErr } = await supabase
-            .from('orders')
-            .delete()
-            .eq('id', orderId);
-
+        const { error: deleteErr } = await supabase.from('orders').delete().eq('id', orderId);
         if (deleteErr) throw deleteErr;
 
         res.json({ success: true, message: 'Заказ удалён, остатки возвращены' });
@@ -768,7 +771,7 @@ app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
     }
 });
 
-
+// Общий обработчик удаления для остальных таблиц
 app.delete('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
     try {
         const { error } = await supabase.from(req.params.table).delete().eq('id', req.params.id);
@@ -793,7 +796,7 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
         // Нужно ли возвращать остатки
         const needReturn = 
             (delivery_status === 'cancelled' || delivery_status === 'returned') &&
-            oldOrder.delivery_status !== delivery_status; // чтобы не возвращать повторно
+            oldOrder.delivery_status !== delivery_status;
 
         // Обновляем статус
         const { data: updatedOrder, error: updateErr } = await supabase
@@ -813,11 +816,20 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
 
             for (const item of orderItems) {
                 if (item.warehouse_id) {
-                    await supabase
+                    const { data: stockData } = await supabase
                         .from('product_stocks')
-                        .update({ quantity: supabase.raw(`quantity + ${item.quantity}`) })
+                        .select('quantity')
                         .eq('product_id', item.product_id)
-                        .eq('warehouse_id', item.warehouse_id);
+                        .eq('warehouse_id', item.warehouse_id)
+                        .maybeSingle();
+                    if (stockData) {
+                        const newQty = stockData.quantity + item.quantity;
+                        await supabase
+                            .from('product_stocks')
+                            .update({ quantity: newQty })
+                            .eq('product_id', item.product_id)
+                            .eq('warehouse_id', item.warehouse_id);
+                    }
                 }
             }
         }
