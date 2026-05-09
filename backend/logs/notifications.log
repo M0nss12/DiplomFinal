@@ -16,3 +16,5 @@
 {"id":"72060afd","timestamp":"09.05.2026, 16:18:16","userId":"111","type":"order","title":"Заказ №40 оформлен","message":"Ваш заказ на сумму 22200 ₽ принят в обработку.","emailSentTo":"monsschogath@gmail.com"}
 {"id":"ca95e825","timestamp":"09.05.2026, 16:18:45","userId":"111","type":"order","title":"Заказ №40 выдан","message":"Ваш заказ был выдан.","emailSentTo":"monsschogath@gmail.com"}
 {"id":"ec8100c4","timestamp":"09.05.2026, 16:18:47","userId":"111","type":"order","title":"Заказ №40 выдан","message":"Ваш заказ был выдан.","emailSentTo":"monsschogath@gmail.com"}
+{"id":"8d0db8a5","timestamp":"09.05.2026, 16:51:08","userId":"c112b0ee-cc34-4079-818e-1fa721e795aa","type":"order","title":"Заказ №35 выдан","message":"Ваш заказ был выдан.","emailSentTo":"customer@mail.com"}
+{"id":"13284f4a","timestamp":"09.05.2026, 16:51:10","userId":"c112b0ee-cc34-4079-818e-1fa721e795aa","type":"order","title":"Заказ №35 выдан","message":"Ваш заказ был выдан.","emailSentTo":"customer@mail.com"}

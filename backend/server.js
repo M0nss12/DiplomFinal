@@ -439,16 +439,15 @@ app.post('/api/orders', async (req, res) => {
     const { customer_name, customer_email, customer_phone, items, warehouse_id, payment_method } = req.body;
     
     try {
-        // 1. Данные о ПВЗ
+        // 1. Данные о ПВЗ и его городе
         const { data: targetWh } = await supabase
             .from('warehouses')
-            .select('*, cities(lat, lon, name, id)')
+            .select('*, cities(id, name, lat, lon)')
             .eq('id', warehouse_id)
             .single();
-
         const targetCityId = targetWh.cities.id;
 
-        // 2. Расчёт доставки через RPC
+        // 2. Расчёт стоимости доставки (без изменений)
         const { data: shippingData, error: shipErr } = await supabase.rpc('calculate_order_shipping', {
             target_warehouse_id: warehouse_id,
             items_json: items
@@ -456,9 +455,9 @@ app.post('/api/orders', async (req, res) => {
         if (shipErr) throw shipErr;
         const totalShipping = shippingData.total;
 
-        // 3. Список складов-отправителей, списание и подсчёт стоимости
+        // 3. Определение складов-отправителей, цен и списание
         let totalPrice = 0;
-        let itemsData = [];
+        const itemsData = [];
 
         for (let item of items) {
             // Цена товара
@@ -470,10 +469,10 @@ app.post('/api/orders', async (req, res) => {
             const price = product.discount_price || product.price;
             totalPrice += price * item.quantity;
 
-            // Определение склада-отправителя
+            // --- Поиск склада-отправителя ---
             let sourceWarehouseId = null;
 
-            // а) Ищем локальный склад (в городе ПВЗ) с достаточным количеством
+            // а) Локальный склад (город ПВЗ, достаточно остатков)
             const { data: localStock } = await supabase
                 .from('product_stocks')
                 .select('warehouse_id')
@@ -492,7 +491,7 @@ app.post('/api/orders', async (req, res) => {
             if (localStock) {
                 sourceWarehouseId = localStock.warehouse_id;
             } else {
-                // б) Ищем межгородской склад (в другом городе) с достаточным количеством
+                // б) Межгородской склад (другой город, достаточно остатков)
                 const { data: intercityStock } = await supabase
                     .from('product_stocks')
                     .select('warehouse_id, warehouses!inner(city_id)')
@@ -505,22 +504,27 @@ app.post('/api/orders', async (req, res) => {
                 if (intercityStock) {
                     sourceWarehouseId = intercityStock.warehouse_id;
                 } else {
-                    // Частичное наличие – берём любой склад (можно просто отказать)
+                    // Нигде нет нужного количества – отказ
                     return res.status(400).json({
-                        error: `Товар "${item.product_id}" недоступен в нужном количестве`
+                        error: `Товар "${item.product_id}" недоступен в количестве ${item.quantity} шт.`
                     });
                 }
             }
 
-            // Списание остатка (уменьшаем quantity)
-            const { error: updateErr } = await supabase
+            // --- Списание остатков (атомарно с проверкой) ---
+            const { error: updateErr, data: updateResult } = await supabase
                 .from('product_stocks')
                 .update({ quantity: supabase.raw(`quantity - ${item.quantity}`) })
                 .eq('product_id', item.product_id)
                 .eq('warehouse_id', sourceWarehouseId)
-                .gte('quantity', item.quantity);
+                .gte('quantity', item.quantity)   // дополнительная страховка
+                .select();
 
-            if (updateErr) throw updateErr;
+            if (updateErr || !updateResult || updateResult.length === 0) {
+                return res.status(409).json({
+                    error: `Не удалось зарезервировать товар "${item.product_id}" – возможно, остатки изменились.`
+                });
+            }
 
             itemsData.push({
                 product_id: item.product_id,
@@ -533,13 +537,13 @@ app.post('/api/orders', async (req, res) => {
         const finalTotal = totalPrice + totalShipping;
 
         // 4. Создание заказа
-        const { data: order, error: oErr } = await supabase.from('orders').insert([{
+        const { data: order, error: oErr } = await supabase.from('orders').insert([{ 
             user_id: req.headers['x-user-id'] || crypto.randomUUID(),
-            warehouse_id,
+            warehouse_id, 
             payment_method,
-            payment_status: 'unpaid',
+            payment_status: 'unpaid', 
             delivery_status: 'processing',
-            shipping_cost: totalShipping,
+            shipping_cost: totalShipping, 
             total_price: finalTotal,
             delivery_address: `${targetWh.cities.name}, ${targetWh.address}`,
             customer_name, customer_phone, customer_email
@@ -552,7 +556,7 @@ app.post('/api/orders', async (req, res) => {
             itemsData.map(i => ({ ...i, order_id: order[0].id }))
         );
 
-        // Уведомление о новом заказе
+        // 5. Уведомление (email + сайт)
         if (order && order[0]) {
             const newOrder = order[0];
             await notifyAndEmail({
@@ -694,19 +698,18 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
     const orderId = req.params.id;
 
     try {
-        // Получаем текущий заказ
-        const { data: oldOrder } = await supabase
+        // Текущий заказ
+        const { data: oldOrder, error: fetchErr } = await supabase
             .from('orders')
             .select('*')
             .eq('id', orderId)
             .single();
+        if (fetchErr) return res.status(404).json({ error: 'Заказ не найден' });
 
-        if (!oldOrder) return res.status(404).json({ error: 'Заказ не найден' });
-
-        // Проверяем, нужно ли возвращать остатки
+        // Нужно ли возвращать остатки
         const needReturn = 
             (delivery_status === 'cancelled' || delivery_status === 'returned') &&
-            oldOrder.delivery_status !== delivery_status;
+            oldOrder.delivery_status !== delivery_status; // чтобы не возвращать повторно
 
         // Обновляем статус
         const { data: updatedOrder, error: updateErr } = await supabase
@@ -715,7 +718,6 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
             .eq('id', orderId)
             .select()
             .single();
-
         if (updateErr) throw updateErr;
 
         // Возврат остатков на склады
