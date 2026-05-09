@@ -38,7 +38,13 @@
           </div>
           <div class="input-group">
             <label>📞 Телефон</label>
-            <input v-model="newUser.phone_number" placeholder="+7..." class="form-input" />
+            <input
+              v-model="newUser.phone_number"
+              type="tel"
+              placeholder="+7-___-___-__-__"
+              class="form-input"
+              @input="formatPhone($event, 'new')"
+            />
           </div>
           <div class="input-group">
             <label>👑 Роль</label>
@@ -52,9 +58,27 @@
             <label>🔒 Пароль</label>
             <input v-model="newUser.password" type="password" placeholder="Задайте пароль..." class="form-input" />
           </div>
-          <div class="input-group">
+          <!-- Город с автодополнением -->
+          <div class="input-group autocomplete-wrapper">
             <label>📍 Город</label>
-            <input v-model="newUser.city" placeholder="Москва" class="form-input" />
+            <input
+              v-model="citySearch"
+              type="text"
+              placeholder="Начните вводить..."
+              class="form-input"
+              @input="filterCities"
+              @focus="showCitySuggestions = true"
+              @blur="hideCitySuggestions"
+            />
+            <ul v-if="showCitySuggestions && filteredCities.length" class="suggestions glass-card">
+              <li
+                v-for="c in filteredCities"
+                :key="c.id"
+                @mousedown.prevent="selectCity(c)"
+              >
+                {{ c.name }}
+              </li>
+            </ul>
           </div>
         </div>
         <div class="form-footer">
@@ -129,7 +153,7 @@
               </td>
 
               <td>
-                <div class="client-id">ID: #{{ u.id.split('-')[0] }}...</div>
+                <div class="client-id">ID: {{ u.id }}</div>
                 <div class="name-edit-row">
                   <input v-model="u.last_name" @change="updateUser(u)" class="inline-edit bold" placeholder="Фамилия" />
                   <input v-model="u.first_name" @change="updateUser(u)" class="inline-edit bold" placeholder="Имя" />
@@ -141,7 +165,14 @@
               <td>
                 <div class="contact-fields">
                   <input v-model="u.email" @change="updateUser(u)" class="inline-edit" placeholder="Email" />
-                  <input v-model="u.phone_number" @change="updateUser(u)" class="inline-edit" placeholder="Телефон" />
+                  <input
+                    v-model="u.phone_number"
+                    type="tel"
+                    class="inline-edit"
+                    placeholder="+7-___-___-__-__"
+                    @input="formatPhone($event, u)"
+                    @change="updateUser(u)"
+                  />
                 </div>
               </td>
 
@@ -162,8 +193,16 @@
                 </div>
               </td>
 
+              <!-- Город через select -->
               <td>
-                <input v-model="u.cityName" @change="updateUser(u)" class="inline-edit" placeholder="Город не указан" />
+                <select
+                  v-model="u.city_id"
+                  @change="onCitySelect(u)"
+                  class="inline-edit table-select"
+                >
+                  <option :value="null">-- Не выбран --</option>
+                  <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
+                </select>
               </td>
 
               <td class="text-right action-buttons">
@@ -224,6 +263,7 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 const config = { headers: { 'x-admin-key': ADMIN_SECRET } };
 
 const users = ref([]);
+const cities = ref([]);                     // для выбора города
 const searchQuery = ref('');
 const roleFilter = ref('all');
 const sortOrder = ref('new');
@@ -241,22 +281,70 @@ const showAvatarPicker = ref(false);
 const editingUser = ref(null);
 const previewUrl = ref(null);
 
+// Для автодополнения города в форме создания
+const citySearch = ref('');
+const showCitySuggestions = ref(false);
+const filteredCities = computed(() => {
+  const q = citySearch.value.trim().toLowerCase();
+  if (!q) return [];
+  return cities.value.filter(c => c.name.toLowerCase().includes(q));
+});
+
+const selectCity = (city) => {
+  newUser.city = city.name;
+  citySearch.value = city.name;
+  showCitySuggestions.value = false;
+};
+
+const filterCities = () => {
+  showCitySuggestions.value = true;
+};
+
+const hideCitySuggestions = () => {
+  setTimeout(() => { showCitySuggestions.value = false; }, 150);
+};
+
+// Маска телефона (универсальная для формы и строк таблицы)
+const formatPhone = (event, target) => {
+  const input = event.target;
+  let value = input.value.replace(/[^\d]/g, '');
+  if (value.length === 0) {
+    input.value = '';
+    if (target === 'new') newUser.phone_number = '';
+    else target.phone_number = '';
+    return;
+  }
+
+  let formatted = '+7';
+  if (value.length > 1) formatted += '-' + value.substring(1, 4);
+  if (value.length >= 4) formatted += '-' + value.substring(4, 7);
+  if (value.length >= 7) formatted += '-' + value.substring(7, 9);
+  if (value.length >= 9) formatted += '-' + value.substring(9, 11);
+  input.value = formatted;
+
+  if (target === 'new') newUser.phone_number = formatted;
+  else target.phone_number = formatted;
+};
+
 const loadData = async () => {
   try {
-    const res = await axios.get(`/api/admin/users`, config);
-    // Приводим данные к удобному виду (город из связей)
-    users.value = res.data.map(u => ({
+    const [userRes, cityRes] = await Promise.all([
+      axios.get(`/api/admin/users`, config),
+      axios.get(`/api/cities`)          // публичный эндпоинт городов
+    ]);
+    users.value = userRes.data.map(u => ({
       ...u,
       cityName: u.cities?.name || ''
     }));
+    cities.value = cityRes.data || [];
   } catch (e) { 
-    console.error('Ошибка загрузки пользователей'); 
+    console.error('Ошибка загрузки данных'); 
   }
 };
 
 const formatDate = (date) => date ? new Date(date).toLocaleDateString('ru-RU') : '---';
 
-// Менеджмент Storage
+// Менеджмент Storage (как и раньше)
 const getFilenameFromUrl = (url) => url ? url.split('/').pop() : null;
 const isProtectedAvatar = (url) => {
   const name = getFilenameFromUrl(url);
@@ -295,11 +383,14 @@ const handleFileUpload = async (e) => {
 const newUser = reactive({ first_name: '', last_name: '', otchestvo: '', email: '', phone_number: '', role: 'user', password: '', city: '', allows_data_saving: false });
 
 const createUser = async () => {
+  if (!newUser.first_name) return alert('Имя обязательно');
   loadingAction.value = true;
   try {
-    const res = await axios.post(`/api/users/register`, { ...newUser, captchaToken: 'admin_bypass' }, config);
+    // Для города передаем название (newUser.city уже заполнено через автодополнение)
+    const res = await axios.post(`/api/admin/users`, newUser, config);
     await loadData();
     Object.assign(newUser, { first_name: '', last_name: '', otchestvo: '', email: '', phone_number: '', password: '', city: '' });
+    citySearch.value = '';
     alert('Пользователь создан!');
   } catch (e) { 
     alert(e.response?.data?.error || 'Ошибка создания'); 
@@ -311,10 +402,21 @@ const createUser = async () => {
 const updateUser = async (user) => {
   try {
     const { cities, cityName, ...payload } = user;
-    // Передаем cityName, бэкенд обработает это в saved_city_id
-    payload.city = cityName; 
+    // Если город выбран через select, city_id содержит id. Передадим его как city_id, а бэкенд сам разберется.
+    // Но текущий бэкенд ожидает 'city' (название). Поэтому мы дополнительно отправляем city_id? 
+    // Проще: при выборе в select мы сохраняем city_id и cityName. В payload отправляем city: cityName.
+    payload.city = user.cityName || '';
     await axios.put(`/api/users/profile/${user.id}`, payload, config);
   } catch (e) { console.error("Update error"); }
+};
+
+// Обработчик изменения города в таблице
+const onCitySelect = (user) => {
+  const selectedCity = cities.value.find(c => c.id === user.city_id);
+  if (selectedCity) {
+    user.cityName = selectedCity.name;
+    updateUser(user);
+  }
 };
 
 const resetUserPassword = async (user) => {
@@ -340,10 +442,12 @@ const filteredUsers = computed(() => {
   if (roleFilter.value !== 'all') res = res.filter(u => u.role === roleFilter.value);
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase().trim();
-    res = res.filter(u => 
-      `${u.first_name} ${u.last_name} ${u.otchestvo || ''}`.toLowerCase().includes(q) || 
-      (u.email && u.email.toLowerCase().includes(q)) || 
-      (u.phone_number && u.phone_number.includes(q)) ||
+    res = res.filter(u =>
+      (u.first_name || '').toLowerCase().includes(q) ||
+      (u.last_name || '').toLowerCase().includes(q) ||
+      (u.otchestvo || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.phone_number || '').includes(q) ||
       u.id.includes(q)
     );
   }
@@ -365,10 +469,7 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-/* ==========================================================================
-   АДМИНКА: ПОЛЬЗОВАТЕЛИ (СВЕТЛАЯ/ТЕМНАЯ ТЕМА И СТЕКЛО)
-   ========================================================================== */
-
+/* Полный CSS из предыдущей версии + новые стили для autocomplete */
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -388,10 +489,10 @@ onMounted(loadData);
 /* КАРТОЧКИ */
 .glass-card {
   background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
   backdrop-filter: blur(8px); transition: all 0.3s ease;
 }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
+:global(.dark) .glass-card { background: #1e293b; border-color: #334155; }
 
 .admin-card { padding: 28px; margin-bottom: 32px; }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
@@ -404,16 +505,32 @@ onMounted(loadData);
 .input-group label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); }
 
 .form-input {
-  width: 100%; padding: 10px 14px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.9rem; transition: all 0.3s;
+  width: 100%; padding: 10px 14px; border-radius: 8px; border: 1.5px solid var(--border-color, #cbd5e1);
+  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.9rem; transition: all 0.3s; box-sizing: border-box;
 }
 :global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
 .form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
 
+/* autocomplete */
+.autocomplete-wrapper { position: relative; }
+.suggestions {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+  max-height: 200px; overflow-y: auto; list-style: none; padding: 0; margin-top: 4px;
+  border-radius: 8px; background: var(--bg-card, #fff); border: 1px solid var(--border-color, #e2e8f0);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+:global(.dark) .suggestions { background: #1e293b; border-color: #334155; }
+.suggestions li {
+  padding: 10px 16px; cursor: pointer; font-size: 0.9rem; color: var(--text-main, #0f172a);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+:global(.dark) .suggestions li { color: #f8fafc; }
+.suggestions li:hover { background: rgba(37, 99, 235, 0.1); }
+
 .form-footer { display: flex; justify-content: flex-end; }
 .btn-primary {
   background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); color: white; border: none;
-  padding: 12px 30px; border-radius: var(--radius-md, 8px); font-weight: 800; cursor: pointer; transition: 0.3s;
+  padding: 12px 30px; border-radius: 8px; font-weight: 800; cursor: pointer; transition: 0.3s;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); display: flex; align-items: center; gap: 10px;
 }
 .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
@@ -431,7 +548,7 @@ onMounted(loadData);
 .admin-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
 .admin-table th { padding: 16px 20px; text-align: left; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
 :global(.dark) .admin-table th { border-color: #334155; }
-.admin-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; transition: background 0.2s; }
+.admin-table td { padding: 12px 16px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; transition: background 0.2s; }
 :global(.dark) .admin-table td { border-color: #334155; }
 .user-row:hover td { background: rgba(37, 99, 235, 0.03); }
 
@@ -448,6 +565,13 @@ onMounted(loadData);
 .inline-edit:focus { border-color: var(--primary, #2563eb); background: var(--bg-card, #fff); outline: none; }
 .bold { font-weight: 800; }
 .date-tag { font-size: 0.65rem; color: var(--text-muted, #94a3b8); margin-top: 5px; font-weight: 600;}
+
+/* Селект города в таблице */
+.table-select {
+  background: transparent; border: 1px solid transparent; padding: 6px; border-radius: 6px;
+  width: 100%; font-weight: 500; cursor: pointer; color: var(--text-main, #0f172a);
+}
+:global(.dark) .table-select { color: #f8fafc; }
 
 /* Роли */
 .role-select { padding: 6px 12px; border-radius: 40px; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; border: none; cursor: pointer; transition: 0.2s; background: rgba(0,0,0,0.05); }

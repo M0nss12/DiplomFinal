@@ -369,6 +369,87 @@ app.post('/api/users/register', async (req, res) => {
     } catch (e) { logError(e, req); res.status(500).json({ error: e.message }); }
 });
 
+// Создание пользователя администратором (без капчи)
+app.post('/api/admin/users', verifyAdmin, async (req, res) => {
+    try {
+        const { email, phone, password, first_name, last_name, otchestvo, city, role } = req.body;
+
+        const newUserId = crypto.randomUUID();
+        const cityId = await getOrCreateCity(city);
+
+        // Проверка существующего пользователя
+        let filter = email ? `email.eq.${email}` : `phone_number.eq.${phone}`;
+        const { data: existing } = await supabase.from('users').select('*').or(filter).maybeSingle();
+
+        if (existing) {
+            if (existing.password_hash) return res.status(400).json({ error: 'Пользователь уже существует' });
+            const { data: updatedUser } = await supabase.from('users').update({
+                password_hash: password, role: role || 'user', first_name, last_name, otchestvo,
+                saved_city_id: cityId, is_email_verified: false
+            }).eq('id', existing.id).select().single();
+            
+            // Отправить письмо подтверждения, если указан email
+            if (email) {
+                const token = crypto.randomBytes(32).toString('hex');
+                const expiresAt = new Date(Date.now() + 3600000).toISOString();
+                await supabase.from('password_reset_tokens').insert([{ user_id: existing.id, token, expires_at: expiresAt }]);
+                
+                const verifyLink = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/users/verify-email?token=${token}`;
+                await notifyAndEmail({
+                    userId: existing.id,
+                    type: 'system',
+                    email: email,
+                    title: 'Подтверждение регистрации',
+                    message: 'Добро пожаловать в ApexDrive! Подтвердите вашу почту.',
+                    templateName: 'email_verify.html',
+                    templateVars: { link: verifyLink, first_name }
+                });
+            }
+            
+            return res.json(updatedUser);
+        }
+
+        const { data: newUser, error } = await supabase.from('users').insert([{
+            id: newUserId,
+            role: role || 'user',
+            email: email || null,
+            phone_number: phone || null,
+            password_hash: password,
+            first_name,
+            last_name,
+            otchestvo,
+            saved_city_id: cityId,
+            avatar_url: DEFAULT_AVATARS[0],
+            is_email_verified: false
+        }]).select().single();
+
+        if (error) throw error;
+
+        // Отправляем письмо для подтверждения, если email указан
+        if (email) {
+            const token = crypto.randomBytes(32).toString('hex');
+            const expiresAt = new Date(Date.now() + 3600000).toISOString();
+            await supabase.from('password_reset_tokens').insert([{ user_id: newUser.id, token, expires_at: expiresAt }]);
+            
+            const verifyLink = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/users/verify-email?token=${token}`;
+            await notifyAndEmail({
+                userId: newUser.id,
+                type: 'system',
+                email: email,
+                title: 'Подтверждение регистрации',
+                message: 'Добро пожаловать в ApexDrive! Подтвердите вашу почту.',
+                templateName: 'email_verify.html',
+                templateVars: { link: verifyLink, first_name }
+            });
+        }
+
+        res.json(newUser);
+    } catch (e) {
+        logError(e, req);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/users/verify-email', async (req, res) => {
     const { token } = req.query;
     try {
