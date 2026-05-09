@@ -29,25 +29,44 @@
               </option>
             </select>
           </div>
+
           <div class="input-group">
             <label>🏎️ Марка</label>
-            <input v-model="newVehicle.brand" placeholder="Напр. Toyota" required class="form-input" />
+            <input v-model="newVehicle.brand" placeholder="Toyota" required class="form-input" />
           </div>
           <div class="input-group">
             <label>🚘 Модель</label>
-            <input v-model="newVehicle.model" placeholder="Напр. Camry" required class="form-input" />
+            <input v-model="newVehicle.model" placeholder="Camry" required class="form-input" />
           </div>
           <div class="input-group">
             <label>📅 Год выпуска</label>
-            <input v-model.number="newVehicle.year" type="number" placeholder="2024" class="form-input" />
+            <input
+              v-model.number="newVehicle.year"
+              type="number"
+              placeholder="2024"
+              class="form-input"
+              :class="{ 'year-warn': isYearInvalid(newVehicle.year) }"
+            />
           </div>
           <div class="input-group">
             <label>🆔 VIN-номер (17 знаков)</label>
-            <input v-model="newVehicle.vin" placeholder="XW7..." maxlength="17" class="form-input vin-input" />
+            <input
+              v-model="newVehicle.vin"
+              maxlength="17"
+              class="form-input vin-input"
+              @input="formatVin($event)"
+            />
           </div>
           <div class="input-group">
             <label>🧪 Объем двигателя (л)</label>
-            <input v-model.number="newVehicle.engine_volume" type="number" step="0.1" placeholder="2.0" class="form-input" />
+            <input
+              v-model.number="newVehicle.engine_volume"
+              type="number"
+              step="0.1"
+              min="0.1"
+              placeholder="2.0"
+              class="form-input"
+            />
           </div>
         </div>
         <div class="form-footer">
@@ -93,17 +112,22 @@
             <tr>
               <th class="col-id">ID</th>
               <th>Владелец</th>
-              <th>Автомобиль</th>
-              <th>VIN-номер</th>
-              <th class="text-center">Характеристики</th>
+              <th class="col-auto">Автомобиль</th>
+              <th class="col-vin">VIN-номер</th>
+              <th class="col-specs text-center">Характеристики</th>
               <th class="text-center">Основной</th>
               <th class="text-right">Действия</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="v in paginatedVehicles" :key="v.id" class="vehicle-row">
+            <tr
+              v-for="v in paginatedVehicles"
+              :key="v.id"
+              class="vehicle-row"
+              :class="{ 'row-updated': updatedRow === v.id, 'row-error': errorRow === v.id }"
+            >
               <td class="col-id">#{{ v.id }}</td>
-              
+
               <td>
                 <div class="owner-info">
                   <strong>{{ getUserName(v.user_id) }}</strong>
@@ -111,22 +135,22 @@
                 </div>
               </td>
 
-              <td>
+              <td class="col-auto">
                 <div class="car-info-row">
-                   <input v-model="v.brand" @change="updateVehicle(v)" class="inline-edit bold" />
-                   <input v-model="v.model" @change="updateVehicle(v)" class="inline-edit" />
+                  <input v-model="v.brand" @change="updateVehicle(v)" class="inline-edit bold auto-input" />
+                  <input v-model="v.model" @change="updateVehicle(v)" class="inline-edit auto-input" />
                 </div>
               </td>
 
-              <td>
-                <input v-model="v.vin" @change="updateVehicle(v)" class="inline-edit vin-code" maxlength="17" />
+              <td class="col-vin">
+                <input v-model="v.vin" @change="updateVehicle(v)" @input="formatVin($event)" class="inline-edit vin-code" maxlength="17" />
               </td>
 
-              <td class="text-center">
+              <td class="col-specs text-center">
                 <div class="specs-inline">
-                  <input v-model.number="v.year" @change="updateVehicle(v)" type="number" class="inline-edit mini" />
+                  <input v-model.number="v.year" @change="updateVehicle(v)" type="number" class="inline-edit mini" :class="{ 'year-warn': isYearInvalid(v.year) }" />
                   <span class="sep">|</span>
-                  <input v-model.number="v.engine_volume" @change="updateVehicle(v)" type="number" step="0.1" class="inline-edit mini" />
+                  <input v-model.number="v.engine_volume" @change="updateVehicle(v)" type="number" step="0.1" min="0.1" class="inline-edit mini" />
                   <span class="muted">л.</span>
                 </div>
               </td>
@@ -174,6 +198,9 @@ const brandFilter = ref('all');
 const currentPage = ref(1);
 const itemsPerPage = 15;
 
+const updatedRow = ref(null);
+const errorRow = ref(null);
+
 const newVehicle = reactive({
   user_id: null,
   brand: '',
@@ -192,15 +219,26 @@ const loadData = async () => {
     ]);
     vehicles.value = vRes.data;
     users.value = uRes.data;
-  } catch (e) { console.error('Ошибка загрузки данных гаража'); }
+  } catch (e) { console.error('Ошибка загрузки'); }
 };
 
-// Хелперы для отображения пользователей
 const getUserName = (id) => {
   const u = users.value.find(user => user.id === id);
-  return u ? `${u.last_name || ''} ${u.first_name}`.trim() : '---';
+  return u ? `${u.last_name || ''} ${u.first_name || ''}`.trim() : '---';
 };
 const getUserEmail = (id) => users.value.find(user => user.id === id)?.email || '';
+
+const formatVin = (event) => {
+  const input = event.target;
+  let val = input.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '');
+  if (val.length > 17) val = val.substring(0, 17);
+  input.value = val;
+};
+
+const isYearInvalid = (year) => {
+  const currentYear = new Date().getFullYear();
+  return year && (year < 1886 || year > currentYear + 1);
+};
 
 // CRUD
 const createVehicle = async () => {
@@ -209,16 +247,40 @@ const createVehicle = async () => {
   try {
     const res = await axios.post(`/api/admin/user_vehicles`, newVehicle, config);
     vehicles.value.unshift(res.data);
-    Object.assign(newVehicle, { brand: '', model: '', year: 2024, vin: '', engine_volume: 1.6, is_primary: false });
-    alert('Автомобиль добавлен в гараж');
+    Object.assign(newVehicle, {
+      brand: '',
+      model: '',
+      year: new Date().getFullYear(),
+      vin: '',
+      engine_volume: 1.6,
+      is_primary: false,
+    });
+    alert('Автомобиль добавлен');
   } catch (e) { alert('Ошибка при сохранении'); }
   finally { loadingAction.value = false; }
 };
 
+// ** Исправляем обновление: убираем лишние поля **
 const updateVehicle = async (v) => {
   try {
-    await axios.put(`/api/admin/user_vehicles/${v.id}`, v, config);
-  } catch (e) { console.error('Ошибка обновления'); }
+    // Отправляем только нужные поля
+    const payload = {
+      user_id: v.user_id,
+      brand: v.brand,
+      model: v.model,
+      year: v.year,
+      vin: v.vin,
+      engine_volume: v.engine_volume,
+      is_primary: v.is_primary
+    };
+    await axios.put(`/api/admin/user_vehicles/${v.id}`, payload, config);
+    updatedRow.value = v.id;
+    setTimeout(() => (updatedRow.value = null), 800);
+  } catch (e) {
+    alert('Ошибка обновления');
+    errorRow.value = v.id;
+    setTimeout(() => (errorRow.value = null), 800);
+  }
 };
 
 const deleteVehicle = async (id) => {
@@ -229,7 +291,7 @@ const deleteVehicle = async (id) => {
   } catch (e) { alert('Ошибка при удалении'); }
 };
 
-// Фильтрация
+// Фильтры
 const uniqueBrands = computed(() => {
   const brands = vehicles.value.map(v => v.brand).filter(Boolean);
   return Array.from(new Set(brands)).sort();
@@ -240,9 +302,9 @@ const filteredVehicles = computed(() => {
   if (brandFilter.value !== 'all') res = res.filter(v => v.brand === brandFilter.value);
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase();
-    res = res.filter(v => 
-      v.brand.toLowerCase().includes(q) || 
-      v.model.toLowerCase().includes(q) || 
+    res = res.filter(v =>
+      v.brand.toLowerCase().includes(q) ||
+      v.model.toLowerCase().includes(q) ||
       (v.vin && v.vin.toLowerCase().includes(q)) ||
       getUserName(v.user_id).toLowerCase().includes(q)
     );
@@ -251,18 +313,17 @@ const filteredVehicles = computed(() => {
 });
 
 const totalPages = computed(() => Math.ceil(filteredVehicles.value.length / itemsPerPage));
-const paginatedVehicles = computed(() => filteredVehicles.value.slice((currentPage.value - 1) * itemsPerPage, currentPage.value * itemsPerPage));
+const paginatedVehicles = computed(() =>
+  filteredVehicles.value.slice((currentPage.value - 1) * itemsPerPage, currentPage.value * itemsPerPage)
+);
 
 const resetFilters = () => { searchQuery.value = ''; brandFilter.value = 'all'; currentPage.value = 1; };
-watch([searchQuery, brandFilter], () => { currentPage.value = 1; });
+watch([searchQuery, brandFilter], () => (currentPage.value = 1));
 
 onMounted(loadData);
 </script>
 
 <style scoped>
-/* ==========================================================================
-   АДМИНКА: ГАРАЖ (GLASSMORPHISM & DARK MODE)
-   ========================================================================== */
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
 .admin-vehicles { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
@@ -278,7 +339,6 @@ onMounted(loadData);
 
 .stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
 
-/* КАРТОЧКИ */
 .glass-card {
   background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
   border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
@@ -290,7 +350,6 @@ onMounted(loadData);
 .card-title { font-size: 1.35rem; font-weight: 900; margin: 0; }
 .card-decoration { width: 50px; height: 4px; background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); border-radius: 4px; margin-top: 5px; }
 
-/* ФОРМА */
 .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 28px; }
 .input-group label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted, #64748b); display: block; margin-bottom: 8px; }
 
@@ -302,6 +361,7 @@ onMounted(loadData);
 .form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; }
 
 .vin-input { font-family: monospace; text-transform: uppercase; letter-spacing: 1px; }
+.year-warn { background: rgba(255, 193, 7, 0.15) !important; border-color: #ffc107 !important; }
 
 .form-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-top: 20px; border-top: 1px dashed var(--border-color, #e2e8f0); padding-top: 20px; }
 
@@ -312,21 +372,21 @@ onMounted(loadData);
 }
 .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
 
-/* ФИЛЬТРЫ */
 .filter-section { background: rgba(0,0,0,0.01); border-style: dashed; }
 .filter-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; align-items: flex-end; }
 .btn-text-link { background: none; border: none; color: var(--primary, #2563eb); font-weight: 800; cursor: pointer; text-decoration: underline; }
 
-/* ТАБЛИЦА */
 .table-container { margin-top: 20px; }
 .admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
+.admin-table { width: 100%; border-collapse: collapse; min-width: 1100px; }
 .admin-table th { padding: 16px 20px; text-align: left; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
 :global(.dark) .admin-table th { border-color: #334155; }
 .admin-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; }
 :global(.dark) .admin-table td { border-color: #334155; }
 
 .vehicle-row:hover td { background: rgba(37, 99, 235, 0.02); }
+.row-updated td { background: rgba(16, 185, 129, 0.15) !important; }
+.row-error td { background: rgba(239, 68, 68, 0.15) !important; }
 
 .col-id { width: 70px; font-weight: 800; color: var(--primary, #2563eb); font-family: monospace; }
 
@@ -334,22 +394,27 @@ onMounted(loadData);
 :global(.dark) .owner-info strong { color: #f8fafc; }
 .owner-info small { color: var(--text-muted, #94a3b8); font-size: 0.8rem; }
 
-.car-info-row { display: flex; gap: 5px; }
+/* Увеличенные столбцы */
+.col-auto { min-width: 200px; }
+.col-vin { min-width: 160px; }
+.col-specs { min-width: 140px; text-align: center; }
+
+.car-info-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.auto-input { flex: 1 1 100px; }
+
 .specs-inline { display: flex; align-items: center; gap: 5px; justify-content: center; }
 
-/* INLINE EDIT */
 .inline-edit { background: transparent; border: 1px solid transparent; padding: 6px; border-radius: 6px; color: var(--text-main, #0f172a); width: 100%; font-weight: 500; transition: 0.2s; }
 :global(.dark) .inline-edit { color: #f8fafc; }
 .inline-edit:hover { background: rgba(0,0,0,0.03); border-color: var(--border-color, #cbd5e1); }
 .inline-edit:focus { border-color: var(--primary, #2563eb); background: var(--bg-card, #fff); outline: none; }
 .bold { font-weight: 800; }
-.vin-code { font-family: monospace; text-transform: uppercase; color: var(--primary, #2563eb); font-weight: 700; width: 160px; }
-.inline-edit.mini { width: 60px; text-align: center; }
+.vin-code { font-family: monospace; text-transform: uppercase; color: var(--primary, #2563eb); font-weight: 700; width: 100%; min-width: 140px; }
+.inline-edit.mini { width: 70px; text-align: center; }
 
 .btn-delete-small { background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); padding: 8px 16px; border-radius: 30px; font-weight: 800; font-size: 0.8rem; color: var(--danger, #ef4444); cursor: pointer; transition: 0.2s; }
 .btn-delete-small:hover { background: var(--danger, #ef4444); color: white; transform: translateY(-2px); }
 
-/* ЧЕКБОКСЫ */
 .custom-checkbox { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-weight: 700; font-size: 0.85rem; }
 .custom-checkbox input { display: none; }
 .checkmark { width: 20px; height: 20px; background: transparent; border: 2px solid var(--border-color, #cbd5e1); border-radius: 6px; position: relative; transition: all 0.2s; }
@@ -357,7 +422,6 @@ onMounted(loadData);
 .custom-checkbox input:checked + .checkmark { background: var(--primary, #2563eb); border-color: var(--primary, #2563eb); }
 .custom-checkbox input:checked + .checkmark::after { content: '✓'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 12px; font-weight: bold; }
 
-/* ПАГИНАЦИЯ */
 .pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 40px; }
 .p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-size: 1.2rem; font-weight: 900; border: 1px solid var(--border-color, #e2e8f0); color: var(--text-main, #0f172a); }
 :global(.dark) .p-btn { color: #f8fafc; }

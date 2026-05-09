@@ -265,6 +265,29 @@ app.get('/api/global-search', async (req, res) => {
 // =====================================================================
 // API: ИЗБРАННОЕ И ОТЗЫВЫ
 // =====================================================================
+
+// Добавление в избранное администратором
+app.post('/api/admin/wishlists', verifyAdmin, async (req, res) => {
+    try {
+        const { user_id, product_id } = req.body;
+        if (!user_id || !product_id) return res.status(400).json({ error: 'user_id и product_id обязательны' });
+
+        const { data, error } = await supabase
+            .from('wishlists')
+            .insert([{ user_id, product_id }])
+            .select('*, users(*), products(*)')
+            .single();
+
+        if (error) {
+            // вероятно, дубликат (уникальное ограничение)
+            return res.status(409).json({ error: 'Этот товар уже в избранном у пользователя' });
+        }
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/wishlist/:userId', async (req, res) => {
     try {
         const { data, error } = await supabase.from('wishlists').select('*, products(*)').eq('user_id', req.params.userId);

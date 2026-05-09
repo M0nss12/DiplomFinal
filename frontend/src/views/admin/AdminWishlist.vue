@@ -12,7 +12,41 @@
       </div>
     </div>
 
-    <!-- 1. ФИЛЬТРЫ И ПОИСК -->
+    <!-- 1. ФОРМА ДОБАВЛЕНИЯ -->
+    <section class="admin-card create-card glass-card">
+      <div class="card-header">
+        <h3 class="card-title">✨ Добавить товар в избранное</h3>
+        <div class="card-decoration"></div>
+      </div>
+      <form @submit.prevent="createWishlistItem" class="admin-form">
+        <div class="input-grid">
+          <div class="input-group">
+            <label>👤 Пользователь</label>
+            <select v-model="newItem.user_id" required class="form-input">
+              <option :value="null" disabled>-- Выберите --</option>
+              <option v-for="u in users" :key="u.id" :value="u.id">
+                {{ getUserFullName(u) }} ({{ u.email || u.phone_number || u.id }})
+              </option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>🛒 Товар</label>
+            <select v-model="newItem.product_id" required class="form-input">
+              <option :value="null" disabled>-- Выберите --</option>
+              <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-footer">
+          <button type="submit" class="btn-primary" :disabled="loadingAction">
+            <span v-if="loadingAction" class="spinner-small"></span>
+            <span v-else>❤️ Добавить в избранное</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 2. ФИЛЬТРЫ И ПОИСК -->
     <section class="admin-card filter-section glass-card">
       <div class="filter-header">
         <h3 class="card-title">🔍 Фильтрация журнала</h3>
@@ -35,7 +69,7 @@
       </div>
     </section>
 
-    <!-- 2. ТАБЛИЦА -->
+    <!-- 3. ТАБЛИЦА -->
     <div class="table-container">
       <div class="table-meta">
         <span class="meta-icon">📄</span>
@@ -112,7 +146,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, reactive, computed, watch } from 'vue';
 import axios from 'axios';
 
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123';
@@ -120,31 +154,55 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 const config = { headers: { 'x-admin-key': ADMIN_SECRET } };
 
 const wishlist = ref([]);
-const loading = ref(true);
+const users = ref([]);
+const products = ref([]);
+const loadingAction = ref(false);
 const searchQuery = ref('');
 const timeFilter = ref('all');
 const currentPage = ref(1);
 const itemsPerPage = 20;
 
+const newItem = reactive({
+  user_id: null,
+  product_id: null
+});
+
 const loadData = async () => {
-  loading.value = true;
   try {
-    const res = await axios.get(`/api/admin/wishlists`, config);
-    wishlist.value = res.data;
+    const [wRes, uRes, pRes] = await Promise.all([
+      axios.get(`/api/admin/wishlists`, config),
+      axios.get(`/api/admin/users`, config),
+      axios.get(`/api/admin/products`, config)
+    ]);
+    wishlist.value = wRes.data;
+    users.value = uRes.data;
+    products.value = pRes.data;
   } catch (e) {
-    console.error('Ошибка загрузки данных избранного');
-  } finally {
-    loading.value = false;
+    console.error('Ошибка загрузки данных');
   }
 };
 
 const getUserFullName = (u) => {
-    if (!u) return 'Гость / Удален';
-    return `${u.last_name || ''} ${u.first_name || ''}`.trim();
+  if (!u) return '';
+  return `${u.last_name || ''} ${u.first_name || ''}`.trim();
 };
 
-const formatDateTime = (iso) => {
-    return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const formatDateTime = (iso) => new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+const createWishlistItem = async () => {
+  if (!newItem.user_id || !newItem.product_id) return alert('Выберите пользователя и товар');
+  loadingAction.value = true;
+  try {
+    const res = await axios.post(`/api/admin/wishlists`, newItem, config);
+    wishlist.value.unshift(res.data);
+    // сброс товара, пользователь остаётся для удобства
+    newItem.product_id = null;
+    alert('Товар добавлен в избранное');
+  } catch (e) {
+    alert(e.response?.data?.error || 'Ошибка добавления');
+  } finally {
+    loadingAction.value = false;
+  }
 };
 
 const removeFromWishlist = async (id) => {
@@ -168,16 +226,15 @@ const filteredWishlist = computed(() => {
     });
   }
 
-  // Фильтр по времени (логика на фронте для примера)
   if (timeFilter.value !== 'all') {
-      const now = new Date();
-      res = res.filter(item => {
-          const added = new Date(item.added_at);
-          if (timeFilter.value === 'today') return added.toDateString() === now.toDateString();
-          if (timeFilter.value === 'week') return (now - added) < 7 * 24 * 60 * 60 * 1000;
-          if (timeFilter.value === 'month') return (now - added) < 30 * 24 * 60 * 60 * 1000;
-          return true;
-      });
+    const now = new Date();
+    res = res.filter(item => {
+      const added = new Date(item.added_at);
+      if (timeFilter.value === 'today') return added.toDateString() === now.toDateString();
+      if (timeFilter.value === 'week') return (now - added) < 7 * 24 * 60 * 60 * 1000;
+      if (timeFilter.value === 'month') return (now - added) < 30 * 24 * 60 * 60 * 1000;
+      return true;
+    });
   }
 
   return res.sort((a, b) => b.id - a.id);
@@ -193,9 +250,53 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-/* ==========================================================================
-   АДМИНКА: ИЗБРАННОЕ (GLASSMORPHISM & DARK MODE)
-   ========================================================================== */
+/* Все существующие стили + новый класс для формы */
+@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+.admin-wishlist { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
+:global(.dark) .admin-wishlist { color: #f8fafc; }
+
+.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-left h1 {
+  font-size: 2.2rem; font-weight: 900; margin: 0;
+  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; }
+
+.stats-badge { padding: 12px 24px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
+
+.glass-card {
+  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(8px); transition: all 0.3s ease;
+}
+:global(.dark) .glass-card { background: #1e293b; border-color: #334155; }
+
+.admin-card { padding: 28px; margin-bottom: 32px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.card-title { font-size: 1.35rem; font-weight: 900; margin: 0; }
+.card-decoration { width: 50px; height: 4px; background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); border-radius: 4px; }
+
+.input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; margin-bottom: 24px; }
+.input-group { display: flex; flex-direction: column; gap: 8px; }
+.input-group label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); }
+
+.form-input {
+  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
+  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s;
+}
+:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
+.form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+.form-footer { display: flex; justify-content: flex-end; }
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); color: white; border: none;
+  padding: 12px 30px; border-radius: 8px; font-weight: 800; cursor: pointer; transition: 0.3s;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); display: flex; align-items: center; gap: 10px;
+}
+.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
+
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
 .admin-wishlist { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
