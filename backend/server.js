@@ -852,6 +852,24 @@ app.delete('/api/storage/:bucket/:filename', verifyAdmin, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/feedback/send', async (req, res) => {
+    const { name, contact, message } = req.body;
+    if (!name || !contact || !message) {
+        return res.status(400).json({ error: 'Все поля обязательны' });
+    }
+    try {
+        await transporter.sendMail({
+            from: `"ApexDrive Форма" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER,   // или специальный ящик для заявок
+            subject: `Новое сообщение от ${name}`,
+            html: `<p><b>Имя:</b> ${name}</p><p><b>Контакты:</b> ${contact}</p><p><b>Сообщение:</b></p><p>${message}</p>`
+        });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Ошибка отправки' });
+    }
+});
+
 // =====================================================================
 // API: АДМИНКА
 // =====================================================================
