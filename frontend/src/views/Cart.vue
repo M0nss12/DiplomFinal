@@ -1,11 +1,11 @@
 <template>
-  <div class="cart-container">
-    <h1>🛒 Ваша корзина</h1>
+  <div class="cart-page animate-fade-in">
+    <h1 class="text-center mb-3">🛒 Ваша корзина</h1>
 
+    <!-- НЕПУСТАЯ КОРЗИНА -->
     <div v-if="cartStore.items.length > 0" class="cart-content">
-      
-      <!-- ТАБЛИЦА ТОВАРОВ -->
-      <div class="cart-table-wrapper glass-card">
+      <!-- Таблица товаров (используем глобальный класс .cart-table) -->
+      <div class="glass-card cart-table-wrapper">
         <table class="cart-table">
           <thead>
             <tr>
@@ -18,48 +18,53 @@
           </thead>
           <transition-group name="row" tag="tbody">
             <tr v-for="item in cartStore.items" :key="item.id">
-              <td class="col-product">
+              <!-- Товар -->
+              <td class="col-product" data-label="Товар">
                 <div class="product-info">
                   <div class="img-wrap">
                     <img :src="getImageUrl(item)" :alt="item.name" loading="lazy" />
                   </div>
                   <div>
                     <strong class="product-name">{{ item.name }}</strong>
-                    <small class="product-sku">Арт: {{ item.sku }}</small>
-                    <div class="weight-hint">⚖️ {{ (item.weight_kg || 0) * (item.quantity || 1) }} кг</div>
+                    <small class="product-sku text-muted">Арт: {{ item.sku }}</small>
+                    <div class="weight-hint text-muted">⚖️ {{ (item.weight_kg || 0) * (item.quantity || 1) }} кг</div>
                   </div>
                 </div>
               </td>
 
-              <td class="col-price">
+              <!-- Цена -->
+              <td class="col-price" data-label="Цена">
                 <div v-if="item.discount_price" class="price-discount">
-                  <span class="discount-tag">-{{ calculatePercent(item) }}%</span>
-                  <strong class="new-price">{{ item.discount_price }} ₽</strong>
-                  <s class="old-price">{{ item.price }} ₽</s>
+                  <span class="badge badge-danger">-{{ calculatePercent(item) }}%</span>
+                  <strong class="new-price text-danger">{{ item.discount_price }} ₽</strong>
+                  <s class="old-price text-muted">{{ item.price }} ₽</s>
                 </div>
                 <div v-else>
                   <strong class="regular-price">{{ item.price }} ₽</strong>
                 </div>
               </td>
 
-              <td class="col-qty">
+              <!-- Количество -->
+              <td class="col-qty" data-label="Количество">
                 <div class="qty-control">
                   <button @click="updateQuantity(item, -1)" class="qty-btn" aria-label="Уменьшить">-</button>
                   <span class="qty-value">{{ item.quantity }}</span>
                   <button @click="updateQuantity(item, 1)" class="qty-btn" aria-label="Увеличить">+</button>
                 </div>
-                <div class="stock-info" :class="{ 'local': isLocalAvailable(item) }">
-                   {{ isLocalAvailable(item) ? '✅ В городе (' + appStore.city + ')' : '🚚 Межгород' }}
+                <div class="stock-info" :class="{ 'text-success': isLocalAvailable(item), 'text-warning': !isLocalAvailable(item) }">
+                  {{ isLocalAvailable(item) ? '✅ В городе (' + appStore.city + ')' : '🚚 Межгород' }}
                 </div>
-                <div v-if="item.stock_quantity != null" class="max-hint">
+                <div v-if="item.stock_quantity != null" class="max-hint text-muted text-xs">
                   Доступно: {{ item.stock_quantity }} шт.
                 </div>
               </td>
 
-              <td class="col-total">
+              <!-- Итого -->
+              <td class="col-total" data-label="Итого">
                 <strong class="total-price">{{ lineTotal(item) }} ₽</strong>
               </td>
 
+              <!-- Удалить -->
               <td class="col-action">
                 <button @click="cartStore.removeFromCart(item.id)" class="remove-btn" title="Удалить">&times;</button>
               </td>
@@ -68,29 +73,29 @@
         </table>
       </div>
 
-      <!-- БЛОК ИТОГО -->
+      <!-- Итоговый блок -->
       <div class="cart-summary glass-card">
         <div class="summary-details">
-          <h4>Состав заказа:</h4>
+          <h4 class="text-muted">Состав заказа:</h4>
           <div class="summary-list">
-            <div v-for="item in cartStore.items" :key="item.id" class="summary-item">
-               <span class="s-name">{{ item.name }} <span class="s-qty">x{{ item.quantity }}</span></span>
-               <span class="s-price">{{ lineTotal(item) }} ₽</span>
+            <div v-for="item in cartStore.items" :key="item.id" class="summary-item flex justify-between">
+              <span class="s-name">{{ item.name }} <span class="s-qty text-muted">x{{ item.quantity }}</span></span>
+              <span class="s-price font-bold">{{ lineTotal(item) }} ₽</span>
             </div>
           </div>
-          <div class="total-weight">
+          <div class="total-weight mt-2 pt-2" style="border-top: 1px solid var(--border-color)">
             Общий вес: <b>{{ totalWeight }} кг</b>
           </div>
         </div>
 
         <div class="summary-total">
-          <div class="price-row">
+          <div class="price-row flex justify-between">
             <span>Товары (без скидки):</span> 
             <strong>{{ totalOriginal }} ₽</strong>
           </div>
 
           <transition name="discount-fade">
-            <div v-if="totalDiscount > 0" class="price-row discount-row">
+            <div v-if="totalDiscount > 0" class="price-row discount-row flex justify-between text-danger">
               <span>Скидка:</span>
               <strong>- {{ totalDiscount }} ₽</strong>
             </div>
@@ -98,25 +103,25 @@
 
           <hr class="divider" />
 
-          <div class="final-total">
-             <span>Итого к оплате:</span>
-             <h1 class="total-h1">{{ totalFinal }} ₽</h1>
+          <div class="final-total flex justify-between items-center">
+            <span>Итого к оплате:</span>
+            <h1 class="total-h1 text-success m-0">{{ totalFinal }} ₽</h1>
           </div>
-          
-          <div class="summary-actions">
-            <button @click="cartStore.clearCart()" class="btn-clear">Очистить</button>
-            <router-link to="/checkout" class="btn-checkout">Оформить заказ</router-link>
+
+          <div class="summary-actions flex gap-2">
+            <button @click="cartStore.clearCart()" class="btn btn-outline flex-1">Очистить</button>
+            <router-link to="/checkout" class="btn btn-success btn-lg flex-1 text-center">Оформить заказ</router-link>
           </div>
         </div>
       </div>
     </div>
 
     <!-- ПУСТАЯ КОРЗИНА -->
-    <div v-else class="empty-cart glass-card">
-      <div class="empty-icon">🛒</div>
-      <h2>Ваша корзина пуста</h2>
-      <p>Перейдите в каталог, чтобы найти нужные детали для вашего авто.</p>
-      <router-link to="/catalog" class="btn-catalog">Перейти в каталог</router-link>
+    <div v-else class="empty-cart glass-card text-center p-5">
+      <div class="empty-icon text-4xl mb-2">🛒</div>
+      <h2 class="mb-1">Ваша корзина пуста</h2>
+      <p class="text-muted mb-3">Перейдите в каталог, чтобы найти нужные детали для вашего авто.</p>
+      <router-link to="/catalog" class="btn btn-primary btn-lg">Перейти в каталог</router-link>
     </div>
   </div>
 </template>
@@ -129,58 +134,39 @@ import { useAppStore } from '@/stores/appStore';
 const cartStore = useCartStore();
 const appStore = useAppStore();
 
-// Получение картинки
 const getImageUrl = (item) => {
-  if (item.images && Array.isArray(item.images) && item.images.length > 0) {
-    return item.images[0];
-  }
+  if (item.images && Array.isArray(item.images) && item.images.length > 0) return item.images[0];
   if (item.image) return item.image;
   return '/assets/images/no-image.png';
 };
 
-// Процент скидки
 const calculatePercent = (item) => {
   if (!item.discount_price) return 0;
   return Math.round(((item.price - item.discount_price) / item.price) * 100);
 };
 
-// Стоимость конкретной строки
-const lineTotal = (item) => {
-  return ((item.discount_price || item.price) * (item.quantity || 1)).toFixed(2);
-};
+const lineTotal = (item) => ((item.discount_price || item.price) * (item.quantity || 1)).toFixed(2);
 
-// Полная стоимость без скидки (по обычной цене)
-const totalOriginal = computed(() => {
-  return cartStore.items.reduce((sum, item) => {
-    return sum + (item.price || 0) * (item.quantity || 1);
-  }, 0).toFixed(2);
-});
+const totalOriginal = computed(() =>
+  cartStore.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0).toFixed(2)
+);
 
-// Общая сумма скидки
-const totalDiscount = computed(() => {
-  return cartStore.items.reduce((sum, item) => {
-    if (item.discount_price && item.price > item.discount_price) {
+const totalDiscount = computed(() =>
+  cartStore.items.reduce((sum, item) => {
+    if (item.discount_price && item.price > item.discount_price)
       return sum + (item.price - item.discount_price) * (item.quantity || 1);
-    }
     return sum;
-  }, 0).toFixed(2);
-});
+  }, 0).toFixed(2)
+);
 
-// Итоговая цена (со скидкой)
-const totalFinal = computed(() => {
-  return cartStore.items.reduce((sum, item) => {
-    return sum + (item.discount_price || item.price) * (item.quantity || 1);
-  }, 0).toFixed(2);
-});
+const totalFinal = computed(() =>
+  cartStore.items.reduce((sum, item) => sum + (item.discount_price || item.price) * (item.quantity || 1), 0).toFixed(2)
+);
 
-// Общий вес
-const totalWeight = computed(() => {
-  return cartStore.items.reduce((sum, item) => {
-    return sum + (item.weight_kg || 0) * (item.quantity || 1);
-  }, 0).toFixed(1);
-});
+const totalWeight = computed(() =>
+  cartStore.items.reduce((sum, item) => sum + (item.weight_kg || 0) * (item.quantity || 1), 0).toFixed(1)
+);
 
-// Проверка локации
 const isSameCity = (city1, city2) => {
   if (!city1 || !city2) return false;
   return city1.trim().toLowerCase() === city2.trim().toLowerCase();
@@ -194,12 +180,10 @@ const isLocalAvailable = (item) => {
   });
 };
 
-// Контроль изменения количества
 const updateQuantity = (item, delta) => {
   const currentQty = item.quantity || 1;
   const newQty = currentQty + delta;
   if (newQty < 1) return;
-
   if (delta > 0 && item.stock_quantity != null && newQty > item.stock_quantity) {
     alert(`Нельзя добавить больше ${item.stock_quantity} шт. (столько всего в наличии).`);
     return;
@@ -209,243 +193,301 @@ const updateQuantity = (item, delta) => {
 </script>
 
 <style scoped>
-.cart-container {
+/* Только уникальные стили, отсутствующие в глобальном CSS */
+.cart-page {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 40px 20px;
-  animation: fadeIn 0.4s ease-out;
+  padding: 24px 16px;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Обёртка таблицы (просто чтобы не терять стекломорфизм) */
+.cart-table-wrapper {
+  overflow: hidden; /* для скругления углов у глобальной .cart-table */
+  margin-bottom: 24px;
 }
 
-h1 {
+/* Колонки (ширины) */
+.col-product { width: 45%; }
+.col-price, .col-qty, .col-total { width: 15%; text-align: center; }
+.col-action { width: 10%; text-align: center; }
+
+/* Товар */
+.product-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.img-wrap {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  background: #fff;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+}
+:global(.dark) .img-wrap {
+  background: #0f172a;
+  border-color: #334155;
+}
+.img-wrap img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.product-name {
+  font-size: 1rem;
+  color: var(--text-main);
+  display: block;
+  line-height: 1.3;
+  margin-bottom: 5px;
+}
+:global(.dark) .product-name {
+  color: #f8fafc;
+}
+.product-sku {
+  font-size: 0.85rem;
+}
+.weight-hint {
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+/* Цены */
+.price-discount {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.new-price {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.old-price {
+  text-decoration: line-through;
+  font-size: 0.9rem;
+}
+.regular-price {
+  font-size: 1.1rem;
+  color: var(--text-main);
+  font-weight: 700;
+}
+:global(.dark) .regular-price {
+  color: #f8fafc;
+}
+
+/* Количество */
+.qty-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.03);
+  padding: 5px;
+  border-radius: var(--radius-sm);
+  width: fit-content;
+  margin: 0 auto;
+}
+:global(.dark) .qty-control {
+  background: rgba(255,255,255,0.05);
+}
+
+.qty-btn {
+  width: 28px;
+  height: 28px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-main);
+  transition: border-color 0.2s, color 0.2s;
+}
+:global(.dark) .qty-btn {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f8fafc;
+}
+.qty-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.qty-value {
+  font-weight: 700;
+  min-width: 20px;
   text-align: center;
-  font-size: 2.5rem;
-  margin-bottom: 40px;
-  color: var(--text-main, #0f172a);
-  font-weight: 800;
+  color: var(--text-main);
 }
-:global(.dark) h1 { color: #f8fafc; }
+:global(.dark) .qty-value {
+  color: #f8fafc;
+}
 
-/* Стеклянные карточки */
-.glass-card {
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+.stock-info {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.max-hint {
+  margin-top: 4px;
+}
+
+/* Итого в строке */
+.total-price {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+:global(.dark) .total-price {
+  color: #f8fafc;
+}
+
+/* Кнопка удаления */
+.remove-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 5px;
+}
+.remove-btn:hover {
+  color: var(--danger);
+}
+
+/* Итоговый блок */
+.cart-summary {
+  display: flex;
+  gap: 30px;
+  padding: 30px;
+}
+.summary-details {
+  flex: 1;
+  padding-right: 30px;
+  border-right: 1px dashed var(--border-color);
+}
+:global(.dark) .summary-details {
+  border-color: #475569;
+}
+.summary-details h4 {
+  margin: 0 0 15px 0;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.summary-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+.summary-list::-webkit-scrollbar { width: 4px; }
+.summary-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+:global(.dark) .summary-list::-webkit-scrollbar-thumb { background: #475569; }
+
+.summary-item {
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+.s-qty {
+  margin-left: 5px;
+}
+
+.summary-total {
+  width: 350px;
+  display: flex;
+  flex-direction: column;
+}
+.price-row {
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+  color: var(--text-main);
+}
+.discount-row {
+  color: var(--danger);
+}
+
+/* Анимация скидки */
+.discount-fade-enter-active,
+.discount-fade-leave-active {
   transition: all 0.3s ease;
 }
-:global(.dark) .glass-card {
-  background: #1e293b;
-  border-color: #334155;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+.discount-fade-enter-from,
+.discount-fade-leave-to {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
 }
 
-/* ТАБЛИЦА */
-.cart-table-wrapper {
-  overflow: hidden;
-  margin-bottom: 30px;
+.final-total {
+  margin-bottom: 25px;
+}
+.total-h1 {
+  font-size: 2.2rem;
 }
 
-.cart-table {
-  width: 100%;
-  border-collapse: collapse;
+/* Пустая корзина */
+.empty-cart {
+  border: 2px dashed var(--border-color);
 }
 
-.cart-table th {
-  background: rgba(0,0,0,0.02);
-  padding: 15px 20px;
-  text-align: left;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: var(--text-muted, #64748b);
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
-}
-:global(.dark) .cart-table th { background: rgba(255,255,255,0.02); border-color: #334155; color: #94a3b8; }
-
-.cart-table td {
-  padding: 20px;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
-  vertical-align: middle;
-}
-:global(.dark) .cart-table td { border-color: #334155; }
-.cart-table tr:last-child td { border-bottom: none; }
-
-/* Анимация удаления */
+/* Анимация удаления строки */
 .row-leave-active {
   transition: all 0.3s ease;
   opacity: 0;
   transform: translateX(-20px);
 }
 
-/* Колонки */
-.col-product { width: 45%; }
-.col-price, .col-qty, .col-total { width: 15%; text-align: center; }
-.col-action { width: 10%; text-align: center; }
-
-/* Товар */
-.product-info { display: flex; align-items: center; gap: 20px; }
-.img-wrap {
-  width: 80px; height: 80px; flex-shrink: 0; background: #fff;
-  border-radius: var(--radius-md, 8px); border: 1px solid var(--border-color, #e2e8f0);
-  display: flex; align-items: center; justify-content: center; padding: 5px;
-}
-:global(.dark) .img-wrap { border-color: #334155; }
-.img-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; }
-
-.product-name { font-size: 1rem; color: var(--text-main, #0f172a); display: block; line-height: 1.3; margin-bottom: 5px; }
-:global(.dark) .product-name { color: #f8fafc; }
-.product-sku { color: var(--text-muted, #64748b); font-size: 0.85rem; }
-.weight-hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
-
-/* Цена */
-.price-discount { display: flex; flex-direction: column; align-items: center; }
-.discount-tag {
-  background: var(--danger, #ef4444); color: white; font-size: 0.75rem;
-  padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-bottom: 4px;
-}
-.new-price { color: var(--danger, #ef4444); font-size: 1.1rem; font-weight: 700; }
-.old-price { text-decoration: line-through; color: var(--text-muted, #64748b); font-size: 0.9rem; }
-.regular-price { font-size: 1.1rem; color: var(--text-main, #0f172a); font-weight: 700; }
-:global(.dark) .regular-price { color: #f8fafc; }
-
-/* Количество */
-.qty-control {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  background: rgba(0,0,0,0.03); padding: 5px; border-radius: var(--radius-sm, 8px);
-  width: fit-content; margin: 0 auto;
-}
-:global(.dark) .qty-control { background: rgba(255,255,255,0.05); }
-
-.qty-btn {
-  width: 28px; height: 28px; background: var(--bg-card, #fff); border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 6px; cursor: pointer; font-weight: 700; color: var(--text-main, #0f172a); transition: all 0.2s;
-}
-:global(.dark) .qty-btn { background: #1e293b; border-color: #475569; color: #f8fafc; }
-.qty-btn:hover { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); }
-.qty-value { font-weight: 700; min-width: 20px; text-align: center; color: var(--text-main, #0f172a); }
-:global(.dark) .qty-value { color: #f8fafc; }
-
-.stock-info { margin-top: 8px; font-size: 0.75rem; color: #f59e0b; font-weight: 600; }
-.stock-info.local { color: var(--success, #10b981); }
-.max-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; }
-
-/* Итого в строке */
-.total-price { font-size: 1.2rem; font-weight: 700; color: var(--text-main, #0f172a); }
-:global(.dark) .total-price { color: #f8fafc; }
-
-/* Удалить */
-.remove-btn { background: none; border: none; font-size: 1.5rem; color: var(--text-muted, #94a3b8); cursor: pointer; transition: color 0.2s; padding: 5px; }
-.remove-btn:hover { color: var(--danger, #ef4444); }
-
-/* СВОДКА (SUMMARY) */
-.cart-summary {
-  display: flex; gap: 30px; padding: 30px;
-}
-.summary-details { flex: 1; padding-right: 30px; border-right: 1px dashed var(--border-color, #cbd5e1); }
-:global(.dark) .summary-details { border-color: #475569; }
-
-.summary-details h4 { margin: 0 0 15px 0; color: var(--text-muted, #64748b); font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; }
-.summary-list { max-height: 200px; overflow-y: auto; padding-right: 10px; }
-.summary-list::-webkit-scrollbar { width: 4px; }
-.summary-list::-webkit-scrollbar-thumb { background: var(--border-color, #cbd5e1); border-radius: 4px; }
-:global(.dark) .summary-list::-webkit-scrollbar-thumb { background: #475569; }
-
-.summary-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; color: var(--text-main, #0f172a); }
-:global(.dark) .summary-item { color: #e2e8f0; }
-.s-qty { color: var(--text-muted, #64748b); margin-left: 5px; }
-
-.total-weight { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color, #cbd5e1); color: var(--text-muted, #64748b); font-size: 0.9rem; }
-:global(.dark) .total-weight { border-color: #475569; }
-
-.summary-total { width: 350px; display: flex; flex-direction: column; }
-.price-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.1rem; color: var(--text-main, #0f172a); }
-:global(.dark) .price-row { color: #f8fafc; }
-.discount-row { color: var(--danger, #ef4444); }
-
-/* Анимация появления/исчезновения скидки */
-.discount-fade-enter-active, .discount-fade-leave-active {
-  transition: all 0.3s ease;
-}
-.discount-fade-enter-from, .discount-fade-leave-to {
-  opacity: 0;
-  max-height: 0;
-  margin-bottom: 0;
-}
-
-.divider { border: none; border-top: 1px solid var(--border-color, #cbd5e1); margin: 15px 0; }
-:global(.dark) .divider { border-color: #475569; }
-
-.final-total { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-.final-total span { font-size: 1.2rem; font-weight: 700; color: var(--text-muted, #64748b); }
-.total-h1 { margin: 0; font-size: 2.2rem; color: var(--success, #10b981); }
-
-.summary-actions { display: flex; gap: 15px; margin-top: auto; }
-.btn-clear {
-  padding: 14px 20px; background: rgba(0,0,0,0.05); color: var(--text-muted, #64748b);
-  border-radius: var(--radius-md, 8px); font-weight: 600; border: none; cursor: pointer; transition: all 0.2s;
-}
-:global(.dark) .btn-clear { background: rgba(255,255,255,0.05); color: #94a3b8; }
-.btn-clear:hover { background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); }
-
-.btn-checkout {
-  flex: 1; text-align: center; padding: 14px; background: var(--success, #10b981); color: white;
-  border-radius: var(--radius-md, 8px); font-weight: 700; text-decoration: none; font-size: 1.1rem;
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); transition: all 0.2s;
-}
-.btn-checkout:hover { background: #059669; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4); }
-
-/* ПУСТАЯ КОРЗИНА */
-.empty-cart { text-align: center; padding: 80px 20px; border: 2px dashed var(--border-color, #cbd5e1); }
-:global(.dark) .empty-cart { border-color: #475569; }
-.empty-icon { font-size: 4rem; margin-bottom: 20px; }
-.empty-cart h2 { margin-bottom: 10px; color: var(--text-main, #0f172a); }
-:global(.dark) .empty-cart h2 { color: #f8fafc; }
-.empty-cart p { color: var(--text-muted, #64748b); margin-bottom: 30px; }
-
-.btn-catalog {
-  display: inline-block; padding: 12px 30px; background: var(--primary, #2563eb); color: white;
-  border-radius: var(--radius-md, 8px); text-decoration: none; font-weight: 700; transition: all 0.2s;
-}
-.btn-catalog:hover { background: #1d4ed8; transform: translateY(-2px); }
-
-/* АДАПТИВНОСТЬ */
+/* Адаптив */
 @media (max-width: 900px) {
-  .cart-summary { flex-direction: column; }
-  .summary-details { border-right: none; border-bottom: 1px dashed var(--border-color, #cbd5e1); padding-right: 0; padding-bottom: 20px; }
-  .summary-total { width: 100%; }
+  .cart-summary {
+    flex-direction: column;
+  }
+  .summary-details {
+    border-right: none;
+    border-bottom: 1px dashed var(--border-color);
+    padding-right: 0;
+    padding-bottom: 20px;
+  }
+  .summary-total {
+    width: 100%;
+  }
 }
 
 @media (max-width: 768px) {
-  .cart-table thead { display: none; }
-  .cart-table tbody tr {
-    display: flex; flex-direction: column; border: 1px solid var(--border-color, #e2e8f0);
-    border-radius: var(--radius-md, 12px); padding: 15px; margin-bottom: 20px; position: relative;
-    background: rgba(0,0,0,0.02);
+  /* Глобальные стили .cart-table уже содержат блочное отображение для tr/td.
+     Добавим лишь точечные доработки под наш дизайн */
+  .cart-table td.col-product {
+    padding-bottom: 15px !important;
+    border-bottom: 1px solid var(--border-color) !important;
   }
-  :global(.dark) .cart-table tbody tr { background: rgba(255,255,255,0.02); border-color: #334155; }
-
-  .cart-table td { padding: 10px 0; border: none; width: 100%; text-align: left; }
-  .col-product { padding-bottom: 15px !important; border-bottom: 1px solid var(--border-color, #e2e8f0) !important; }
-  :global(.dark) .col-product { border-color: #334155 !important; }
-
-  .col-price, .col-qty, .col-total { display: flex; justify-content: space-between; align-items: center; }
-
-  .col-price::before { content: 'Цена:'; color: var(--text-muted, #64748b); font-size: 0.85rem; font-weight: 600; }
-  .col-qty::before { content: 'Количество:'; color: var(--text-muted, #64748b); font-size: 0.85rem; font-weight: 600; }
-  .col-total::before { content: 'Итого:'; color: var(--text-muted, #64748b); font-size: 0.85rem; font-weight: 600; }
-
-  .col-action { position: absolute; top: 10px; right: 10px; width: auto; padding: 0; }
-
-  .qty-control { margin: 0; }
-  .price-discount { align-items: flex-end; }
-  .img-wrap { width: 60px; height: 60px; }
-  
-  .summary-actions { flex-direction: column-reverse; }
-  .btn-clear { width: 100%; }
+  :global(.dark) .cart-table td.col-product {
+    border-color: #334155 !important;
+  }
+  .col-action {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: auto;
+    padding: 0;
+  }
+  .qty-control {
+    margin: 0;
+  }
+  .price-discount {
+    align-items: flex-end;
+  }
+  .img-wrap {
+    width: 60px;
+    height: 60px;
+  }
+  .summary-actions {
+    flex-direction: column-reverse;
+  }
 }
 </style>

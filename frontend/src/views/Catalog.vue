@@ -1,71 +1,79 @@
 <template>
-  <div class="catalog-page">
-    
+  <div class="catalog-page animate-fade-in">
     <!-- ХЛЕБНЫЕ КРОШКИ -->
-    <nav class="breadcrumbs">
-      <router-link to="/catalog">Каталог</router-link>
-      <span v-for="crumb in breadcrumbs" :key="crumb.id" class="crumb-item">
-        <span class="separator">/</span>
-        <router-link :to="'/catalog/' + crumb.id">{{ crumb.name }}</router-link>
-      </span>
+    <nav class="breadcrumbs flex flex-wrap items-center gap-1 mb-2 text-sm">
+      <router-link to="/catalog" class="text-primary font-bold">Каталог</router-link>
+      <template v-for="crumb in breadcrumbs" :key="crumb.id">
+        <span class="text-muted mx-1">/</span>
+        <router-link :to="'/catalog/' + crumb.id" class="text-primary font-bold">{{ crumb.name }}</router-link>
+      </template>
     </nav>
 
-    <div class="header-row">
-      <h1>{{ currentCategoryName }}</h1>
-      <div class="cat-count">Найдено разделов: {{ visibleCategories.length }}</div>
+    <div class="header-row flex justify-between items-center mb-3">
+      <h1 class="text-main">{{ currentCategoryName }}</h1>
+      <span class="cat-count text-muted font-bold">{{ visibleCategories.length }} разделов</span>
     </div>
-    
+
     <hr class="divider" />
 
-    <!-- СОСТОЯНИЕ ЗАГРУЗКИ -->
-    <div v-if="loading" class="loading-state">
-      <div class="loader"></div>
-      <p>Синхронизация с базой данных...</p>
+    <!-- ЗАГРУЗКА -->
+    <div v-if="loading" class="loading-state text-center py-20">
+      <span class="spinner" style="width: 50px; height: 50px; border-width: 4px;"></span>
+      <p class="text-muted mt-3 font-bold">Синхронизация с базой данных...</p>
     </div>
 
-    <!-- СПИСОК КАРТОЧЕК -->
+    <!-- СПИСОК РАЗДЕЛОВ -->
     <div v-else-if="visibleCategories.length > 0">
-      
       <div class="categories-grid">
-        <div v-for="cat in paginatedCategories" :key="cat.id" class="category-card glass-card">
-          
-          <div class="card-header">
-            <h3 @click="goToCategory(cat)">{{ cat.name }}</h3>
-            <img v-if="!currentParentId" :src="cat.image_url || '/assets/images/no-cat.png'" :alt="cat.name" class="cat-icon" />
+        <div
+          v-for="cat in paginatedCategories"
+          :key="cat.id"
+          class="category-card glass-card"
+        >
+          <div class="card-header flex justify-between items-start mb-4">
+            <h3 class="text-main font-extrabold m-0" @click="goToCategory(cat)">{{ cat.name }}</h3>
+            <img
+              v-if="!currentParentId"
+              :src="cat.image_url || '/assets/images/no-cat.png'"
+              :alt="cat.name"
+              class="cat-icon"
+            />
           </div>
-          
+
           <div class="card-body">
+            <!-- ПОДКАТЕГОРИИ -->
             <ul v-if="!currentParentId" class="items-list">
-              <li class="list-label">Подкатегории:</li>
-              <li v-for="child in getChildCategories(cat.id).slice(0, 5)" :key="child.id">
+              <li class="list-label text-uppercase text-muted mb-2">Подкатегории:</li>
+              <li v-for="child in getChildCategories(cat.id).slice(0, 5)" :key="child.id" class="text-muted mb-1">
                 {{ child.name }}
               </li>
-              <li v-if="getChildCategories(cat.id).length > 5" class="more-link">
+              <li v-if="getChildCategories(cat.id).length > 5" class="more-link text-primary font-bold italic mt-2">
                 еще {{ getChildCategories(cat.id).length - 5 }} разделов...
               </li>
-              <li v-if="getChildCategories(cat.id).length === 0" class="muted">Нет подкатегорий</li>
+              <li v-if="getChildCategories(cat.id).length === 0" class="text-muted italic">Нет подкатегорий</li>
             </ul>
 
+            <!-- ТОВАРЫ В РАЗДЕЛЕ -->
             <ul v-else class="items-list products-theme">
-              <li class="list-label">Товары в наличии:</li>
-              <li v-for="prod in getProductsForCategory(cat.id).slice(0, 6)" :key="prod.id" class="product-li">
+              <li class="list-label text-uppercase text-muted mb-2">Товары в наличии:</li>
+              <li v-for="prod in getProductsForCategory(cat.id).slice(0, 6)" :key="prod.id" class="font-semibold mb-1">
                 {{ prod.name }}
               </li>
-              <li v-if="getProductsForCategory(cat.id).length > 6" class="more-link">
+              <li v-if="getProductsForCategory(cat.id).length > 6" class="more-link text-primary font-bold italic mt-2">
                 Смотреть все товары ({{ getProductsForCategory(cat.id).length }})
               </li>
-              <li v-if="getProductsForCategory(cat.id).length === 0" class="muted">В этом разделе пока нет товаров</li>
+              <li v-if="getProductsForCategory(cat.id).length === 0" class="text-muted italic">В этом разделе пока нет товаров</li>
             </ul>
           </div>
 
-          <div class="card-footer-actions">
-            <div class="action-primary" @click="goToCategory(cat)">
+          <div class="card-footer-actions flex justify-between items-center gap-2 mt-5 pt-4" style="border-top: 1px solid var(--border-color)">
+            <div class="action-primary flex items-center gap-2 text-primary font-extrabold text-uppercase cursor-pointer" @click="goToCategory(cat)">
               <span>{{ currentParentId ? 'К товарам раздела' : 'Открыть раздел' }}</span>
               <span class="arrow">→</span>
             </div>
             <button
               v-if="getChildCategories(cat.id).length > 0"
-              class="action-all"
+              class="btn btn-primary btn-sm"
               @click.stop="goToAllProducts(cat)"
             >
               🛒 Все товары
@@ -75,22 +83,19 @@
       </div>
 
       <!-- ПАГИНАЦИЯ -->
-      <div v-if="totalPages > 1" class="pagination-controls">
-        <button @click="currentPage--" :disabled="currentPage === 1" class="page-btn glass-card">←</button>
-        <div class="page-numbers glass-card">
-          <span class="current-page">{{ currentPage }}</span> / <span>{{ totalPages }}</span>
-        </div>
-        <button @click="currentPage++" :disabled="currentPage === totalPages" class="page-btn glass-card">→</button>
+      <div v-if="totalPages > 1" class="pagination mt-10">
+        <button @click="currentPage--" :disabled="currentPage === 1">←</button>
+        <span class="font-bold text-muted mx-4">{{ currentPage }} / {{ totalPages }}</span>
+        <button @click="currentPage++" :disabled="currentPage === totalPages">→</button>
       </div>
-
     </div>
 
-    <!-- ПУСТОЕ СОСТОЯНИЕ -->
-    <div v-else class="empty-state glass-card">
-      <div class="empty-icon">📂</div>
+    <!-- ПУСТО -->
+    <div v-else class="empty-state glass-card text-center p-10">
+      <div class="empty-state-icon">📂</div>
       <h3>В этом разделе пока ничего нет</h3>
       <p>Попробуйте вернуться в основной каталог или воспользуйтесь поиском.</p>
-      <button @click="$router.push('/catalog')" class="btn-back">В начало каталога</button>
+      <button @click="$router.push('/catalog')" class="btn btn-primary btn-lg mt-4">В начало каталога</button>
     </div>
   </div>
 </template>
@@ -126,7 +131,7 @@ const loadData = async () => {
   }
 };
 
-const currentParentId = computed(() => route.params.id ? Number(route.params.id) : null);
+const currentParentId = computed(() => (route.params.id ? Number(route.params.id) : null));
 
 const currentCategoryName = computed(() => {
   if (!currentParentId.value) return 'Каталог запчастей';
@@ -135,7 +140,6 @@ const currentCategoryName = computed(() => {
 });
 
 const getChildCategories = (parentId) => allCategories.value.filter(c => c.parent_id === parentId);
-
 const getProductsForCategory = (catId) => allProducts.value.filter(p => p.category_id === catId);
 
 const visibleCategories = computed(() => getChildCategories(currentParentId.value));
@@ -181,71 +185,108 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-/* все стили без изменений, плюс добавленный .action-all */
-.catalog-page { padding: 40px 20px 100px; max-width: 1250px; margin: 0 auto; animation: fadeIn 0.4s ease-out; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+/* Увеличенные шрифты и картинки */
+.catalog-page {
+  max-width: 1250px;
+  margin: 0 auto;
+  padding: 40px 20px 100px;
+}
 
-.glass-card { background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); backdrop-filter: blur(10px); transition: all 0.3s ease; }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
+.categories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 30px;
+}
 
-.breadcrumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 25px; font-size: 0.9rem; }
-.breadcrumbs a { color: var(--primary, #2563eb); text-decoration: none; font-weight: 600; }
-.breadcrumbs a:hover { text-decoration: underline; }
-:global(.dark) .breadcrumbs a { color: #60a5fa; }
-.separator { color: var(--text-muted); margin: 0 4px; }
+.category-card {
+  padding: 30px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 320px; /* немного выше для больших фото */
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.category-card:hover {
+  transform: translateY(-8px);
+  border-color: var(--primary);
+  box-shadow: 0 20px 40px -10px var(--primary-light);
+}
 
-.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-h1 { font-size: 2.2rem; font-weight: 900; color: var(--text-main, #0f172a); }
-:global(.dark) h1 { color: #f8fafc; }
-.cat-count { font-size: 0.9rem; color: var(--text-muted); font-weight: 700; background: rgba(0,0,0,0.05); padding: 5px 15px; border-radius: 20px; }
-:global(.dark) .cat-count { background: rgba(255,255,255,0.05); }
+.category-card h3 {
+  font-size: 1.6rem; /* было 1.4rem по умолчанию, увеличили */
+}
 
-.divider { border: none; border-top: 1px solid var(--border-color, #e2e8f0); margin-bottom: 40px; }
-:global(.dark) .divider { border-color: #334155; }
+.cat-icon {
+  width: 80px;  /* было 60px */
+  height: 80px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+}
 
-.categories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 30px; }
-.category-card { padding: 30px; cursor: pointer; display: flex; flex-direction: column; height: 100%; min-height: 280px; }
-.category-card:hover { transform: translateY(-8px); border-color: var(--primary, #2563eb); box-shadow: 0 20px 40px -10px rgba(37,99,235,0.15); }
+.items-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+}
+.items-list li:not(.list-label) {
+  position: relative;
+  padding-left: 15px;
+  color: var(--text-muted);
+  font-size: 1rem; /* было 0.95rem, увеличили */
+}
+.items-list li:not(.list-label)::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: var(--primary);
+  font-weight: 900;
+}
 
-.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-.category-card h3 { font-size: 1.4rem; color: var(--text-main, #0f172a); font-weight: 800; margin: 0; }
-:global(.dark) .category-card h3 { color: #f8fafc; }
-.cat-icon { width: 60px; height: 60px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+.list-label {
+  font-size: 0.8rem; /* чуток крупнее */
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+}
 
-.items-list { list-style: none; padding: 0; margin: 0; flex: 1; }
-.list-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; letter-spacing: 1px; }
-.items-list li:not(.list-label) { font-size: 0.95rem; color: var(--text-muted, #64748b); margin-bottom: 8px; padding-left: 15px; position: relative; }
-:global(.dark) .items-list li:not(.list-label) { color: #94a3b8; }
-.items-list li:not(.list-label)::before { content: '•'; position: absolute; left: 0; color: var(--primary, #2563eb); font-weight: 900; }
-.products-theme li:not(.list-label) { color: var(--text-main, #0f172a); font-weight: 600; }
-:global(.dark) .products-theme li:not(.list-label) { color: #e2e8f0; }
-.more-link { color: var(--primary, #2563eb) !important; font-style: italic; font-weight: 700 !important; margin-top: 10px; }
-.muted { color: var(--text-muted); font-style: italic; font-size: 0.9rem; }
+.products-theme li:not(.list-label) {
+  color: var(--text-main);
+  font-weight: 600;
+}
 
-.card-footer-actions { margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border-color, #e2e8f0); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-:global(.dark) .card-footer-actions { border-color: #334155; }
+.action-primary {
+  font-size: 0.9rem; /* немного больше */
+}
+.action-primary:hover .arrow {
+  transform: translateX(5px);
+}
+.arrow {
+  transition: transform 0.2s;
+}
 
-.action-primary { font-weight: 800; font-size: 0.85rem; color: var(--primary, #2563eb); text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 5px; }
-.action-primary:hover { color: var(--primary-hover, #1d4ed8); }
-.arrow { transition: transform 0.3s; }
-.action-primary:hover .arrow { transform: translateX(5px); }
+.cat-count {
+  background: rgba(0,0,0,0.05);
+  padding: 5px 15px;
+  border-radius: 20px;
+}
+:global(.dark) .cat-count {
+  background: rgba(255,255,255,0.08);
+}
 
-.action-all { background: var(--primary, #2563eb); color: white; border: none; border-radius: 20px; padding: 6px 15px; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
-.action-all:hover { background: var(--primary-hover, #1d4ed8); transform: scale(1.03); }
-
-.pagination-controls { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 60px; }
-.page-btn { padding: 12px 25px; font-weight: 800; cursor: pointer; color: var(--text-main); border: none; }
-.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.page-numbers { padding: 12px 25px; font-weight: 800; color: var(--text-muted); }
-.current-page { color: var(--primary, #2563eb); font-size: 1.2rem; }
-
-.loading-state { text-align: center; padding: 100px; color: var(--text-muted); font-weight: 700; }
-.loader { border: 4px solid var(--border-color, #e2e8f0); border-top: 4px solid var(--primary, #2563eb); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-.empty-state { text-align: center; padding: 80px; }
-.empty-icon { font-size: 4rem; margin-bottom: 20px; opacity: 0.5; }
-.btn-back { background: var(--primary, #2563eb); color: white; border: none; padding: 15px 35px; border-radius: 40px; font-weight: 800; cursor: pointer; margin-top: 25px; }
-
-@media (max-width: 768px) { .categories-grid { grid-template-columns: 1fr; } .category-card { min-height: auto; } }
+@media (max-width: 768px) {
+  .categories-grid {
+    grid-template-columns: 1fr;
+  }
+  .category-card {
+    min-height: auto;
+  }
+  .cat-icon {
+    width: 60px;
+    height: 60px;
+  }
+}
 </style>

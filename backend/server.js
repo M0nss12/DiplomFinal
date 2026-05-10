@@ -818,6 +818,72 @@ app.get('/api/orders/:userId', async (req, res) => {
     res.json(data || []);
 });
 
+// =====================================================================
+// API: ОТМЕНА ЗАКАЗА ПОЛЬЗОВАТЕЛЕМ
+// =====================================================================
+app.patch('/api/orders/:id', async (req, res) => {
+    const orderId = req.params.id;
+    const userId = req.headers['x-user-id'];
+    if (!userId) return res.status(401).json({ error: 'Требуется авторизация' });
+
+    try {
+        const { data: order, error: orderErr } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', orderId)
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (orderErr || !order) {
+            return res.status(404).json({ error: 'Заказ не найден или доступ запрещён' });
+        }
+
+        const { delivery_status } = req.body;
+        if (delivery_status !== 'cancelled' || ['delivered', 'cancelled', 'returned'].includes(order.delivery_status)) {
+            return res.status(400).json({ error: 'Невозможно отменить данный заказ' });
+        }
+
+        // Возвращаем списанные остатки
+        const { data: items } = await supabase
+            .from('order_items')
+            .select('product_id, quantity, warehouse_id')
+            .eq('order_id', orderId);
+
+        if (items) {
+            for (const item of items) {
+                if (item.warehouse_id) {
+                    const { data: stock } = await supabase
+                        .from('product_stocks')
+                        .select('quantity')
+                        .eq('product_id', item.product_id)
+                        .eq('warehouse_id', item.warehouse_id)
+                        .maybeSingle();
+                    if (stock) {
+                        await supabase
+                            .from('product_stocks')
+                            .update({ quantity: stock.quantity + item.quantity })
+                            .eq('product_id', item.product_id)
+                            .eq('warehouse_id', item.warehouse_id);
+                    }
+                }
+            }
+        }
+
+        // Обновляем статус
+        const { data: updated, error: updateErr } = await supabase
+            .from('orders')
+            .update({ delivery_status: 'cancelled' })
+            .eq('id', orderId)
+            .select()
+            .single();
+        if (updateErr) throw updateErr;
+
+        res.json(updated);
+    } catch (e) {
+        console.error('Ошибка отмены заказа:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post('/api/calculate-shipping', verifyAdmin, async (req, res) => {
     const { warehouse_id, items } = req.body;
     try {

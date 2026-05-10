@@ -1,5 +1,5 @@
 <template>
-  <div class="not-found-page">
+  <div class="not-found-page animate-fade-in">
     <div class="error-container glass-card">
       
       <!-- ВИЗУАЛЬНАЯ ЧАСТЬ -->
@@ -19,9 +19,9 @@
 
       <!-- КНОПКИ ДЕЙСТВИЯ -->
       <div class="error-actions">
-        <router-link to="/" class="btn-primary">На главную</router-link>
-        <button @click="goBack" class="btn-outline">Вернуться назад</button>
-        <router-link to="/catalog" class="btn-link">Перейти в каталог →</router-link>
+        <router-link to="/" class="btn btn-primary btn-lg btn-block">На главную</router-link>
+        <button @click="goBack" class="btn btn-outline btn-lg btn-block">Вернуться назад</button>
+        <router-link to="/catalog" class="text-primary font-bold mt-2">Перейти в каталог →</router-link>
       </div>
 
       <!-- БЛОК ПОМОЩИ -->
@@ -36,18 +36,19 @@
 
 <script setup>
 import { useRouter } from 'vue-router';
-
 const router = useRouter();
-
-const goBack = () => {
-  router.go(-1);
-};
+const goBack = () => router.go(-1);
 </script>
 
 <style scoped>
 /* ==========================================================================
-   СТИЛИ СТРАНИЦЫ 404 (GLASSMORPHISM & DARK MODE)
+   УНИКАЛЬНЫЕ СТИЛИ СТРАНИЦЫ 404 (глобальный CSS используется)
    ========================================================================== */
+
+/* Легкий эффект стекла поверх глобального .glass-card */
+.glass-card {
+  backdrop-filter: blur(12px);
+}
 
 .not-found-page {
   min-height: 80vh;
@@ -55,11 +56,8 @@ const goBack = () => {
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  animation: fadeIn 0.5s ease-out;
   text-align: center;
 }
-
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .error-container {
   max-width: 600px;
@@ -67,26 +65,12 @@ const goBack = () => {
   padding: 60px 40px;
 }
 
-/* Стеклянные карточки */
-.glass-card {
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 24px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(12px);
-}
-:global(.dark) .glass-card {
-  background: #1e293b;
-  border-color: #334155;
-  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
-}
-
-/* ВИЗУАЛ */
+/* 404 число */
 .number-404 {
   font-size: 8rem;
   font-weight: 900;
   line-height: 1;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
+  background: linear-gradient(135deg, var(--primary), var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -94,6 +78,7 @@ const goBack = () => {
   letter-spacing: -5px;
 }
 
+/* Анимация машинки */
 .car-animation {
   position: relative;
   width: 200px;
@@ -108,7 +93,7 @@ const goBack = () => {
 
 .road {
   height: 4px;
-  background: var(--border-color, #cbd5e1);
+  background: var(--border-color);
   width: 100%;
   border-radius: 2px;
   margin-top: -10px;
@@ -121,7 +106,7 @@ const goBack = () => {
   position: absolute;
   width: 40px;
   height: 100%;
-  background: var(--primary, #2563eb);
+  background: var(--primary);
   animation: roadMove 1.5s infinite linear;
 }
 
@@ -135,24 +120,22 @@ const goBack = () => {
   to { left: 100%; }
 }
 
-/* ТЕКСТ */
+/* Заголовок и описание */
 h1 {
   font-size: 1.8rem;
   font-weight: 800;
-  color: var(--text-main, #0f172a);
+  color: var(--text-main);
   margin-bottom: 15px;
 }
-:global(.dark) h1 { color: #f8fafc; }
 
 p {
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted);
   font-size: 1.1rem;
   line-height: 1.6;
   margin-bottom: 40px;
 }
-:global(.dark) p { color: #94a3b8; }
 
-/* КНОПКИ */
+/* Кнопки */
 .error-actions {
   display: flex;
   flex-direction: column;
@@ -160,80 +143,43 @@ p {
   align-items: center;
 }
 
-.btn-primary {
-  width: 100%;
-  max-width: 280px;
-  padding: 14px;
-  background: var(--primary, #2563eb);
-  color: white;
-  text-decoration: none;
-  border-radius: 40px;
-  font-weight: 800;
-  transition: all 0.3s;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
-  background: var(--primary-hover, #1d4ed8);
-}
-
-.btn-outline {
-  width: 100%;
-  max-width: 280px;
-  padding: 12px;
-  background: transparent;
-  border: 2px solid var(--border-color, #cbd5e1);
-  color: var(--text-main, #0f172a);
-  border-radius: 40px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-:global(.dark) .btn-outline { color: #f8fafc; border-color: #475569; }
-
-.btn-outline:hover {
-  background: rgba(0,0,0,0.03);
-  border-color: var(--primary, #2563eb);
-  color: var(--primary, #2563eb);
-}
-:global(.dark) .btn-outline:hover { background: rgba(255,255,255,0.05); }
-
-.btn-link {
-  color: var(--primary, #2563eb);
-  text-decoration: none;
-  font-weight: 700;
-  margin-top: 10px;
-}
-.btn-link:hover { text-decoration: underline; }
-
-/* ПОМОЩЬ */
+/* Блок помощи */
 .support-hint {
   margin-top: 40px;
   padding-top: 25px;
-  border-top: 1px solid var(--border-color, #e2e8f0);
+  border-top: 1px solid var(--border-color);
   font-size: 0.9rem;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted);
   display: flex;
   justify-content: center;
   gap: 10px;
 }
-:global(.dark) .support-hint { border-color: #334155; }
 
 .support-hint a {
-  color: var(--text-main, #0f172a);
+  color: var(--text-main);
   font-weight: 700;
   text-decoration: none;
 }
-:global(.dark) .support-hint a { color: #f8fafc; }
-.support-hint a:hover { text-decoration: underline; }
+:global(.dark) .support-hint a {
+  color: #f8fafc;
+}
+.support-hint a:hover {
+  text-decoration: underline;
+}
 
-/* АДАПТИВНОСТЬ */
+/* Адаптив */
 @media (max-width: 480px) {
-  .number-404 { font-size: 6rem; }
-  .error-container { padding: 40px 20px; }
-  h1 { font-size: 1.5rem; }
-  p { font-size: 1rem; }
+  .number-404 {
+    font-size: 6rem;
+  }
+  .error-container {
+    padding: 40px 20px;
+  }
+  h1 {
+    font-size: 1.5rem;
+  }
+  p {
+    font-size: 1rem;
+  }
 }
 </style>
