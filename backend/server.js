@@ -10,6 +10,8 @@ const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const https = require('https');
 const querystring = require('querystring');
+const sgMail = require('@sendgrid/mail');
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // 1. Настройка DNS
 const dns = require('dns');
@@ -121,14 +123,14 @@ const notifyAndEmail = async ({ userId, type, title, message, email, templateNam
                 templateName || 'notification_general.html',
                 { title, message, ...templateVars }
             );
-            await transporter.sendMail({
-                from: `"ApexDrive" <${process.env.EMAIL_USER}>`,
+            await sgMail.send({
                 to: email,
+                from: process.env.EMAIL_USER,   // ваш подтверждённый email в SendGrid
                 subject: title,
                 html: html
             });
-        } catch (e) { 
-            console.error("❌ ОШИБКА ПОЧТЫ (SMTP):", e.message); 
+        } catch (e) {
+            console.error("❌ ОШИБКА ОТПРАВКИ через SendGrid:", e.response?.body || e.message);
         }
     }
 };
