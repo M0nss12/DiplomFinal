@@ -18,13 +18,24 @@
           <transition name="dropdown-fade">
             <div v-if="isCityDropdownOpen" class="dropdown-menu city-menu glass-card" role="listbox">
               <div class="city-search">
-                <input v-model="citySearch" placeholder="Поиск города..." @keyup.enter="selectCustomCity" @click.stop aria-label="Поиск города" />
+                <input
+                  v-model="citySearch"
+                  placeholder="Поиск города..."
+                  @keyup.enter="selectFirstFilteredCity"
+                  @click.stop
+                  aria-label="Поиск города"
+                />
               </div>
               <div class="city-list">
-                <button v-if="citySearch && !exactMatch" @click="selectCustomCity" class="dropdown-item custom-option" role="option">
-                  ✨ Использовать: <b>"{{ citySearch }}"</b>
-                </button>
-                <button v-for="city in filteredCities" :key="city" @click="selectCity(city)" class="dropdown-item" :class="{ active: city === appStore.city }" role="option">
+                <!-- Только города из списка, без произвольного ввода -->
+                <button
+                  v-for="city in filteredCities"
+                  :key="city"
+                  @click="selectCity(city)"
+                  class="dropdown-item"
+                  :class="{ active: city === appStore.city }"
+                  role="option"
+                >
                   {{ city }}
                 </button>
               </div>
@@ -326,7 +337,7 @@ const clearSearch = () => {
 };
 const closeSearch = () => isSearchOpen.value = false;
 
-// --- ГОРОДА ---
+// --- ГОРОДА (только из списка, без произвольного ввода) ---
 const isCityDropdownOpen = ref(false);
 const cityMenu = ref(null);
 const availableCities = ref([]);
@@ -350,12 +361,11 @@ const selectCity = async (city) => {
   citySearch.value = '';
 };
 
-const selectCustomCity = async () => {
-  if (citySearch.value.trim()) {
-    const city = citySearch.value.trim();
-    await appStore.setCity(city);
-    isCityDropdownOpen.value = false;
-    citySearch.value = '';
+// Выбор первого подходящего города при нажатии Enter
+const selectFirstFilteredCity = () => {
+  const cities = filteredCities.value;
+  if (cities.length > 0) {
+    selectCity(cities[0]);
   }
 };
 
@@ -411,7 +421,7 @@ onUnmounted(() => {
 
 <style scoped>
 /* ==========================================================================
-   ГЛАВНАЯ НАВИГАЦИЯ – УЛУЧШЕННАЯ ВЕРСИЯ
+   ГЛАВНАЯ НАВИГАЦИЯ – УЛУЧШЕННАЯ ВЕРСИЯ (без произвольного города)
    ========================================================================== */
 
 .main-navbar {
