@@ -56,9 +56,13 @@ const DEFAULT_AVATARS = [
 
 // --- Почта и шаблоны ---
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com', port: 587, secure: false,
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-    tls: { rejectUnauthorized: false }
+    host: 'smtp.yandex.ru',
+    port: 465,                      // SSL
+    secure: true,                   // обязательно true для 465 порта
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
 });
 
 const getEmailTemplate = (templateName, variables = {}) => {
@@ -761,29 +765,24 @@ app.post('/api/orders', async (req, res) => {
             return res.status(500).json({ error: 'Не удалось сохранить позиции заказа' });
         }
 
-        // Фоновое уведомление (не ждём)
+// Фоновое уведомление (не ждём)
 if (order && order[0]) {
     const newOrder = order[0];
-    try {
-        console.log('🔔 Отправка уведомления о заказе на почту:', customer_email);
-        await notifyAndEmail({
-            userId: req.headers['x-user-id'] || null,
-            type: 'order',
-            email: customer_email,
-            title: `Заказ №${newOrder.id} оформлен`,
-            message: `Ваш заказ на сумму ${finalTotal} ₽ принят в обработку.`,
-            templateName: 'order_created.html',
-            templateVars: {
-                order_id: newOrder.id,
-                total: finalTotal,
-                name: customer_name,
-                address: newOrder.delivery_address
-            }
-        });
-        console.log('✅ Уведомление отправлено успешно');
-    } catch (notifyErr) {
-        console.error('❌ Ошибка отправки уведомления:', notifyErr);
-    }
+    console.log('🔔 Планируем отправку уведомления о заказе на почту:', customer_email);
+    notifyAndEmail({
+        userId: req.headers['x-user-id'] || null,
+        type: 'order',
+        email: customer_email,
+        title: `Заказ №${newOrder.id} оформлен`,
+        message: `Ваш заказ на сумму ${finalTotal} ₽ принят в обработку.`,
+        templateName: 'order_created.html',
+        templateVars: {
+            order_id: newOrder.id,
+            total: finalTotal,
+            name: customer_name,
+            address: newOrder.delivery_address
+        }
+    }).catch(err => console.error('❌ Ошибка отправки уведомления:', err));
 }
 
         res.json({ orderId: order[0].id, total: finalTotal, distance_based_shipping: totalShipping });
