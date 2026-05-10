@@ -1072,3 +1072,45 @@ body.dark-theme,
 @media (min-width: 769px) {
   .hidden-desktop { display: none; }
 }
+
+/* Принудительный фикс пелены, если она лезет из других файлов */
+html.dark, .dark, body.dark-theme {
+  opacity: 1 !important; 
+}
+
+/* Дополнительные стили для выравнивания списка товаров */
+.products-list-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.product-list-item {
+  display: flex;
+  align-items: stretch;
+  padding: 24px;
+  gap: 24px;
+}
+
+.item-image-col {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.item-info-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item-action-col {
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-left: 1px solid var(--border-color);
+  padding-left: 24px;
+}

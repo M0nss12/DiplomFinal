@@ -1046,7 +1046,8 @@ app.get('/api/admin/:table', verifyAdmin, async (req, res) => {
         if (req.params.table === 'product_stocks') query = supabase.from('product_stocks').select('*, products(name, sku), warehouses(*, cities(name))');
         if (req.params.table === 'user_vehicles') query = supabase.from('user_vehicles').select('*, users(first_name, last_name)');
         if (req.params.table === 'return_requests') query = supabase.from('return_requests').select('*, users(first_name, last_name)');
-        if (req.params.table === 'order_items') query = supabase.from('order_items').select('*, products(name, sku)');
+        if (req.params.table === 'order_items') 
+  query = supabase.from('order_items').select('*, products(name, sku, images)');
         const { data, error } = await query.order('id', { ascending: false });
         if (error) throw error;
         res.json(data || []);

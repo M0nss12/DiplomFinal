@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-history">
+  <div class="admin-history animate-fade-in">
     <!-- ЗАГОЛОВОК -->
     <div class="header-row">
       <div class="header-left">
@@ -19,17 +19,17 @@
         <button @click="resetFilters" class="btn-text-link">Сбросить всё</button>
       </div>
       <div class="filter-grid">
-        <div class="input-group">
+        <div class="form-group">
           <label>📦 Номер заказа (ID)</label>
-          <input v-model="filters.orderId" placeholder="Напр. 125" class="form-input" />
+          <input v-model="filters.orderId" placeholder="Напр. 125" />
         </div>
-        <div class="input-group">
+        <div class="form-group">
           <label>👨‍💼 Кто изменил (Admin ID)</label>
-          <input v-model="filters.changedBy" placeholder="ID администратора..." class="form-input" />
+          <input v-model="filters.changedBy" placeholder="ID администратора..." />
         </div>
-        <div class="input-group">
+        <div class="form-group">
           <label>🚚 Статус доставки</label>
-          <select v-model="filters.delivery" class="form-input">
+          <select v-model="filters.delivery">
             <option value="all">Все</option>
             <option value="processing">Обработка</option>
             <option value="shipping">В пути</option>
@@ -42,8 +42,9 @@
 
     <!-- СПИСОК СОБЫТИЙ (TIMELINE STYLE) -->
     <div class="timeline-container">
-      <div v-if="loading" class="loading-state">
-        <div class="loader"></div>
+      <div v-if="loading" class="text-center py-10">
+        <span class="spinner" style="width: 40px; height: 40px; border-width: 3px;"></span>
+        <p class="text-muted mt-2">Загрузка истории...</p>
       </div>
 
       <div v-else-if="paginatedHistory.length > 0" class="timeline">
@@ -82,19 +83,19 @@
       </div>
 
       <div v-else class="empty-state glass-card">
-        <div class="empty-icon">🕳️</div>
+        <div class="empty-state-icon">🕳️</div>
         <h3>История пуста</h3>
         <p>Событий по заданным фильтрам не найдено.</p>
       </div>
     </div>
 
     <!-- ПАГИНАЦИЯ -->
-    <div v-if="totalPages > 1" class="pagination-wrapper">
-      <button @click="currentPage--" :disabled="currentPage === 1" class="p-btn glass-card">←</button>
-      <div class="p-numbers">
-        <button v-for="p in totalPages" :key="p" @click="currentPage = p" class="glass-card" :class="{ active: currentPage === p }">{{ p }}</button>
+    <div v-if="totalPages > 1" class="pagination mt-3">
+      <button @click="currentPage--" :disabled="currentPage === 1">←</button>
+      <div class="pagination-pages">
+        <button v-for="p in totalPages" :key="p" @click="currentPage = p" :class="{ active: currentPage === p }">{{ p }}</button>
       </div>
-      <button @click="currentPage++" :disabled="currentPage === totalPages" class="p-btn glass-card">→</button>
+      <button @click="currentPage++" :disabled="currentPage === totalPages">→</button>
     </div>
   </div>
 </template>
@@ -110,7 +111,7 @@ const config = { headers: { 'x-admin-key': ADMIN_SECRET } };
 const history = ref([]);
 const loading = ref(true);
 const currentPage = ref(1);
-const itemsPerPage = 15;
+const itemsPerPage = 20;   // стандартное значение
 
 const filters = reactive({
   orderId: '',
@@ -176,91 +177,221 @@ onMounted(loadHistory);
 
 <style scoped>
 /* ==========================================================================
-   АДМИНКА: ИСТОРИЯ СТАТУСОВ (TIMELINE STYLE)
+   УНИКАЛЬНЫЕ СТИЛИ ИСТОРИИ (глобальный CSS используется)
    ========================================================================== */
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-.admin-history { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-history { color: #f8fafc; }
+.admin-history {
+  padding: 40px 24px;
+}
 
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
 .header-left h1 {
-  font-size: 2.2rem; font-weight: 900; margin: 0;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; }
-
-.stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
-
-/* КАРТОЧКИ */
-.glass-card {
-  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px); transition: all 0.3s ease;
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
 }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
 
-.admin-card { padding: 25px; margin-bottom: 30px; }
-.filter-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: flex-end; }
-
-.form-input {
-  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s;
+.stats-badge {
+  padding: 10px 20px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
 }
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
-.input-group label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); margin-bottom: 8px; }
 
-/* ТАЙМЛАЙН */
-.timeline-container { margin-top: 20px; }
-.timeline { display: flex; flex-direction: column; gap: 15px; position: relative; }
+.admin-card {
+  padding: 25px;
+  margin-bottom: 30px;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  align-items: flex-end;
+}
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Таймлайн */
+.timeline-container {
+  margin-top: 20px;
+}
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  position: relative;
+}
 .timeline::before {
-    content: ''; position: absolute; left: 160px; top: 0; bottom: 0; width: 2px;
-    background: linear-gradient(to bottom, var(--primary, #2563eb), transparent); opacity: 0.2;
+  content: '';
+  position: absolute;
+  left: 160px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--primary), transparent);
+  opacity: 0.2;
 }
 
-.timeline-item { display: flex; padding: 20px; gap: 40px; position: relative; }
-.timeline-item:hover { transform: translateX(5px); border-color: var(--primary, #2563eb); }
+.timeline-item {
+  display: flex;
+  padding: 20px;
+  gap: 40px;
+  position: relative;
+}
+.timeline-item:hover {
+  transform: translateX(5px);
+  border-color: var(--primary);
+}
 
-.timeline-left { width: 140px; flex-shrink: 0; text-align: right; }
-.order-num-tag { font-weight: 900; font-size: 1rem; color: var(--primary, #2563eb); }
-.time-stamp { font-size: 0.75rem; color: var(--text-muted, #94a3b8); margin-top: 5px; font-weight: 600;}
+.timeline-left {
+  width: 140px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.order-num-tag {
+  font-weight: 900;
+  font-size: 1rem;
+  color: var(--primary);
+}
+.time-stamp {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 5px;
+  font-weight: 600;
+}
 
-.timeline-content { flex: 1; }
-.status-path { display: flex; align-items: center; gap: 20px; margin-bottom: 12px; flex-wrap: wrap; }
-.path-segment { display: flex; align-items: center; gap: 8px; }
-.path-label { font-size: 0.7rem; font-weight: 800; color: var(--text-muted, #64748b); text-transform: uppercase; }
+.timeline-content {
+  flex: 1;
+}
+.status-path {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.path-segment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.path-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
 
-.status-badge-mini { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; background: rgba(0,0,0,0.05); }
-.status-badge-mini.delivered { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.status-badge-mini.cancelled { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-.status-badge-mini.paid { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid #10b981; }
+.status-badge-mini {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  background: rgba(0,0,0,0.05);
+  color: var(--text-main);
+}
+.status-badge-mini.delivered { background: var(--success-light); color: var(--success); }
+.status-badge-mini.cancelled { background: var(--danger-light); color: var(--danger); }
+.status-badge-mini.paid { background: var(--success-light); color: var(--success); border: 1px solid var(--success); }
 
-.log-comment { 
-    background: rgba(0,0,0,0.02); padding: 12px 15px; border-radius: 8px; font-style: italic; 
-    color: var(--text-main, #0f172a); margin-bottom: 15px; font-size: 0.9rem; position: relative;
+.log-comment {
+  background: rgba(0,0,0,0.02);
+  padding: 12px 15px;
+  border-radius: 8px;
+  font-style: italic;
+  color: var(--text-main);
+  margin-bottom: 15px;
+  font-size: 0.9rem;
+  position: relative;
 }
 :global(.dark) .log-comment { background: rgba(255,255,255,0.03); color: #cbd5e1; }
-.quote-icon { font-size: 2rem; position: absolute; left: -10px; top: -10px; opacity: 0.1; color: var(--primary, #2563eb); }
+.quote-icon {
+  font-size: 2rem;
+  position: absolute;
+  left: -10px;
+  top: -10px;
+  opacity: 0.1;
+  color: var(--primary);
+}
 
-.log-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border-color, #e2e8f0); padding-top: 12px; }
-:global(.dark) .log-footer { border-color: #334155; }
-.author-tag { font-size: 0.8rem; color: var(--text-muted, #64748b); }
-.author-tag b { color: var(--text-main, #0f172a); }
-:global(.dark) .author-tag b { color: #f8fafc; }
+.log-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px dashed var(--border-color);
+  padding-top: 12px;
+}
+.author-tag {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.author-tag b {
+  color: var(--text-main);
+}
 
-.btn-go-order { font-size: 0.8rem; font-weight: 800; color: var(--primary, #2563eb); text-decoration: none; }
-.btn-go-order:hover { text-decoration: underline; }
+.btn-go-order {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--primary);
+  text-decoration: none;
+}
+.btn-go-order:hover {
+  text-decoration: underline;
+}
 
-/* ПАГИНАЦИЯ */
-.pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 40px; }
-.p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-size: 1.2rem; font-weight: 900; color: var(--text-main, #0f172a); }
-:global(.dark) .p-btn { color: #f8fafc; }
+/* Пагинация */
+.pagination-pages {
+  display: flex;
+  gap: 8px;
+}
+.pagination-pages button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pagination-pages button:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.pagination-pages button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
 
-.p-numbers button { width: 44px; height: 44px; border-radius: 12px; font-weight: 800; cursor: pointer; color: var(--text-muted, #64748b); }
-.p-numbers button.active { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
-
-/* АДАПТИВНОСТЬ */
 @media (max-width: 768px) {
   .timeline::before { display: none; }
   .timeline-item { flex-direction: column; gap: 15px; }

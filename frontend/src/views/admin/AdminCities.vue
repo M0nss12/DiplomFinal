@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-cities">
+  <div class="admin-cities animate-fade-in">
     <!-- ЗАГОЛОВОК -->
     <div class="header-row">
       <div class="header-left">
@@ -20,26 +20,26 @@
       </div>
       <form @submit.prevent="createCity" class="admin-form">
         <div class="input-grid">
-          <div class="input-group">
+          <div class="form-group">
             <label>Название города *</label>
-            <input v-model="newCity.name" placeholder="Напр. Новосибирск" required class="form-input" />
+            <input v-model="newCity.name" placeholder="Напр. Новосибирск" required />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>Регион / Область</label>
-            <input v-model="newCity.region" placeholder="Новосибирская обл." class="form-input" />
+            <input v-model="newCity.region" placeholder="Новосибирская обл." />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>Широта (Lat)</label>
-            <input v-model.number="newCity.lat" type="number" step="0.000001" placeholder="55.0084" class="form-input" />
+            <input v-model.number="newCity.lat" type="number" step="0.000001" placeholder="55.0084" />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>Долгота (Lon)</label>
-            <input v-model.number="newCity.lon" type="number" step="0.000001" placeholder="82.9357" class="form-input" />
+            <input v-model.number="newCity.lon" type="number" step="0.000001" placeholder="82.9357" />
           </div>
         </div>
         <div class="form-footer">
-          <button type="submit" class="btn-primary" :disabled="loading">
-            <span v-if="loading" class="spinner-small"></span>
+          <button type="submit" class="btn btn-primary create-btn" :disabled="loading">
+            <span v-if="loading" class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></span>
             <span v-else>➕ Создать город</span>
           </button>
         </div>
@@ -52,8 +52,8 @@
         <h3 class="card-title">🔍 Поиск</h3>
         <button @click="searchQuery = ''" class="btn-text-link">Сбросить</button>
       </div>
-      <div class="input-group">
-        <input v-model="searchQuery" placeholder="Поиск по названию или региону..." class="form-input" />
+      <div class="form-group">
+        <input v-model="searchQuery" placeholder="Поиск по названию или региону..." />
       </div>
     </section>
 
@@ -91,7 +91,7 @@
               </td>
 
               <td class="text-right">
-                <button @click="deleteCity(city.id)" class="btn-delete-small">🗑️ Удалить</button>
+                <button @click="deleteCity(city.id)" class="btn btn-danger btn-sm">🗑️ Удалить</button>
               </td>
             </tr>
           </tbody>
@@ -99,12 +99,12 @@
       </div>
 
       <!-- ПАГИНАЦИЯ -->
-      <div v-if="totalPages > 1" class="pagination-wrapper">
-        <button @click="currentPage--" :disabled="currentPage === 1" class="p-btn glass-card">←</button>
-        <div class="p-numbers">
-          <button v-for="p in totalPages" :key="p" @click="currentPage = p" class="glass-card" :class="{ active: currentPage === p }">{{ p }}</button>
+      <div v-if="totalPages > 1" class="pagination">
+        <button @click="currentPage--" :disabled="currentPage === 1">←</button>
+        <div class="pagination-pages">
+          <button v-for="p in totalPages" :key="p" @click="currentPage = p" :class="{ active: currentPage === p }">{{ p }}</button>
         </div>
-        <button @click="currentPage++" :disabled="currentPage === totalPages" class="p-btn glass-card">→</button>
+        <button @click="currentPage++" :disabled="currentPage === totalPages">→</button>
       </div>
     </div>
   </div>
@@ -174,100 +174,225 @@ watch(searchQuery, () => currentPage.value = 1);
 onMounted(loadCities);
 </script>
 
+
 <style scoped>
 /* ==========================================================================
-   АДМИНКА: ГОРОДА (GLASSMORPHISM & DARK MODE)
+   УНИКАЛЬНЫЕ СТИЛИ АДМИНКИ ГОРОДОВ (глобальные классы уже применены)
    ========================================================================== */
 
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+.admin-cities {
+  padding: 40px 24px;
+}
 
-.admin-cities { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-cities { color: #f8fafc; }
-
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
 .header-left h1 {
-  font-size: 2.2rem; font-weight: 900; margin: 0;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; font-weight: 500; }
-
-.stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
-
-/* КАРТОЧКИ */
-.glass-card {
-  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px); transition: all 0.3s ease;
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
 }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
 
-.admin-card { padding: 28px; margin-bottom: 32px; }
-.card-title { font-size: 1.35rem; font-weight: 900; margin: 0; }
-.card-decoration { width: 50px; height: 4px; background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); border-radius: 4px; margin-top: 5px; }
-
-/* ФОРМА */
-.input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
-.input-group label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); margin-bottom: 8px; display: block;}
-
-.form-input {
-  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s; box-sizing: border-box;
+.stats-badge {
+  padding: 10px 20px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
 }
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
-.form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; }
+.stats-icon {
+  font-size: 1.2rem;
+}
 
-.form-footer { display: flex; justify-content: flex-end; margin-top: 20px; }
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); color: white; border: none;
-  padding: 12px 30px; border-radius: var(--radius-md, 8px); font-weight: 800; cursor: pointer; transition: 0.3s;
+/* Карточки */
+.admin-card {
+  padding: 28px;
+  margin-bottom: 32px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.card-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  margin: 0;
+}
+.card-decoration {
+  width: 50px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 4px;
+}
+
+/* Сетка формы */
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+/* Кнопка создания (глобальный btn + градиент) */
+.create-btn {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border: none;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
 }
-.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
+.create-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+}
 
-.spinner-small { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
-@keyframes spin { to { transform: rotate(360deg); } }
+/* Фильтры */
+.filter-section {
+  background: rgba(0,0,0,0.01);
+  border-style: dashed;
+}
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.9rem;
+}
 
-/* ТАБЛИЦА */
-.admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 800px; }
-.admin-table th { padding: 16px 20px; text-align: left; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
-:global(.dark) .admin-table th { border-color: #334155; }
-.admin-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; }
-:global(.dark) .admin-table td { border-color: #334155; }
+/* Таблица */
+.admin-table-wrapper {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+}
+.admin-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+}
+.admin-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+.city-row:hover td {
+  background: rgba(37, 99, 235, 0.02);
+}
 
-.city-row:hover td { background: rgba(37, 99, 235, 0.02); }
+.col-id {
+  width: 80px;
+  font-weight: 800;
+  color: var(--primary);
+  font-family: monospace;
+}
 
-.col-id { width: 80px; font-weight: 800; color: var(--primary, #2563eb); font-family: monospace; }
+.inline-edit {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--text-main);
+  width: 100%;
+  font-weight: 500;
+  transition: 0.2s;
+}
+.inline-edit:hover {
+  background: rgba(0,0,0,0.03);
+  border-color: var(--border-color);
+}
+.inline-edit:focus {
+  border-color: var(--primary);
+  background: var(--bg-card);
+  outline: none;
+}
+.bold {
+  font-weight: 800;
+}
 
-.inline-edit { background: transparent; border: 1px solid transparent; padding: 6px 10px; border-radius: 6px; color: var(--text-main, #0f172a); width: 100%; font-weight: 500; transition: 0.2s; }
-:global(.dark) .inline-edit { color: #f8fafc; }
-.inline-edit:hover { background: rgba(0,0,0,0.03); border-color: var(--border-color, #cbd5e1); }
-.inline-edit:focus { border-color: var(--primary, #2563eb); background: var(--bg-card, #fff); outline: none; }
-.bold { font-weight: 800; }
+.coords-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.inline-edit.mini {
+  width: 90px;
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+.sep {
+  font-weight: bold;
+  color: var(--text-muted);
+}
 
-.coords-row { display: flex; align-items: center; gap: 5px; }
-.inline-edit.mini { width: 90px; font-family: monospace; font-size: 0.8rem; }
-.sep { font-weight: bold; color: var(--text-muted, #94a3b8); }
+.text-right {
+  text-align: right;
+}
 
-.btn-delete-small { background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); padding: 8px 16px; border-radius: 30px; font-weight: 800; font-size: 0.8rem; color: var(--danger, #ef4444); cursor: pointer; transition: 0.2s; }
-.btn-delete-small:hover { background: var(--danger, #ef4444); color: white; transform: translateY(-2px); }
-
-/* ПАГИНАЦИЯ */
-.pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 40px; }
-.p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-size: 1.2rem; font-weight: 900; border: 1px solid var(--border-color, #e2e8f0); color: var(--text-main, #0f172a); }
-:global(.dark) .p-btn { color: #f8fafc; }
-.p-numbers { display: flex; gap: 8px; }
-.p-numbers button { width: 44px; height: 44px; border-radius: 12px; font-weight: 800; cursor: pointer; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-card, #fff); color: var(--text-muted, #64748b); }
-.p-numbers button.active { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
-
-.text-right { text-align: right; }
-.btn-text-link { background: none; border: none; color: var(--primary, #2563eb); font-weight: 800; cursor: pointer; text-decoration: underline; font-size: 0.9rem; }
+/* Пагинация (используем глобальный .pagination с доработкой) */
+.pagination-pages {
+  display: flex;
+  gap: 8px;
+}
+.pagination-pages button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pagination-pages button:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.pagination-pages button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
 
 @media (max-width: 768px) {
-  .header-row { flex-direction: column; align-items: flex-start; }
-  .input-grid { grid-template-columns: 1fr; }
-  .form-footer { width: 100%; }
-  .btn-primary { width: 100%; }
+  .header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .input-grid {
+    grid-template-columns: 1fr;
+  }
+  .create-btn {
+    width: 100%;
+  }
 }
 </style>

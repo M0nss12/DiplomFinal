@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-categories">
+  <div class="admin-categories animate-fade-in">
     <!-- ЗАГОЛОВОК -->
     <div class="header-row">
       <div class="header-left">
@@ -20,23 +20,22 @@
       </div>
       <form @submit.prevent="createCategory" class="admin-form">
         <div class="input-grid">
-          <div class="input-group">
+          <div class="form-group">
             <label>📛 Название</label>
-            <input v-model="newCategory.name" placeholder="Напр. Трансмиссия" required class="form-input" />
+            <input v-model="newCategory.name" placeholder="Напр. Трансмиссия" required />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>🔗 Slug (URL адрес)</label>
-            <input v-model="newCategory.slug" placeholder="transmission" required class="form-input" />
+            <input v-model="newCategory.slug" placeholder="transmission" required />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>📁 Родительская категория</label>
-            <select v-model="newCategory.parent_id" class="form-input" @change="onParentChangeForNew">
+            <select v-model="newCategory.parent_id" @change="onParentChangeForNew">
               <option :value="null">-- Корневая (нет родителя) --</option>
               <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
           </div>
-          <!-- Иконка только для корневых категорий -->
-          <div class="input-group" v-if="!newCategory.parent_id">
+          <div class="form-group" v-if="!newCategory.parent_id">
             <label>🖼️ Иконка раздела</label>
             <div class="upload-controls">
               <div v-if="newCategory.image_url" class="preview-new-img glass-card">
@@ -45,15 +44,15 @@
               </div>
               <label v-else class="file-label glass-card">
                 📁 Загрузить файл
-                <input type="file" @change="(e) => handleFileUpload(e, 'new')" accept="image/*" class="hidden-file" />
+                <input type="file" @change="(e) => handleFileUpload(e, 'new')" accept="image/*" hidden />
               </label>
-              <input v-model="newCategory.image_url" placeholder="Или прямая ссылка" class="form-input url-mini" />
+              <input v-model="newCategory.image_url" placeholder="Или прямая ссылка" class="url-mini" />
             </div>
           </div>
         </div>
         <div class="form-footer">
-          <button type="submit" :disabled="uploading" class="btn-primary">
-            <span v-if="uploading" class="spinner-small"></span>
+          <button type="submit" class="btn btn-primary create-btn" :disabled="uploading">
+            <span v-if="uploading" class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></span>
             <span v-else>✨ Создать категорию</span>
           </button>
         </div>
@@ -62,19 +61,18 @@
 
     <!-- 2. УМНАЯ ФИЛЬТРАЦИЯ -->
     <section class="admin-card filter-section glass-card">
-      <div class="filter-header">
+      <div class="filter-header flex justify-between items-center mb-4">
         <h3 class="card-title">🔍 Поиск и фильтры</h3>
         <button @click="resetFilters" class="btn-text-link">Сбросить всё</button>
       </div>
       <div class="filter-grid">
-        <div class="input-group">
+        <div class="form-group">
           <label>🔎 Поиск (Название, Slug или ID)</label>
-          <input v-model="searchQuery" placeholder="Введите данные для поиска..." class="form-input" />
+          <input v-model="searchQuery" placeholder="Введите данные для поиска..." />
         </div>
-
-        <div class="input-group">
+        <div class="form-group">
           <label>📂 Тип</label>
-          <select v-model="categoryType" class="form-input">
+          <select v-model="categoryType">
             <option value="all">Все</option>
             <option value="root">Только категории (корневые)</option>
             <option value="sub">Только подкатегории</option>
@@ -112,7 +110,6 @@
               <td class="col-id">#{{ cat.id }}</td>
 
               <td class="col-photo">
-                <!-- Подкатегориям не показываем иконку -->
                 <template v-if="cat.parent_id">
                   <span class="no-icon">—</span>
                 </template>
@@ -185,7 +182,7 @@
               </td>
 
               <td class="text-right">
-                <button @click="deleteCategory(cat)" class="btn-delete-small">
+                <button @click="deleteCategory(cat)" class="btn btn-danger btn-sm">
                   🗑️ Удалить
                 </button>
               </td>
@@ -195,20 +192,18 @@
       </div>
 
       <!-- ПАГИНАЦИЯ -->
-      <div v-if="totalPages > 1" class="pagination-wrapper">
+      <div v-if="totalPages > 1" class="pagination">
         <button
           @click="currentPage--"
           :disabled="currentPage === 1"
-          class="p-btn glass-card"
         >
           ←
         </button>
-        <div class="p-numbers">
+        <div class="pagination-pages">
           <button
             v-for="p in totalPages"
             :key="p"
             @click="currentPage = p"
-            class="glass-card"
             :class="{ active: currentPage === p }"
           >
             {{ p }}
@@ -217,7 +212,6 @@
         <button
           @click="currentPage++"
           :disabled="currentPage === totalPages"
-          class="p-btn glass-card"
         >
           →
         </button>
@@ -418,20 +412,356 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-/* Все предыдущие стили без изменений, добавим только новые */
-/* ... (оставьте все стили из предыдущей версии) ... */
+/* ==========================================================================
+   УНИКАЛЬНЫЕ СТИЛИ АДМИНКИ КАТЕГОРИЙ (глобальные классы уже применены)
+   ========================================================================== */
 
-/* Новые / изменённые стили */
+.admin-categories {
+  padding: 40px 24px;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
+.header-left h1 {
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0 0 6px 0;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.subtitle {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.stats-badge {
+  padding: 10px 20px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+}
+.stats-icon {
+  font-size: 1.2rem;
+}
+
+/* Карточки */
+.admin-card {
+  padding: 28px;
+  margin-bottom: 32px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.card-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  margin: 0;
+}
+.card-decoration {
+  width: 50px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 4px;
+}
+
+/* Сетка формы */
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+/* Загрузка логотипа */
+.upload-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.file-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 8px;
+  width: fit-content;
+  transition: border-color 0.2s, background 0.2s;
+}
+.file-label:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.url-mini {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.preview-new-img {
+  position: relative;
+  width: 80px;
+  height: 60px;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 4px;
+  margin-bottom: 8px;
+}
+.preview-new-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.btn-clear-img {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 22px;
+  height: 22px;
+  background: var(--danger);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Кнопка создания (глобальный btn + градиент) */
+.create-btn {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border: none;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+.create-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+}
+
+/* Фильтры */
+.filter-section {
+  background: rgba(0,0,0,0.01);
+  border-style: dashed;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr;
+  gap: 24px;
+  align-items: flex-end;
+}
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.9rem;
+}
+
+/* Таблица */
+.table-container {
+  margin-top: 16px;
+}
+.table-meta {
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-table-wrapper {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+.admin-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+}
+.admin-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+  transition: background 0.2s;
+}
+.category-row:hover td {
+  background: rgba(37, 99, 235, 0.03);
+}
+:global(.dark) .category-row:hover td {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.col-id {
+  width: 70px;
+  font-weight: 800;
+  color: var(--primary);
+  font-family: monospace;
+}
+.col-photo {
+  width: 90px;
+  text-align: center;
+}
+
+.category-img-box {
+  width: 60px;
+  height: 60px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: 12px;
+  padding: 4px !important;
+}
+.category-img-box img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+.upload-mini-btn {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+.btn-img-delete {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 18px;
+  height: 18px;
+  background: var(--danger);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.inline-edit {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 8px;
+  border-radius: 8px;
+  color: var(--text-main);
+  width: 100%;
+  font-weight: 500;
+  transition: 0.2s;
+}
+.inline-edit:hover {
+  background: rgba(0,0,0,0.03);
+  border-color: var(--border-color);
+}
+:global(.dark) .inline-edit:hover {
+  background: rgba(255,255,255,0.03);
+  border-color: #475569;
+}
+.inline-edit:focus {
+  background: var(--bg-card);
+  border-color: var(--primary);
+  outline: none;
+}
+.bold {
+  font-weight: 800;
+}
+
 .name-cell {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .sub-arrow {
-  color: var(--primary, #2563eb);
+  color: var(--primary);
   font-weight: 900;
   font-size: 1.2rem;
   line-height: 1;
+}
+
+.slug-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.slug-prefix {
+  font-weight: 800;
+  color: var(--primary);
+}
+.slug-text {
+  font-family: monospace;
+  color: var(--primary);
+}
+:global(.dark) .slug-text {
+  color: #60a5fa;
+}
+
+.table-select {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 8px;
+  border-radius: 8px;
+  width: 100%;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-main);
+}
+:global(.dark) .table-select {
+  color: #f8fafc;
+}
+
+.table-select:hover {
+  background: rgba(0,0,0,0.03);
+  border-color: var(--border-color);
+}
+:global(.dark) .table-select:hover {
+  background: rgba(255,255,255,0.03);
+  border-color: #475569;
 }
 
 .is-sub td {
@@ -443,149 +773,69 @@ onMounted(loadData);
 }
 
 .no-icon {
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted);
   font-weight: 700;
   font-size: 1.1rem;
 }
-.no-icon {
-  color: var(--text-muted, #94a3b8);
-  font-weight: 700;
-  font-size: 1.2rem;
+
+.text-right { text-align: right; }
+
+/* Пагинация (используем глобальный .pagination с доработкой) */
+.pagination-pages {
+  display: flex;
+  gap: 8px;
 }
-.is-sub td {
-  background: rgba(0,0,0,0.01);
+.pagination-pages button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pagination-pages button:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.pagination-pages button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* Адаптивность */
+@media (max-width: 1024px) {
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 768px) {
-  .no-icon { font-size: 1rem; }
+  .admin-categories {
+    padding: 24px 16px;
+  }
+  .header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .input-grid {
+    grid-template-columns: 1fr;
+  }
+  .pagination {
+    flex-wrap: wrap;
+  }
 }
+</style>
 
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.admin-categories {
-  padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a);
-}
-:global(.dark) .admin-categories { color: #f8fafc; }
-
-/* ШАПКА */
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
-.header-left h1 {
-  font-size: 2.2rem; font-weight: 900; margin: 0 0 6px 0;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-.subtitle { color: var(--text-muted, #64748b); margin: 0; font-size: 0.95rem; font-weight: 500; }
-:global(.dark) .subtitle { color: #94a3b8; }
-
-.stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
-
-/* КАРТОЧКИ */
-.glass-card {
-  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px); transition: all 0.3s ease;
-}
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
-
-.admin-card { padding: 28px; margin-bottom: 32px; }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.card-title { font-size: 1.35rem; font-weight: 900; margin: 0; }
-.card-decoration { width: 50px; height: 4px; background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); border-radius: 4px; }
-
-/* ФОРМА */
-.input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; margin-bottom: 28px; }
-.input-group { display: flex; flex-direction: column; gap: 8px; }
-.input-group label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted, #64748b); }
-
-.form-input {
-  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s; box-sizing: border-box;
-}
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
-.form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
-
-.upload-controls { display: flex; flex-direction: column; gap: 10px; }
-.file-label { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 0.85rem; font-weight: 700; cursor: pointer; border-radius: 8px; width: fit-content; transition: 0.2s; }
-.file-label:hover { background: rgba(37, 99, 235, 0.1); border-color: var(--primary, #2563eb); }
-.hidden-file { display: none; }
-
-.preview-new-img { position: relative; width: 80px; height: 60px; background: #fff; border-radius: 8px; overflow: hidden; padding: 4px; margin-bottom: 8px; }
-.preview-new-img img { width: 100%; height: 100%; object-fit: contain; }
-.btn-clear-img { position: absolute; top: -5px; right: -5px; width: 22px; height: 22px; background: var(--danger, #ef4444); color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-
-.form-footer { display: flex; justify-content: flex-end; }
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); color: white; border: none;
-  padding: 14px 32px; border-radius: var(--radius-md, 8px); font-weight: 800; font-size: 0.95rem; cursor: pointer; transition: all 0.3s;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); display: flex; align-items: center; gap: 10px;
-}
-.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.spinner-small { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
-
-/* ФИЛЬТРЫ */
-.filter-section { background: rgba(0,0,0,0.01); border-style: dashed; }
-.filter-grid { display: grid; grid-template-columns: 2fr 1.5fr; gap: 24px; align-items: flex-end; }
-.btn-text-link { background: none; border: none; color: var(--primary, #2563eb); font-weight: 800; cursor: pointer; text-decoration: underline; font-size: 0.9rem; }
-
-/* ТАБЛИЦА */
-.table-container { margin-top: 16px; }
-.table-meta { margin-bottom: 16px; font-size: 0.85rem; color: var(--text-muted, #64748b); font-weight: 600; display: flex; align-items: center; gap: 8px; }
-
-.admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 900px; }
-.admin-table th { padding: 16px 20px; text-align: left; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
-:global(.dark) .admin-table th { border-color: #334155; }
-.admin-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; transition: background 0.2s; }
-:global(.dark) .admin-table td { border-color: #334155; }
-.category-row:hover td { background: rgba(37, 99, 235, 0.03); }
-:global(.dark) .category-row:hover td { background: rgba(37, 99, 235, 0.05); }
-
-.col-id { width: 70px; font-weight: 800; color: var(--primary, #2563eb); font-family: monospace; }
-.col-photo { width: 90px; text-align: center; }
-.category-img-box { width: 60px; height: 60px; background: #fff; display: flex; align-items: center; justify-content: center; position: relative; border-radius: 12px; padding: 4px !important; }
-.category-img-box img { max-width: 90%; max-height: 90%; object-fit: contain; cursor: zoom-in; }
-.upload-mini-btn { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: #cbd5e1; cursor: pointer; }
-.btn-img-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: var(--danger, #ef4444); color: white; border: none; border-radius: 50%; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-
-.inline-edit { background: transparent; border: 1px solid transparent; padding: 8px; border-radius: 8px; color: var(--text-main, #0f172a); width: 100%; font-weight: 500; transition: 0.2s; }
-:global(.dark) .inline-edit { color: #f8fafc; }
-.inline-edit:hover { background: rgba(0,0,0,0.03); border-color: var(--border-color, #e2e8f0); }
-:global(.dark) .inline-edit:hover { background: rgba(255,255,255,0.03); border-color: #475569; }
-.inline-edit:focus { background: var(--bg-card, #fff); border-color: var(--primary, #2563eb); outline: none; }
-.bold { font-weight: 800; }
-
-.slug-wrapper { display: flex; align-items: center; gap: 4px; }
-.slug-prefix { font-weight: 800; color: var(--primary, #2563eb); }
-.slug-text { font-family: monospace; color: var(--primary, #2563eb); }
-:global(.dark) .slug-text { color: #60a5fa; }
-
-.table-select { background: transparent; border: 1px solid transparent; padding: 8px; border-radius: 8px; width: 100%; font-weight: 600; cursor: pointer; color: var(--text-main, #0f172a); }
-:global(.dark) .table-select { color: #f8fafc; }
-.table-select:hover { background: rgba(0,0,0,0.03); border-color: var(--border-color, #e2e8f0); }
-:global(.dark) .table-select:hover { background: rgba(255,255,255,0.03); border-color: #475569; }
-
-.btn-delete-small { background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); padding: 8px 16px; border-radius: 30px; font-weight: 800; font-size: 0.8rem; color: var(--danger, #ef4444); cursor: pointer; transition: all 0.2s; }
-.btn-delete-small:hover { background: var(--danger, #ef4444); color: white; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(239, 68, 68, 0.2); }
-
-/* ПАГИНАЦИЯ */
-.pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 40px; }
-.p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-size: 1.2rem; font-weight: 900; color: var(--text-main, #0f172a); border: 1px solid var(--border-color, #e2e8f0); }
-:global(.dark) .p-btn { color: #f8fafc; }
-.p-btn:hover:not(:disabled) { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); background: rgba(37, 99, 235, 0.05); }
-.p-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-.p-numbers { display: flex; gap: 8px; }
-.p-numbers button { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-weight: 800; cursor: pointer; transition: all 0.2s; color: var(--text-muted, #64748b); }
-:global(.dark) .p-numbers button { color: #94a3b8; }
-.p-numbers button.active { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
-
-/* АДАПТИВНОСТЬ */
-@media (max-width: 1024px) { .filter-grid { grid-template-columns: 1fr; } }
-@media (max-width: 768px) {
-  .admin-categories { padding: 24px 16px; }
-  .header-row { flex-direction: column; align-items: flex-start; }
-  .input-grid { grid-template-columns: 1fr; }
-  .pagination-wrapper { flex-wrap: wrap; }
+<style>
+/* Исправление белых опций в тёмной теме для селекта родительской категории */
+html.dark .table-select option {
+  background-color: var(--bg-input) !important;
+  color: var(--text-main) !important;
 }
 </style>

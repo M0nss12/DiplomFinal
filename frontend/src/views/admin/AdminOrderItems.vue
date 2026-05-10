@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-sales-report">
+  <div class="admin-sales-report animate-fade-in">
     <!-- ЗАГОЛОВОК -->
     <div class="header-row">
       <div class="header-left">
@@ -19,13 +19,13 @@
         <button @click="resetFilters" class="btn-text-link">Сбросить</button>
       </div>
       <div class="filter-grid">
-        <div class="input-group search-group">
+        <div class="form-group">
           <label>🔎 Поиск (Товар, SKU или № заказа)</label>
-          <input v-model="searchQuery" placeholder="Введите название или артикул..." class="form-input" />
+          <input v-model="searchQuery" placeholder="Введите название или артикул..." />
         </div>
-        <div class="input-group">
+        <div class="form-group">
           <label>📅 Период</label>
-          <select v-model="dateFilter" class="form-input">
+          <select v-model="dateFilter">
             <option value="all">За всё время</option>
             <option value="today">За сегодня</option>
             <option value="week">За неделю</option>
@@ -37,8 +37,7 @@
 
     <!-- 2. ТАБЛИЦА -->
     <div class="table-container">
-      <div class="table-meta">
-        <span class="meta-icon">📄</span>
+      <div class="table-meta text-muted mb-2">
         Всего продано позиций: <b>{{ filteredItems.length }}</b>
       </div>
 
@@ -58,35 +57,54 @@
           <tbody>
             <tr v-for="item in paginatedItems" :key="item.id" class="item-row">
               <td class="col-id">#{{ item.id }}</td>
-              
+
               <td>
-                <router-link :to="'/admin/orders'" class="order-link">
+                <router-link to="/admin/orders" class="order-link">
                   📦 Заказ #{{ item.order_id }}
                 </router-link>
               </td>
 
               <td>
                 <div class="product-cell">
-                  <img :src="item.products?.images?.[0] || '/assets/images/no-photo.png'" class="mini-thumb glass-card" />
+                  <div class="thumb-wrap glass-card">
+                    <img
+                      :src="getProductImage(item)"
+                      :alt="item.products?.name || 'Товар'"
+                      class="mini-thumb"
+                      @error="onImgError($event)"
+                    />
+                  </div>
                   <div class="p-info">
-                    <strong>{{ item.products?.name || 'Товар удален' }}</strong>
+                    <strong>{{ item.products?.name || 'Товар удалён' }}</strong>
                     <code class="sku-tag">{{ item.products?.sku || '---' }}</code>
                   </div>
                 </div>
               </td>
 
               <td class="text-center">
-                <span class="qty-badge">{{ item.quantity }} шт.</span>
+                <span class="badge">{{ item.quantity }} шт.</span>
               </td>
 
-              <td>{{ item.unit_price.toLocaleString() }} ₽</td>
+              <td>{{ Number(item.unit_price).toLocaleString() }} ₽</td>
 
               <td>
-                <strong class="total-cell">{{ (item.unit_price * item.quantity).toLocaleString() }} ₽</strong>
+                <strong class="total-cell">
+                  {{ (Number(item.unit_price) * item.quantity).toLocaleString() }} ₽
+                </strong>
               </td>
 
               <td class="text-right">
-                <button @click="deleteItem(item.id)" class="btn-delete-small" title="Удалить позицию (только из отчета)">🗑️</button>
+                <button
+                  @click="deleteItem(item.id)"
+                  class="btn btn-danger btn-sm"
+                  title="Удалить позицию"
+                >🗑️</button>
+              </td>
+            </tr>
+
+            <tr v-if="paginatedItems.length === 0">
+              <td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted);">
+                Нет данных по заданным фильтрам
               </td>
             </tr>
           </tbody>
@@ -94,12 +112,17 @@
       </div>
 
       <!-- ПАГИНАЦИЯ -->
-      <div v-if="totalPages > 1" class="pagination-wrapper">
-        <button @click="currentPage--" :disabled="currentPage === 1" class="p-btn glass-card">←</button>
-        <div class="p-numbers">
-          <button v-for="p in totalPages" :key="p" @click="currentPage = p" class="glass-card" :class="{ active: currentPage === p }">{{ p }}</button>
+      <div v-if="totalPages > 1" class="pagination mt-3">
+        <button @click="currentPage--" :disabled="currentPage === 1">←</button>
+        <div class="pagination-pages">
+          <button
+            v-for="p in totalPages"
+            :key="p"
+            @click="currentPage = p"
+            :class="{ active: currentPage === p }"
+          >{{ p }}</button>
         </div>
-        <button @click="currentPage++" :disabled="currentPage === totalPages" class="p-btn glass-card">→</button>
+        <button @click="currentPage++" :disabled="currentPage === totalPages">→</button>
       </div>
     </div>
   </div>
@@ -110,139 +133,283 @@ import { ref, onMounted, computed, watch } from 'vue';
 import axios from 'axios';
 
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123';
-const API_URL = import.meta.env.VITE_API_URL || '';
 const config = { headers: { 'x-admin-key': ADMIN_SECRET } };
 
-const items = ref([]);
+// Заглушка в base64 — не зависит от файловой системы проекта
+const FALLBACK_IMG =
+  'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDUiIGhlaWdodD0iNDUiIHZpZXdCb3g9IjAgMCA0NSA0NSIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDUiIGhlaWdodD0iNDUiIHJ4PSI4IiBmaWxsPSIjRjFGNUY5Ii8+PHRleHQgeD0iNTAlIiB5PSI1NCUiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5NEEzQjgiPvCfk7g8L3RleHQ+PC9zdmc+';
+
+const items       = ref([]);
 const searchQuery = ref('');
-const dateFilter = ref('all');
+const dateFilter  = ref('all');
 const currentPage = ref(1);
 const itemsPerPage = 20;
 
+// ── Загрузка ─────────────────────────────────────────────────────────────────
 const loadData = async () => {
   try {
-    // В server.js должен быть эндпоинт /api/admin/order_items
-    const res = await axios.get(`/api/admin/order_items`, config);
+    const res = await axios.get('/api/admin/order_items', config);
     items.value = res.data;
   } catch (e) {
-    console.error('Ошибка загрузки данных продаж');
+    console.error('Ошибка загрузки данных продаж', e);
   }
 };
 
+// ── Изображение товара ───────────────────────────────────────────────────────
+/*
+  images в БД хранится как TEXT[] (массив строк).
+  Supabase возвращает его по-разному в зависимости от версии клиента:
+  - уже как JS Array → берём [0]
+  - как строка вида '{"url1","url2"}' (PostgreSQL literal) → парсим
+*/
+const getProductImage = (item) => {
+  const raw = item.products?.images;
+  if (!raw) return FALLBACK_IMG;
+
+  // Уже массив
+  if (Array.isArray(raw) && raw.length > 0) return raw[0];
+
+  // PostgreSQL-литерал: {"https://...","https://..."}
+  if (typeof raw === 'string') {
+    try {
+      // Превращаем PG-формат в JSON-массив
+      const jsonStr = raw.replace(/^\{/, '[').replace(/\}$/, ']');
+      const parsed = JSON.parse(jsonStr);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+    } catch {
+      // Если строка сама по себе URL
+      if (raw.startsWith('http')) return raw;
+    }
+  }
+
+  return FALLBACK_IMG;
+};
+
+// При ошибке загрузки ставим заглушку и не повторяем попытку
+const onImgError = (e) => {
+  if (e.target.src !== FALLBACK_IMG) {
+    e.target.src = FALLBACK_IMG;
+  }
+};
+
+// ── CRUD ─────────────────────────────────────────────────────────────────────
 const deleteItem = async (id) => {
-  if (!confirm('Вы уверены? Это изменит только запись в базе состава заказа, но не итоговую сумму в самом заказе!')) return;
+  if (!confirm(
+    'Вы уверены? Это изменит только запись состава заказа, но не итоговую сумму в самом заказе!'
+  )) return;
   try {
     await axios.delete(`/api/admin/order_items/${id}`, config);
     items.value = items.value.filter(i => i.id !== id);
-  } catch (e) { alert('Ошибка при удалении'); }
+  } catch (e) {
+    alert('Ошибка при удалении');
+  }
 };
 
+// ── Фильтрация ───────────────────────────────────────────────────────────────
 const filteredItems = computed(() => {
   let res = [...items.value];
-  
+
+  // Текстовый поиск
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase().trim();
-    res = res.filter(i => 
-      (i.products?.name || '').toLowerCase().includes(q) || 
-      (i.products?.sku || '').toLowerCase().includes(q) ||
-      i.order_id.toString() === q
+    res = res.filter(i =>
+      (i.products?.name || '').toLowerCase().includes(q) ||
+      (i.products?.sku  || '').toLowerCase().includes(q) ||
+      String(i.order_id) === q
     );
   }
-  
-  // Логика фильтра по датам (если в ответе есть поле created_at от заказа)
-  // Для этого в server.js запрос должен делать .select('*, products(*), orders(created_at)')
-  
+
+  // Фильтр по периоду
+  if (dateFilter.value !== 'all') {
+    const now = new Date();
+    const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const today   = startOf(now);
+    const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
+    const monthAgo = new Date(today); monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+    res = res.filter(i => {
+      // order_items не имеет created_at → используем порядок id как прокси,
+      // или берём дату из связанного заказа если она есть
+      const d = i.orders?.created_at ? new Date(i.orders.created_at) : null;
+      if (!d) return true; // нет даты — не исключаем
+
+      if (dateFilter.value === 'today')  return d >= today;
+      if (dateFilter.value === 'week')   return d >= weekAgo;
+      if (dateFilter.value === 'month')  return d >= monthAgo;
+      return true;
+    });
+  }
+
   return res.sort((a, b) => b.id - a.id);
 });
 
-const totalRevenue = computed(() => {
-  return filteredItems.value.reduce((sum, i) => sum + (Number(i.unit_price) * i.quantity), 0);
+const totalRevenue = computed(() =>
+  filteredItems.value.reduce((sum, i) => sum + Number(i.unit_price) * i.quantity, 0)
+);
+
+const totalPages = computed(() =>
+  Math.ceil(filteredItems.value.length / itemsPerPage)
+);
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage;
+  return filteredItems.value.slice(start, start + itemsPerPage);
 });
 
-const totalPages = computed(() => Math.ceil(filteredItems.value.length / itemsPerPage));
-const paginatedItems = computed(() => filteredItems.value.slice((currentPage.value - 1) * itemsPerPage, currentPage.value * itemsPerPage));
+const resetFilters = () => {
+  searchQuery.value = '';
+  dateFilter.value  = 'all';
+  currentPage.value = 1;
+};
 
-const resetFilters = () => { searchQuery.value = ''; dateFilter.value = 'all'; currentPage.value = 1; };
-watch([searchQuery, dateFilter], () => currentPage.value = 1);
+watch([searchQuery, dateFilter], () => { currentPage.value = 1; });
 
 onMounted(loadData);
 </script>
 
 <style scoped>
-/* ==========================================================================
-   АДМИНКА: ПРОДАЖИ (GLASSMORPHISM & DARK MODE)
-   ========================================================================== */
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+.admin-sales-report { padding: 40px 24px; }
 
-.admin-sales-report { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-sales-report { color: #f8fafc; }
-
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
 .header-left h1 {
-  font-size: 2.2rem; font-weight: 900; margin: 0;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; font-weight: 500; }
+.subtitle { color: var(--text-muted); font-size: 0.95rem; font-weight: 500; }
 
-.stats-badge { padding: 12px 24px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 1rem; color: var(--success, #10b981); }
-
-/* КАРТОЧКИ */
-.glass-card {
-  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px); transition: all 0.3s ease;
+.stats-badge {
+  padding: 12px 24px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1rem;
+  color: var(--success);
 }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
 
 .admin-card { padding: 25px; margin-bottom: 30px; }
-.filter-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; align-items: flex-end; }
 
-.form-input {
-  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s;
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 }
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
-.input-group label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); margin-bottom: 8px; }
+.card-title { font-size: 1.2rem; font-weight: 900; margin: 0; }
 
-/* ТАБЛИЦА */
+.filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 25px;
+  align-items: flex-end;
+}
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.9rem;
+}
+
 .table-container { margin-top: 20px; }
-.table-meta { margin-bottom: 16px; font-size: 0.85rem; color: var(--text-muted, #64748b); font-weight: 600; }
+.table-meta { font-size: 0.85rem; font-weight: 600; }
 
 .admin-table-wrapper { overflow-x: auto; }
 .admin-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
-.admin-table th { padding: 16px 20px; text-align: left; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
-:global(.dark) .admin-table th { border-color: #334155; }
-.admin-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; font-size: 0.95rem; }
-:global(.dark) .admin-table td { border-color: #334155; }
-
+.admin-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+}
+.admin-table td {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+  font-size: 0.95rem;
+}
 .item-row:hover td { background: rgba(37, 99, 235, 0.02); }
 
-.col-id { width: 70px; font-weight: 800; color: var(--primary, #2563eb); font-family: monospace; }
+.col-id { width: 70px; font-weight: 800; color: var(--primary); font-family: monospace; }
 
-.order-link { color: var(--primary, #2563eb); text-decoration: none; font-weight: 800; padding: 6px 12px; background: rgba(37, 99, 235, 0.1); border-radius: 20px; font-size: 0.85rem; }
-.order-link:hover { text-decoration: underline; background: var(--primary, #2563eb); color: white; }
+.order-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 800;
+  padding: 6px 12px;
+  background: var(--primary-light);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.order-link:hover { background: var(--primary); color: white; }
 
-.product-cell { display: flex; align-items: center; gap: 15px; }
-.mini-thumb { width: 45px; height: 45px; object-fit: contain; padding: 4px; background: #fff; border-radius: 8px; }
-.p-info { display: flex; flex-direction: column; gap: 2px; }
-.sku-tag { font-size: 0.7rem; color: var(--text-muted, #94a3b8); font-weight: 700; text-transform: uppercase; }
+/* Ячейка товара */
+.product-cell { display: flex; align-items: center; gap: 14px; }
 
-.qty-badge { background: rgba(0,0,0,0.05); padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 0.85rem; }
-:global(.dark) .qty-badge { background: rgba(255,255,255,0.05); }
+.thumb-wrap {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+.mini-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
 
-.total-cell { color: var(--primary, #2563eb); font-size: 1.1rem; }
+.p-info { display: flex; flex-direction: column; gap: 3px; }
+.sku-tag { font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+
+.total-cell { color: var(--primary); font-size: 1.05rem; }
 :global(.dark) .total-cell { color: #60a5fa; }
 
-.btn-delete-small { background: rgba(239, 68, 68, 0.05); border: none; width: 36px; height: 36px; border-radius: 50%; color: var(--danger, #ef4444); cursor: pointer; transition: 0.2s; font-size: 1.1rem; }
-.btn-delete-small:hover { background: var(--danger, #ef4444); color: white; }
+.text-right  { text-align: right; }
+.text-center { text-align: center; }
 
-/* ПАГИНАЦИЯ */
-.pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 40px; }
-.p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; border: 1px solid var(--border-color, #cbd5e1); color: var(--text-main, #0f172a); }
-:global(.dark) .p-btn { color: #f8fafc; border-color: #475569; }
-.p-numbers button { width: 44px; height: 44px; border-radius: 12px; font-weight: 800; cursor: pointer; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-card, #fff); color: var(--text-muted, #64748b); }
-.p-numbers button.active { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
+/* Пагинация */
+.pagination-pages { display: flex; gap: 8px; }
+.pagination-pages button {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pagination-pages button:hover { background: var(--primary-light); border-color: var(--primary); }
+.pagination-pages button.active { background: var(--primary); color: white; border-color: var(--primary); }
 
-.btn-text-link { background: none; border: none; color: var(--primary, #2563eb); font-weight: 800; cursor: pointer; text-decoration: underline; font-size: 0.9rem; }
+@media (max-width: 768px) {
+  .filter-grid { grid-template-columns: 1fr; }
+  .header-row  { flex-direction: column; align-items: flex-start; }
+}
 </style>

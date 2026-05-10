@@ -1,49 +1,29 @@
 <template>
-  <nav class="main-navbar" aria-label="Основная навигация">
+  <nav class="main-navbar animate-fade-in" aria-label="Основная навигация">
     <div class="nav-container">
-      
       <!-- ЛЕВАЯ ЧАСТЬ -->
       <div class="nav-section left-section">
         <router-link to="/" class="logo" aria-label="Главная страница ApexDrive">
           <strong>ApexDrive</strong>
         </router-link>
-        
         <div class="city-selector-container" ref="cityMenu">
-          <button @click="toggleCityDropdown" class="city-btn glass-btn" aria-haspopup="listbox" :aria-expanded="isCityDropdownOpen">
+          <button @click="toggleCityDropdown" class="city-btn glass-card" aria-haspopup="listbox" :aria-expanded="isCityDropdownOpen">
             <span class="city-icon">📍</span>
             <span class="city-name">{{ appStore.city || 'Выберите город' }}</span>
             <span class="dropdown-arrow" :class="{ rotate: isCityDropdownOpen }">▼</span>
           </button>
-          
           <transition name="dropdown-fade">
             <div v-if="isCityDropdownOpen" class="dropdown-menu city-menu glass-card" role="listbox">
               <div class="city-search">
-                <input
-                  v-model="citySearch"
-                  placeholder="Поиск города..."
-                  @keyup.enter="selectFirstFilteredCity"
-                  @click.stop
-                  aria-label="Поиск города"
-                />
+                <input v-model="citySearch" placeholder="Поиск города..." @keyup.enter="selectFirstFilteredCity" @click.stop aria-label="Поиск города" />
               </div>
               <div class="city-list">
-                <!-- Только города из списка, без произвольного ввода -->
-                <button
-                  v-for="city in filteredCities"
-                  :key="city"
-                  @click="selectCity(city)"
-                  class="dropdown-item"
-                  :class="{ active: city === appStore.city }"
-                  role="option"
-                >
-                  {{ city }}
-                </button>
+                <button v-for="city in filteredCities" :key="city" @click="selectCity(city)" class="dropdown-item" :class="{ active: city === appStore.city }" role="option">{{ city }}</button>
               </div>
             </div>
           </transition>
         </div>
-
-        <div class="menu-links desktop-only">
+        <div class="menu-links hidden-mobile">
           <router-link to="/catalog" active-class="active-link">Каталог</router-link>
           <router-link to="/about" active-class="active-link">О нас</router-link>
           <router-link to="/contacts" active-class="active-link">Контакты</router-link>
@@ -55,17 +35,9 @@
         <div class="search-input-wrapper glass-card" :class="{ 'is-focused': isSearchOpen }">
           <span v-if="!isSearching" class="search-icon">🔍</span>
           <span v-else class="search-icon loading-spinner">⏳</span>
-          <input 
-            v-model="searchQuery" 
-            type="text" 
-            placeholder="Поиск деталей, категорий (от 2 букв)..." 
-            @focus="isSearchOpen = true"
-            @input="handleGlobalSearch"
-            aria-label="Поиск по сайту"
-          />
+          <input v-model="searchQuery" type="text" placeholder="Поиск деталей, категорий (от 2 букв)..." @focus="isSearchOpen = true" @input="handleGlobalSearch" aria-label="Поиск по сайту" />
           <button v-if="searchQuery" @click="clearSearch" class="search-clear-btn" aria-label="Очистить поиск">&times;</button>
         </div>
-
         <transition name="dropdown-fade">
           <div v-if="isSearchOpen && searchQuery.length >= 2" class="search-dropdown glass-card">
             <div v-if="isSearching" class="s-none">Ищем лучшие совпадения...</div>
@@ -103,8 +75,6 @@
 
       <!-- ПРАВАЯ ЧАСТЬ -->
       <div class="nav-section right-section">
-        
-        <!-- ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ -->
         <label class="theme-switch" title="Сменить тему">
           <input type="checkbox" :checked="appStore.theme === 'dark'" @change="appStore.toggleTheme" />
           <span class="slider">
@@ -121,7 +91,6 @@
               <span v-if="unreadNotifsCount > 0" class="badge notif-badge">{{ unreadNotifsCount }}</span>
             </transition>
           </div>
-          
           <transition name="dropdown-fade">
             <div v-if="isNotifDropdownOpen" class="dropdown-menu notif-menu glass-card">
               <div class="notif-header">
@@ -130,20 +99,13 @@
               </div>
               <div class="notif-list">
                 <div v-if="notifications.length === 0" class="p-3 text-center text-muted text-sm">Нет новых уведомлений</div>
-                <div 
-                  v-for="n in notifications" :key="n.id" 
-                  class="notif-item" 
-                  :class="{ 'is-unread': !n.is_read }"
-                  @click="markAsRead(n)"
-                >
+                <div v-for="n in notifications" :key="n.id" class="notif-item" :class="{ 'is-unread': !n.is_read }" @click="markAsRead(n)">
                   <div class="notif-title">{{ n.title }}</div>
                   <div class="notif-message">{{ n.message }}</div>
                   <div class="notif-time">{{ new Date(n.created_at).toLocaleDateString() }}</div>
                 </div>
               </div>
-              <router-link to="/notifications" class="notif-footer" @click="isNotifDropdownOpen = false">
-                Все уведомления →
-              </router-link>
+              <router-link to="/notifications" class="notif-footer" @click="isNotifDropdownOpen = false">Все уведомления →</router-link>
             </div>
           </transition>
         </div>
@@ -158,10 +120,10 @@
           </div>
         </router-link>
 
-        <div class="divider desktop-only"></div>
+        <div class="divider hidden-mobile d-none d-lg-block"></div>
 
         <!-- АВТОРИЗАЦИЯ -->
-        <div v-if="!userId" class="auth-links desktop-only">
+        <div v-if="!userId" class="auth-links hidden-mobile">
           <router-link to="/login" class="auth-link">Войти</router-link>
           <router-link to="/register" class="auth-link reg-btn">Регистрация</router-link>
         </div>
@@ -169,10 +131,9 @@
         <div v-else class="user-profile-container" ref="profileMenu">
           <div class="profile-trigger" @click="toggleProfileDropdown" aria-haspopup="true" :aria-expanded="isProfileDropdownOpen">
             <img :src="userAvatar || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png'" class="nav-avatar" alt="Аватар" />
-            <span class="user-display-name desktop-only">{{ userName || 'Профиль' }}</span>
-            <span class="dropdown-arrow desktop-only" :class="{ rotate: isProfileDropdownOpen }">▼</span>
+            <span class="user-display-name hidden-mobile">{{ userName || 'Профиль' }}</span>
+            <span class="dropdown-arrow hidden-mobile" :class="{ rotate: isProfileDropdownOpen }">▼</span>
           </div>
-          
           <transition name="dropdown-fade">
             <div v-if="isProfileDropdownOpen" class="dropdown-menu profile-menu glass-card">
               <router-link v-if="userRole === 'admin'" to="/admin" class="dropdown-item admin-item" @click="isProfileDropdownOpen = false">
@@ -200,18 +161,18 @@
               <span v-if="cartItemsCount > 0" class="badge cart-badge">{{ cartItemsCount }}</span>
             </transition>
           </div>
-          <div class="cart-info desktop-only">
+          <div class="cart-info hidden-mobile">
             <div class="cart-title">Корзина</div>
             <div class="cart-total">{{ cartStore.totalPriceFinal || 0 }} ₽</div>
           </div>
         </div>
-        
       </div>
     </div>
   </nav>
 </template>
 
 <script setup>
+// (логика без изменений)
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
@@ -222,7 +183,6 @@ const router = useRouter();
 const cartStore = useCartStore();
 const appStore = useAppStore();
 
-// Настройка заголовков axios
 const storedId = localStorage.getItem('user_id');
 const storedName = localStorage.getItem('user_first_name') || localStorage.getItem('user_name');
 const storedRole = localStorage.getItem('role');
@@ -236,7 +196,6 @@ const userName = ref(storedName || '');
 const userAvatar = ref(localStorage.getItem('user_avatar') || '');
 const userRole = ref(storedRole || '');
 
-// --- СЧЁТЧИКИ ---
 const wishlistCount = ref(0);
 
 const cartItemsCount = computed(() => {
@@ -244,7 +203,6 @@ const cartItemsCount = computed(() => {
   return Array.isArray(items) ? items.reduce((total, item) => total + (item.quantity || 1), 0) : 0;
 });
 
-// --- ИЗБРАННОЕ ---
 const loadWishlistCount = async () => {
   if (userId.value) {
     try {
@@ -254,7 +212,6 @@ const loadWishlistCount = async () => {
   }
 };
 
-// --- УВЕДОМЛЕНИЯ ---
 const notifications = ref([]);
 const isNotifDropdownOpen = ref(false);
 const notifMenu = ref(null);
@@ -288,7 +245,6 @@ const markAllAsRead = async () => {
   notifications.value.forEach(n => markAsRead(n));
 };
 
-// --- УМНЫЙ ПОИСК ---
 const searchQuery = ref('');
 const isSearchOpen = ref(false);
 const isSearching = ref(false);
@@ -316,7 +272,6 @@ const handleGlobalSearch = () => {
     isSearching.value = false;
     return;
   }
-  
   isSearching.value = true;
   searchTimer = setTimeout(async () => {
     try {
@@ -337,7 +292,6 @@ const clearSearch = () => {
 };
 const closeSearch = () => isSearchOpen.value = false;
 
-// --- ГОРОДА (только из списка, без произвольного ввода) ---
 const isCityDropdownOpen = ref(false);
 const cityMenu = ref(null);
 const availableCities = ref([]);
@@ -361,7 +315,6 @@ const selectCity = async (city) => {
   citySearch.value = '';
 };
 
-// Выбор первого подходящего города при нажатии Enter
 const selectFirstFilteredCity = () => {
   const cities = filteredCities.value;
   if (cities.length > 0) {
@@ -372,7 +325,6 @@ const selectFirstFilteredCity = () => {
 const exactMatch = computed(() => availableCities.value.some(c => c.toLowerCase() === citySearch.value.toLowerCase().trim()));
 const filteredCities = computed(() => citySearch.value ? availableCities.value.filter(c => c.toLowerCase().includes(citySearch.value.toLowerCase())) : availableCities.value);
 
-// --- ДРОПДАУНЫ И КЛИК ВНЕ ---
 const isProfileDropdownOpen = ref(false);
 const profileMenu = ref(null);
 
@@ -421,14 +373,14 @@ onUnmounted(() => {
 
 <style scoped>
 /* ==========================================================================
-   ГЛАВНАЯ НАВИГАЦИЯ – УЛУЧШЕННАЯ ВЕРСИЯ (без произвольного города)
+   УНИКАЛЬНЫЕ СТИЛИ НАВИГАЦИИ (глобальный CSS используется для glass-card, badge и т.п.)
    ========================================================================== */
 
 .main-navbar {
-  background: rgba(255, 255, 255, 0.85);
+background: var(--nav-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  border-bottom: 1px solid var(--border-color);
   height: 80px;
   position: sticky;
   top: 0;
@@ -453,7 +405,6 @@ onUnmounted(() => {
   gap: 20px;
 }
 
-/* ЛЕВАЯ СЕКЦИЯ */
 .left-section {
   display: flex;
   align-items: center;
@@ -464,7 +415,7 @@ onUnmounted(() => {
   text-decoration: none;
   font-size: 1.7rem;
   font-weight: 900;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
+  background: linear-gradient(135deg, var(--primary), var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -472,11 +423,10 @@ onUnmounted(() => {
 }
 .logo:hover { transform: scale(1.02); }
 
-/* КНОПКА ГОРОДА */
 .city-selector-container { position: relative; }
 .city-btn {
   background: transparent;
-  border: 1px solid var(--border-color, #cbd5e1);
+  border: 1px solid var(--border-color);
   padding: 8px 16px;
   border-radius: 40px;
   font-size: 0.9rem;
@@ -485,91 +435,78 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  color: var(--text-main, #1e293b);
+  color: var(--text-main);
   transition: all 0.2s;
 }
-:global(.dark) .city-btn { color: #f8fafc; border-color: #334155; }
+:global(.dark) .city-btn {  border-color: #334155; }
 .city-btn:hover {
-  border-color: var(--primary, #2563eb);
-  background: rgba(37, 99, 235, 0.05);
+  border-color: var(--primary);
+  background: var(--primary-light);
 }
 .city-name { max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dropdown-arrow { font-size: 0.7rem; transition: transform 0.3s; }
 .dropdown-arrow.rotate { transform: rotate(180deg); }
 
-/* МЕНЮ ССЫЛКИ */
 .menu-links { display: flex; gap: 24px; }
 .menu-links a {
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted);
   font-weight: 600;
   font-size: 0.95rem;
   position: relative;
   padding: 6px 0;
   text-decoration: none;
 }
-:global(.dark) .menu-links a { color: #94a3b8; }
 .menu-links a::after {
   content: ''; position: absolute; width: 0; height: 3px; bottom: 0; left: 0;
-  background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
+  background: linear-gradient(90deg, var(--primary), var(--accent));
   transition: width 0.3s ease; border-radius: 3px;
 }
 .menu-links a:hover::after, .menu-links a.active-link::after { width: 100%; }
-.menu-links a:hover, .menu-links a.active-link { color: var(--text-main, #0f172a); }
+.menu-links a:hover, .menu-links a.active-link { color: var(--text-main); }
 :global(.dark) .menu-links a:hover, :global(.dark) .menu-links a.active-link { color: #fff; }
 
-/* ПОИСК */
+/* Поиск */
 .search-bar-container { flex: 1; max-width: 500px; position: relative; }
 .search-input-wrapper {
   display: flex; align-items: center;
-  background: var(--bg-card, #fff);
-  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 60px;
   padding: 0 16px; height: 44px;
   transition: all 0.3s;
 }
 :global(.dark) .search-input-wrapper { background: #1e293b; border-color: #334155; }
 .search-input-wrapper.is-focused {
-  border-color: var(--primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
 }
-.search-icon { font-size: 1.1rem; color: var(--text-muted, #94a3b8); margin-right: 12px; }
+.search-icon { font-size: 1.1rem; color: var(--text-muted); margin-right: 12px; }
 .loading-spinner { animation: spin 2s linear infinite; }
-@keyframes spin { 100% { transform: rotate(360deg); } }
-
 .search-input-wrapper input {
   flex: 1; border: none; background: transparent;
-  font-size: 0.95rem; color: var(--text-main, #0f172a); outline: none;
+  font-size: 0.95rem; color: var(--text-main); outline: none;
 }
-:global(.dark) .search-input-wrapper input { color: #f8fafc; }
 .search-clear-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-muted); }
 
 .search-dropdown {
   position: absolute; top: calc(100% + 8px); left: 0; right: 0;
-  background: var(--bg-card, #fff);
-  border-radius: var(--radius-md, 12px); border: 1px solid var(--border-color, #e2e8f0);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  z-index: 1100; max-height: 480px; overflow-y: auto; padding: 8px 0;
+  border-radius: var(--radius-md); padding: 8px 0;
 }
-:global(.dark) .search-dropdown { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); }
-
-.s-label { font-size: 0.7rem; text-transform: uppercase; font-weight: 800; color: var(--text-muted, #94a3b8); padding: 6px 16px; background: rgba(0,0,0,0.02); }
+.s-label { font-size: 0.7rem; text-transform: uppercase; font-weight: 800; color: var(--text-muted); padding: 6px 16px; background: rgba(0,0,0,0.02); }
 :global(.dark) .s-label { background: rgba(255,255,255,0.02); }
-.s-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; text-decoration: none; color: var(--text-main, #0f172a); transition: background 0.2s; }
-:global(.dark) .s-item { color: #f8fafc; }
-.s-item:hover { background: rgba(37, 99, 235, 0.05); }
-
+.s-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; text-decoration: none; color: var(--text-main); transition: background 0.2s; }
+.s-item:hover { background: var(--primary-light); }
 .prod-flex .s-img { width: 40px; height: 40px; object-fit: contain; background: #fff; border-radius: 6px; padding: 2px; }
 .s-info { display: flex; flex-direction: column; }
-.s-name { font-size: 0.9rem; font-weight: 600; }
+.s-name { font-weight: 600; font-size: 0.9rem; }
 .s-meta { display: flex; gap: 10px; font-size: 0.8rem; align-items: center; }
-.s-sku { color: var(--text-muted, #94a3b8); }
-.s-price { color: var(--success, #10b981); font-weight: 700; }
+.s-price { color: var(--success); font-weight: 700; }
 .s-none { padding: 16px; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
 
-/* ПРАВАЯ СЕКЦИЯ */
+/* Правая часть */
 .right-section { display: flex; align-items: center; gap: 20px; }
 
-/* ТЕМА */
+/* Переключатель темы */
 .theme-switch { position: relative; display: inline-block; width: 56px; height: 28px; cursor: pointer; }
 .theme-switch input { opacity: 0; width: 0; height: 0; }
 .slider {
@@ -585,25 +522,21 @@ onUnmounted(() => {
 }
 .theme-switch input:checked + .slider::before { transform: translateX(28px); }
 
-/* ИКОНКИ (Уведомления, Избранное) */
+/* Иконки с бейджами – бейджи используют глобальный .badge с переопределением цвета */
 .nav-icon-container { position: relative; cursor: pointer; }
 .icon-with-badge { position: relative; display: flex; align-items: center; justify-content: center; padding: 4px; }
-.nav-icon-btn { font-size: 1.6rem; transition: transform 0.2s; }
-.heart-icon { font-size: 1.6rem; transition: transform 0.2s; }
+.nav-icon-btn, .heart-icon { font-size: 1.6rem; transition: transform 0.2s; }
 .icon-with-badge:hover .nav-icon-btn, .icon-with-badge:hover .heart-icon { transform: scale(1.1); }
 
 .badge {
   position: absolute; top: -4px; right: -6px;
-  color: white; font-size: 0.65rem; font-weight: 800; padding: 2px 5px;
-  border-radius: 20px; border: 2px solid var(--bg-card, #fff); min-width: 18px; text-align: center;
-  line-height: 1.2;
+  font-size: 0.65rem; font-weight: 800; padding: 2px 5px;
+  border-radius: 20px; border: 2px solid var(--bg-card); min-width: 18px; text-align: center;
 }
-:global(.dark) .badge { border-color: #0f172a; }
-.notif-badge { background: var(--primary, #2563eb); }
+.notif-badge { background: var(--primary); }
 .wishlist-badge { background: #ef4444; }
-.cart-badge { background: var(--success, #10b981); }
+.cart-badge { background: var(--success); }
 
-/* Анимация появления бейджа */
 .badge-pop-enter-active { animation: pop-in 0.3s ease-out; }
 .badge-pop-leave-active { animation: pop-out 0.2s ease-in; }
 @keyframes pop-in {
@@ -616,33 +549,30 @@ onUnmounted(() => {
   100% { transform: scale(0); opacity: 0; }
 }
 
-/* ДРОПДАУН УВЕДОМЛЕНИЙ */
+/* Дропдаун уведомлений */
 .notif-menu { width: 320px; right: -60px; padding: 0; overflow: hidden; }
-.notif-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color, #e2e8f0); }
+.notif-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
 .notif-list { max-height: 300px; overflow-y: auto; }
-.notif-item { padding: 12px 16px; border-bottom: 1px solid var(--border-color, #e2e8f0); cursor: pointer; transition: background 0.2s; }
-.notif-item.is-unread { background: rgba(37, 99, 235, 0.05); border-left: 3px solid var(--primary, #2563eb); }
+.notif-item { padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s; }
+.notif-item.is-unread { background: var(--primary-light); border-left: 3px solid var(--primary); }
 .notif-item:hover { background: rgba(0,0,0,0.02); }
 :global(.dark) .notif-item:hover { background: rgba(255,255,255,0.05); }
-.notif-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; color: var(--text-main, #0f172a); }
-:global(.dark) .notif-title { color: #f8fafc; }
-.notif-message { font-size: 0.8rem; color: var(--text-muted, #64748b); line-height: 1.3; }
+.notif-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; color: var(--text-main); }
+.notif-message { font-size: 0.8rem; color: var(--text-muted); line-height: 1.3; }
 .notif-time { font-size: 0.7rem; color: #94a3b8; margin-top: 6px; text-align: right; }
-.notif-footer { display: block; text-align: center; padding: 10px; font-size: 0.85rem; font-weight: 600; color: var(--primary, #2563eb); text-decoration: none; background: rgba(0,0,0,0.02); }
-.notif-footer:hover { background: rgba(37, 99, 235, 0.1); }
+.notif-footer { display: block; text-align: center; padding: 10px; font-size: 0.85rem; font-weight: 600; color: var(--primary); text-decoration: none; background: rgba(0,0,0,0.02); }
+.notif-footer:hover { background: var(--primary-light); }
 
-/* РАЗДЕЛИТЕЛЬ */
-.divider { width: 1px; height: 32px; background: var(--border-color, #e2e8f0); }
-:global(.dark) .divider { background: #334155; }
+/* Разделитель */
+.divider { width: 1px; height: 32px; background: var(--border-color); }
 
-/* АВТОРИЗАЦИЯ */
+/* Авторизация */
 .auth-links { display: flex; gap: 12px; align-items: center; }
-.auth-link { font-weight: 600; font-size: 0.9rem; color: var(--text-main, #0f172a); text-decoration: none; }
-:global(.dark) .auth-link { color: #f8fafc; }
-.reg-btn { background: var(--primary, #2563eb); color: white !important; padding: 8px 16px; border-radius: 40px; transition: transform 0.2s, box-shadow 0.2s; }
-.reg-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+.auth-link { font-weight: 600; font-size: 0.9rem; color: var(--text-main); text-decoration: none; }
+.reg-btn { background: var(--primary); color: white !important; padding: 8px 16px; border-radius: 40px; transition: transform 0.2s, box-shadow 0.2s; }
+.reg-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px var(--primary-light); }
 
-/* ПРОФИЛЬ */
+/* Профиль */
 .user-profile-container { position: relative; }
 .profile-trigger {
   display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 8px;
@@ -650,59 +580,52 @@ onUnmounted(() => {
 }
 .profile-trigger:hover { background: rgba(0,0,0,0.05); }
 :global(.dark) .profile-trigger:hover { background: rgba(255,255,255,0.05); }
-.nav-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color, #e2e8f0); }
-.user-display-name { font-weight: 600; font-size: 0.85rem; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main, #0f172a); }
-:global(.dark) .user-display-name { color: #f8fafc; }
-
+.nav-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color); }
 .dropdown-menu {
   position: absolute; top: calc(100% + 12px); right: 0;
-  background: var(--bg-card, #fff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-md, 12px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
   min-width: 200px; z-index: 1200;
 }
-:global(.dark) .dropdown-menu { background: #1e293b; border-color: #334155; }
-.dropdown-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; text-decoration: none; color: var(--text-main, #0f172a); font-size: 0.9rem; transition: background 0.2s; cursor: pointer; width: 100%; border: none; text-align: left; background: transparent; }
-:global(.dark) .dropdown-item { color: #f8fafc; }
-.dropdown-item:hover { background: rgba(37, 99, 235, 0.05); color: var(--primary, #2563eb); }
+.dropdown-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; text-decoration: none; color: var(--text-main); font-size: 0.9rem; transition: background 0.2s; cursor: pointer; width: 100%; border: none; text-align: left; background: transparent; }
+.dropdown-item:hover { background: var(--primary-light); color: var(--primary); }
 .admin-item { color: #d97706; background: rgba(217, 119, 6, 0.1); }
 .logout-item { color: #ef4444; }
-.logout-item:hover { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
-.dropdown-divider { margin: 4px 0; border: none; height: 1px; background: var(--border-color, #e2e8f0); }
-:global(.dark) .dropdown-divider { background: #334155; }
+.logout-item:hover { background: var(--danger-light); color: #dc2626; }
+.dropdown-divider { margin: 4px 0; border: none; height: 1px; background: var(--border-color); }
 
-/* КОРЗИНА */
+/* Корзина */
 .cart-card {
   display: flex; align-items: center; gap: 12px;
-  background: var(--bg-card, #fff); border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--bg-card); border: 1px solid var(--border-color);
   border-radius: 40px; padding: 6px 16px 6px 12px; cursor: pointer; transition: all 0.3s;
 }
 :global(.dark) .cart-card { background: #1e293b; border-color: #334155; }
-.cart-card:hover { border-color: var(--success, #10b981); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15); }
-.cart-icon-wrapper svg { color: var(--text-main, #0f172a); transition: color 0.2s; }
-:global(.dark) .cart-icon-wrapper svg { color: #f8fafc; }
-.cart-card:hover .cart-icon-wrapper svg { color: var(--success, #10b981); }
-.cart-badge { top: -8px; right: -10px; background: var(--success, #10b981); }
+.cart-card:hover { border-color: var(--success); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15); }
+.cart-icon-wrapper svg { color: var(--text-main); transition: color 0.2s; }
+.cart-card:hover .cart-icon-wrapper svg { color: var(--success); }
 .cart-info { text-align: right; }
-.cart-title { font-size: 0.65rem; font-weight: 700; color: var(--text-muted, #94a3b8); text-transform: uppercase; }
-.cart-total { font-size: 0.95rem; font-weight: 800; color: var(--text-main, #0f172a); }
-:global(.dark) .cart-total { color: #f8fafc; }
+.cart-title { font-size: 0.65rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+.cart-total { font-size: 0.95rem; font-weight: 800; color: var(--text-main); }
 
-/* АНИМАЦИИ ДРОПДАУНОВ */
+/* Анимации */
 .dropdown-fade-enter-active, .dropdown-fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
 .dropdown-fade-enter-from, .dropdown-fade-leave-to { opacity: 0; transform: translateY(-10px); }
 
-/* АДАПТИВНОСТЬ */
+/* Класс скрытия на мобильных */
 @media (max-width: 1100px) {
-  .menu-links.desktop-only, .divider.desktop-only, .cart-info.desktop-only { display: none; }
+  .hidden-mobile { display: none !important; }
+}
+
+/* Адаптив */
+@media (max-width: 1100px) {
+  .cart-info, .divider { display: none; }
   .cart-card { padding: 8px 12px; border-radius: 50%; }
 }
 @media (max-width: 768px) {
-  .main-navbar { height: auto; padding: 12px 0; }
+  .main-navbar { height: auto; padding: 12px 0; background: var(--nav-bg);  }
   .nav-container { flex-wrap: wrap; gap: 12px; }
   .search-bar-container { order: 3; width: 100%; max-width: 100%; }
-  .left-section { flex: 1; justify-content: space-between; }
-  .right-section { flex-wrap: wrap; justify-content: flex-end; }
-  .user-display-name.desktop-only, .dropdown-arrow.desktop-only { display: none; }
+  .left-section, .right-section { flex: 1; justify-content: space-between; }
+  .user-display-name, .dropdown-arrow { display: none; }
   .notif-menu { right: -100px; }
 }
 @media (max-width: 480px) {

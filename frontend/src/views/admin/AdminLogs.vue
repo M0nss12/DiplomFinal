@@ -1,6 +1,6 @@
 <template>
-  <div class="admin-logs-page">
-    <!-- ШАПКА ЖУРНАЛА -->
+  <div class="admin-logs-page animate-fade-in">
+    <!-- ШАПКА -->
     <div class="header-row">
       <div class="header-left">
         <h1>🖥️ Системный журнал</h1>
@@ -14,14 +14,14 @@
     <!-- ПАНЕЛЬ УПРАВЛЕНИЯ -->
     <section class="admin-card control-panel glass-card">
       <div class="filter-grid">
-        <div class="input-group search-group">
+        <div class="form-group">
           <label>🔍 Поиск</label>
-          <input v-model="searchQuery" placeholder="IP, ID пользователя или текст..." class="form-input" />
+          <input v-model="searchQuery" placeholder="IP, ID пользователя или текст..." />
         </div>
 
-        <div class="input-group">
+        <div class="form-group">
           <label>Тип данных</label>
-          <div class="tab-switcher glass-card">
+          <div class="tab-switcher">
             <button :class="{ active: logType === 'actions' }" @click="setLogType('actions')">🚀 Действия</button>
             <button :class="{ active: logType === 'notifications' }" @click="setLogType('notifications')">🔔 Уведомления</button>
             <button :class="{ active: logType === 'errors' }" @click="setLogType('errors')">❌ Ошибки</button>
@@ -29,13 +29,14 @@
         </div>
 
         <div class="refresh-group">
-          <label class="custom-checkbox live-check">
+          <label class="custom-checkbox">
             <input type="checkbox" v-model="autoRefresh" />
             <span class="checkmark"></span>
             <span class="live-label">LIVE</span>
           </label>
-          <button @click="fetchLogs" class="btn-refresh glass-card" :disabled="loading" :title="loading ? 'Загрузка...' : 'Обновить'">
-            <span :class="{ 'spinning': loading }">🔄</span>
+          <button @click="fetchLogs" class="btn btn-outline btn-sm" :disabled="loading">
+            <span v-if="loading" class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></span>
+            <span v-else>🔄 Обновить</span>
           </button>
         </div>
       </div>
@@ -43,6 +44,9 @@
 
     <!-- ТАБЛИЦА ДЕЙСТВИЙ -->
     <div v-if="logType === 'actions'" class="table-container">
+      <div class="table-meta text-muted mb-2">
+        Показано {{ paginatedLogs.length }} из {{ filteredLogs.length }} записей (страница {{ currentPage }} из {{ totalPages }})
+      </div>
       <div class="admin-table-wrapper glass-card">
         <table class="admin-table">
           <thead>
@@ -60,11 +64,11 @@
               <td>
                 <div class="user-info">
                   <span class="user-name">{{ log.user?.name || 'Система' }}</span>
-                  <small class="user-id">ID: {{ log.user?.id || '---' }}</small>
+                  <small class="text-muted text-xs">ID: {{ log.user?.id || '---' }}</small>
                 </div>
               </td>
               <td>
-                <span class="method-badge" :class="getMethodClass(log.action)">{{ log.action }}</span>
+                <span class="badge" :class="getMethodClass(log.action)">{{ log.action }}</span>
               </td>
               <td class="cell-msg">{{ log.message }}</td>
               <td><code>{{ log.ip }}</code></td>
@@ -76,6 +80,9 @@
 
     <!-- ТАБЛИЦА УВЕДОМЛЕНИЙ -->
     <div v-if="logType === 'notifications'" class="table-container">
+      <div class="table-meta text-muted mb-2">
+        Показано {{ paginatedLogs.length }} из {{ filteredLogs.length }} записей (страница {{ currentPage }} из {{ totalPages }})
+      </div>
       <div class="admin-table-wrapper glass-card">
         <table class="admin-table">
           <thead>
@@ -91,11 +98,11 @@
               <td class="col-datetime">{{ log.timestamp || '—' }}</td>
               <td><code class="id-code">{{ log.userId || 'Все' }}</code></td>
               <td>
-                <span class="type-badge" :class="log.type">{{ log.type }}</span>
+                <span class="badge" :class="log.type">{{ log.type }}</span>
               </td>
               <td class="cell-msg">
                 <strong>{{ log.title }}</strong>
-                <p class="msg-sub">{{ log.message }}</p>
+                <p class="msg-sub text-muted text-xs">{{ log.message }}</p>
               </td>
             </tr>
           </tbody>
@@ -105,6 +112,9 @@
 
     <!-- ТАБЛИЦА ОШИБОК -->
     <div v-if="logType === 'errors'" class="table-container">
+      <div class="table-meta text-muted mb-2">
+        Показано {{ paginatedLogs.length }} из {{ filteredLogs.length }} записей (страница {{ currentPage }} из {{ totalPages }})
+      </div>
       <div class="admin-table-wrapper glass-card">
         <table class="admin-table">
           <thead>
@@ -121,10 +131,10 @@
               <td class="error-msg"><b>{{ log.message }}</b></td>
               <td>
                  <code class="url-text">{{ log.url }}</code>
-                 <div class="user-id-small">User: {{ log.user }}</div>
+                 <div class="text-muted text-xs">User: {{ log.user }}</div>
               </td>
               <td class="text-right">
-                <button @click="openErrorDetail(log)" class="btn-detail glass-card">🔍 Анализ</button>
+                <button @click="openErrorDetail(log)" class="btn btn-outline btn-sm">🔍 Анализ</button>
               </td>
             </tr>
           </tbody>
@@ -133,14 +143,34 @@
     </div>
 
     <!-- ПАГИНАЦИЯ -->
-    <div v-if="totalPages > 1" class="pagination-wrapper">
-      <button @click="currentPage--" :disabled="currentPage === 1" class="p-btn glass-card">←</button>
-      <div class="p-numbers">
-        <button v-for="p in totalPages" :key="p" @click="currentPage = p" class="glass-card" :class="{ active: currentPage === p }">
-          {{ p }}
+    <div v-if="totalPages > 1" class="pagination-wrapper mt-3">
+      <div class="pagination">
+        <button @click="currentPage = 1" :disabled="currentPage === 1" title="Первая страница">
+          ««
+        </button>
+        <button @click="currentPage--" :disabled="currentPage === 1" title="Предыдущая">
+          «
+        </button>
+        <div class="pagination-pages">
+          <button
+            v-for="p in visiblePages"
+            :key="p"
+            @click="currentPage = p"
+            :class="{ active: currentPage === p }"
+          >
+            {{ p }}
+          </button>
+        </div>
+        <button @click="currentPage++" :disabled="currentPage === totalPages" title="Следующая">
+          »
+        </button>
+        <button @click="currentPage = totalPages" :disabled="currentPage === totalPages" title="Последняя страница">
+          »»
         </button>
       </div>
-      <button @click="currentPage++" :disabled="currentPage === totalPages" class="p-btn glass-card">→</button>
+      <div class="pagination-info text-muted text-sm mt-2">
+        Всего страниц: {{ totalPages }} | Записей на странице: {{ itemsPerPage }}
+      </div>
     </div>
 
     <!-- МОДАЛКА ДЕТАЛЕЙ ОШИБКИ -->
@@ -148,7 +178,7 @@
       <div class="modal-content log-modal glass-card" @click.stop>
         <div class="modal-header">
           <h3>🚨 Отчет об ошибке сервера</h3>
-          <button @click="selectedError = null" class="close-btn">&times;</button>
+          <button @click="selectedError = null" class="modal-close">&times;</button>
         </div>
         <div class="modal-body">
             <div class="tech-info">
@@ -179,7 +209,7 @@ const selectedError = ref(null);
 const loading = ref(false);
 const searchQuery = ref('');
 const currentPage = ref(1);
-const itemsPerPage = 25;
+const itemsPerPage = 50;
 const autoRefresh = ref(false);
 let refreshInterval = null;
 
@@ -222,6 +252,24 @@ const paginatedLogs = computed(() => {
     return filteredLogs.value.slice(start, start + itemsPerPage);
 });
 
+// Вычисляет список видимых страниц (текущая ±2, с ограничениями)
+const visiblePages = computed(() => {
+  const total = totalPages.value;
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const current = currentPage.value;
+  let start = Math.max(1, current - 2);
+  let end = Math.min(total, current + 2);
+  if (current <= 3) end = 5;
+  if (current >= total - 2) start = total - 4;
+  const pages = [];
+  if (start > 1) pages.push(1, '...');
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < total) pages.push('...', total);
+  return pages;
+});
+
 watch(searchQuery, () => currentPage.value = 1);
 watch(autoRefresh, (newVal) => {
     if (newVal) refreshInterval = setInterval(fetchLogs, 10000);
@@ -245,114 +293,278 @@ onUnmounted(() => clearInterval(refreshInterval));
 
 <style scoped>
 /* ==========================================================================
-   АДМИНКА: ЛОГИ (GLASSMORPHISM & DARK MODE) – с датой
+   УНИКАЛЬНЫЕ СТИЛИ СИСТЕМНОГО ЖУРНАЛА (глобальные классы уже применены)
    ========================================================================== */
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-.admin-logs-page { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-logs-page { color: #f8fafc; }
+.admin-logs-page {
+  padding: 40px 24px;
+}
 
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
 .header-left h1 {
-  font-size: 2.2rem; font-weight: 900; margin: 0;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; font-weight: 500; }
-
-.stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.9rem; }
-
-.glass-card {
-  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px); transition: all 0.3s ease;
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
 }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
 
-.admin-card { padding: 25px; margin-bottom: 30px; }
-.filter-grid { display: grid; grid-template-columns: 1.5fr 2fr 1fr; gap: 25px; align-items: flex-end; }
-
-.form-input {
-  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s;
+.stats-badge {
+  padding: 10px 20px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
 }
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
-.form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; }
 
-.tab-switcher { background: rgba(0,0,0,0.03); padding: 4px; display: flex; gap: 4px; border-radius: 12px; }
-:global(.dark) .tab-switcher { background: rgba(255,255,255,0.05); }
+.admin-card {
+  padding: 25px;
+  margin-bottom: 30px;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 2fr 1fr;
+  gap: 25px;
+  align-items: flex-end;
+}
+
+/* Переключатель вкладок */
+.tab-switcher {
+  background: rgba(0,0,0,0.03);
+  padding: 4px;
+  display: flex;
+  gap: 4px;
+  border-radius: 12px;
+}
+:global(.dark) .tab-switcher {
+  background: rgba(255,255,255,0.05);
+}
 .tab-switcher button {
-  flex: 1; padding: 10px; border: none; background: transparent; color: var(--text-muted, #64748b);
-  font-weight: 800; font-size: 0.85rem; cursor: pointer; border-radius: 10px; transition: all 0.2s;
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: all 0.2s;
 }
-.tab-switcher button.active { background: var(--primary, #2563eb); color: white; box-shadow: 0 4px 10px rgba(37,99,235,0.2); }
-
-.refresh-group { display: flex; align-items: center; gap: 20px; justify-content: flex-end; }
-.live-check { color: var(--success, #10b981) !important; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.8rem; }
-.btn-refresh {
-  width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-size: 1.2rem; cursor: pointer; background: var(--bg-card, #fff); transition: transform 0.2s;
+.tab-switcher button.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 10px rgba(37,99,235,0.2);
 }
-.btn-refresh:hover { transform: scale(1.1); color: var(--primary, #2563eb); border-color: var(--primary, #2563eb); }
-.spinning { animation: spin 1s linear infinite; display: inline-block; }
 
+/* Группа обновления */
+.refresh-group {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: flex-end;
+}
+
+.live-label {
+  color: var(--success);
+  font-weight: 800;
+}
+
+/* Таблицы */
 .table-container { margin-top: 20px; }
 .admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
-.admin-table th { padding: 16px 20px; text-align: left; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
-:global(.dark) .admin-table th { border-color: #334155; }
-.admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; font-size: 0.9rem; }
-:global(.dark) .admin-table td { border-color: #334155; }
-.log-row:hover td { background: rgba(37, 99, 235, 0.02); }
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+}
+.admin-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+}
+.admin-table td {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+.log-row:hover td {
+  background: rgba(37, 99, 235, 0.02);
+}
 
-.col-datetime { font-family: 'JetBrains Mono', monospace; font-weight: 800; color: var(--primary, #2563eb); width: 130px; white-space: nowrap; }
+.col-datetime {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+  color: var(--primary);
+  width: 130px;
+  white-space: nowrap;
+}
 
-code { background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; color: var(--text-muted, #64748b); }
-:global(.dark) code { background: rgba(255,255,255,0.05); color: #94a3b8; }
+code {
+  background: rgba(0,0,0,0.05);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+:global(.dark) code {
+  background: rgba(255,255,255,0.05);
+  color: #94a3b8;
+}
 
-.method-badge { padding: 4px 10px; border-radius: 6px; font-weight: 900; font-family: monospace; font-size: 0.75rem; text-transform: uppercase; }
-.m-get { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.m-post { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
-.m-update { background: rgba(245, 158, 11, 0.1); color: #d97706; }
-.m-delete { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+/* Бейджи действий (поверх глобального .badge) */
+.badge.m-post { background: var(--primary); }
+.badge.m-update { background: var(--warning); }
+.badge.m-delete { background: var(--danger); }
+.badge.m-get { background: var(--success); }
 
-.type-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
-.type-badge.order { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
-.type-badge.system { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+.badge.order { background: var(--primary); }
+.badge.system { background: var(--success); }
 
-.user-info { display: flex; flex-direction: column; }
-.user-name { font-weight: 800; font-size: 0.9rem; }
-.user-id { font-size: 0.7rem; color: var(--text-muted, #94a3b8); }
+.user-info {
+  display: flex;
+  flex-direction: column;
+}
+.user-name {
+  font-weight: 800;
+  font-size: 0.9rem;
+}
 
-.row-error { background: rgba(239, 68, 68, 0.02); }
-.error-msg { color: var(--danger, #ef4444); font-size: 0.95rem; }
-.url-text { color: var(--text-muted, #64748b); font-size: 0.8rem; }
-.btn-detail { background: rgba(0,0,0,0.03); border: 1px solid var(--border-color, #cbd5e1); padding: 8px 16px; border-radius: 30px; cursor: pointer; font-weight: 700; font-size: 0.8rem; transition: 0.2s; }
-:global(.dark) .btn-detail { background: rgba(255,255,255,0.05); border-color: #475569; color: #f8fafc; }
-.btn-detail:hover { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); }
+.row-error {
+  background: rgba(239, 68, 68, 0.02);
+}
+.error-msg {
+  color: var(--danger);
+  font-size: 0.95rem;
+}
 
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 10000; }
-.log-modal { width: 90%; max-width: 900px; padding: 35px; position: relative; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-.modal-header h3 { font-size: 1.5rem; font-weight: 900; }
-.close-btn { background: none; border: none; font-size: 2.2rem; cursor: pointer; color: var(--text-muted, #94a3b8); }
+/* Модалка */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+.log-modal {
+  width: 90%;
+  max-width: 900px;
+  padding: 35px;
+  position: relative;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+.modal-header h3 {
+  font-size: 1.5rem;
+  font-weight: 900;
+}
 
 .terminal-box {
-    background: #0f172a; color: #38bdf8; padding: 25px; border-radius: 12px;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; overflow-x: auto;
-    margin: 15px 0; line-height: 1.6; border: 1px solid rgba(255,255,255,0.1);
-    box-shadow: inset 0 4px 10px rgba(0,0,0,0.5);
+  background: #0f172a;
+  color: #38bdf8;
+  padding: 25px;
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  margin: 15px 0;
+  line-height: 1.6;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: inset 0 4px 10px rgba(0,0,0,0.5);
 }
-:global(.dark) .terminal-box { background: #020617; }
-.label-tech { font-weight: 800; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted, #64748b); margin-top: 20px; }
+:global(.dark) .terminal-box {
+  background: #020617;
+}
+.label-tech {
+  font-weight: 800;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 20px;
+}
 
-.pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 40px; }
-.p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-weight: 900; cursor: pointer; border: 1px solid var(--border-color, #e2e8f0); color: var(--text-main, #0f172a); }
-:global(.dark) .p-btn { color: #f8fafc; }
-.p-numbers button { width: 44px; height: 44px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.2s; color: var(--text-muted, #64748b); }
-.p-numbers button.active { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
+/* ПАГИНАЦИЯ */
+.pagination-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
 
-@media (max-width: 1024px) { .filter-grid { grid-template-columns: 1fr; gap: 15px; } .refresh-group { justify-content: space-between; } }
-@media (max-width: 600px) { .admin-logs-page { padding: 20px 15px; } .header-row { flex-direction: column; align-items: flex-start; } .p-numbers { display: none; } }
+.pagination-pages {
+  display: flex;
+  gap: 4px;
+}
+.pagination-pages button {
+  min-width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pagination-pages button:hover:not(.active) {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.pagination-pages button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.pagination-pages button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 1024px) {
+  .filter-grid { grid-template-columns: 1fr; gap: 15px; }
+  .refresh-group { justify-content: space-between; }
+}
+@media (max-width: 600px) {
+  .admin-logs-page { padding: 20px 15px; }
+  .header-row { flex-direction: column; align-items: flex-start; }
+  .pagination-pages { gap: 2px; }
+  .pagination-pages button { min-width: 34px; height: 34px; font-size: 0.8rem; }
+}
 </style>

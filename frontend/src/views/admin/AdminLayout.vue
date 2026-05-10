@@ -1,6 +1,6 @@
 <template>
   <div class="admin-layout">
-    <!-- БОКОВАЯ ПАНЕЛЬ (SIDEBAR) -->
+    <!-- БОКОВАЯ ПАНЕЛЬ -->
     <aside class="admin-sidebar glass-card">
       <div class="admin-brand">
         <div class="admin-logo">AD</div>
@@ -71,7 +71,6 @@ import { useRoute } from 'vue-router';
 const route = useRoute();
 const userAvatar = localStorage.getItem('user_avatar') || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png';
 
-// Группировка меню по смыслу (Все 17 таблиц + Логи)
 const groupedMenu = [
   {
     title: '🛍️ Магазин',
@@ -124,30 +123,17 @@ const currentPageName = computed(() => {
 
 <style scoped>
 /* ==========================================================================
-   ADMIN LAYOUT: GLASSMORPHISM & DARK MODE
+   УНИКАЛЬНЫЕ СТИЛИ АДМИН-МАКЕТА (глобальные классы уже применены)
    ========================================================================== */
 
 .admin-layout {
   display: flex;
   height: 100vh;
-  background: var(--bg-body, #f8fafc);
+  background: var(--bg-body);
   overflow: hidden;
 }
 
-/* Стеклянный эффект */
-.glass-card {
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-:global(.dark) .glass-card {
-  background: #1e293b;
-  border-color: #334155;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-}
-
-/* SIDEBAR */
+/* Сайдбар */
 .admin-sidebar {
   width: 260px;
   display: flex;
@@ -168,7 +154,7 @@ const currentPageName = computed(() => {
 .admin-logo {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
+  background: linear-gradient(135deg, var(--primary), var(--accent));
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -178,10 +164,20 @@ const currentPageName = computed(() => {
   box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
 }
 
-.brand-text h2 { font-size: 1.1rem; margin: 0; font-weight: 900; color: var(--text-main, #0f172a); }
-.brand-text span { font-size: 0.65rem; color: var(--text-muted, #64748b); font-weight: 700; text-transform: uppercase; }
+.brand-text h2 {
+  font-size: 1.1rem;
+  margin: 0;
+  font-weight: 900;
+  color: var(--text-main);
+}
+.brand-text span {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+}
 
-/* Навигация с группами */
+/* Навигация */
 .admin-nav-container {
   flex: 1;
   overflow-y: auto;
@@ -195,7 +191,7 @@ const currentPageName = computed(() => {
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted);
   padding: 0 12px 8px;
   font-weight: 800;
 }
@@ -208,20 +204,18 @@ const currentPageName = computed(() => {
   gap: 12px;
   padding: 10px 12px;
   text-decoration: none;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted);
   font-weight: 700;
   border-radius: 10px;
   transition: all 0.2s;
   font-size: 0.9rem;
 }
-
 .nav-link:hover {
-  background: rgba(37, 99, 235, 0.05);
-  color: var(--primary, #2563eb);
+  background: var(--primary-light);
+  color: var(--primary);
 }
-
 .nav-link.router-link-active {
-  background: var(--primary, #2563eb);
+  background: var(--primary);
   color: white;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
@@ -236,12 +230,17 @@ const currentPageName = computed(() => {
   text-decoration: none;
   font-weight: 800;
   font-size: 0.8rem;
-  color: var(--text-main, #0f172a);
+  color: var(--text-main);
   border-radius: 10px;
+  transition: background 0.2s, color 0.2s;
 }
-.exit-link:hover { background: var(--primary, #2563eb); color: white; border-color: var(--primary); }
+.exit-link:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
 
-/* CONTENT AREA */
+/* Основной контент */
 .admin-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
 .admin-top-bar {
@@ -254,18 +253,42 @@ const currentPageName = computed(() => {
   padding: 0 20px;
 }
 
-.breadcrumb { font-weight: 600; color: var(--text-muted, #64748b); font-size: 0.85rem; }
-.current-page { color: var(--primary, #2563eb); font-weight: 800; }
+.breadcrumb {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.current-page {
+  color: var(--primary);
+  font-weight: 800;
+}
 
 .top-right { display: flex; align-items: center; gap: 20px; }
 .server-status {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 0.7rem; font-weight: 800; text-transform: uppercase;
-  color: var(--success, #10b981);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--success);
 }
-.status-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981; animation: pulse 2s infinite; }
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--success);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--success);
+  animation: pulse 2s infinite;
+}
 
-.mini-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary, #2563eb); }
+.mini-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+}
 
 .admin-content-view {
   flex: 1;
@@ -273,17 +296,26 @@ const currentPageName = computed(() => {
   padding: 0 20px 30px;
 }
 
+/* Анимации */
 @keyframes pulse { 
   0% { transform: scale(0.95); opacity: 0.7; } 
   50% { transform: scale(1.1); opacity: 1; } 
   100% { transform: scale(0.95); opacity: 0.7; } 
 }
 
-.fade-admin-enter-active, .fade-admin-leave-active { transition: opacity 0.2s, transform 0.2s; }
-.fade-admin-enter-from { opacity: 0; transform: translateY(10px); }
-.fade-admin-leave-to { opacity: 0; transform: translateY(-10px); }
+.fade-admin-enter-active, .fade-admin-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+.fade-admin-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-admin-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
 
-/* АДАПТИВНОСТЬ */
+/* Адаптивность */
 @media (max-width: 1024px) {
   .admin-sidebar { width: 70px; }
   .brand-text, .nav-name, .group-title, .sidebar-footer, .breadcrumb { display: none; }
