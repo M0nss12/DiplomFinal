@@ -818,6 +818,30 @@ app.get('/api/orders/:userId', async (req, res) => {
     res.json(data || []);
 });
 
+// Подтверждение оплаты (заглушка для модального окна)
+app.post('/api/payment/confirm', async (req, res) => {
+    const { orderId } = req.body;
+    try {
+        const { data: order, error: fetchErr } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', orderId)
+            .maybeSingle();
+        if (fetchErr || !order) return res.status(404).json({ error: 'Заказ не найден' });
+        if (order.payment_status === 'paid') return res.status(400).json({ error: 'Заказ уже оплачен' });
+
+        // Меняем метод и статус
+        await supabase.from('orders').update({
+            payment_method: 'card',
+            payment_status: 'paid'
+        }).eq('id', orderId);
+
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // =====================================================================
 // API: ОТМЕНА ЗАКАЗА ПОЛЬЗОВАТЕЛЕМ
 // =====================================================================

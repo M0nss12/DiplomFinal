@@ -50,7 +50,29 @@
         </div>
 
         <div class="order-delivery-info">
-          <span class="pin-icon">📍</span> <b>Доставка ({{ order.delivery_type === 'courier' ? 'Курьер' : 'ПВЗ' }}):</b> {{ order.delivery_address }}
+          <span class="pin-icon">📍</span> 
+          <b>Доставка ({{ order.delivery_type === 'courier' ? 'Курьер' : 'ПВЗ' }}):</b> {{ order.delivery_address }}
+        </div>
+
+        <!-- Блок для неоплаченных заказов -->
+        <div v-if="order.payment_status === 'unpaid' && order.delivery_status !== 'cancelled'" class="management-box">
+          <div class="payment-row">
+            <span>Способ оплаты: <strong>{{ order.payment_method === 'card' ? 'Картой онлайн' : 'При получении' }}</strong></span>
+            <button 
+              v-if="order.payment_method !== 'card'" 
+              @click="openPaymentModal(order)" 
+              class="btn btn-primary pay-btn"
+            >
+              💳 Оплатить картой онлайн
+            </button>
+            <button 
+              v-else 
+              @click="openPaymentModal(order)" 
+              class="btn btn-primary pay-btn"
+            >
+              💳 Оплатить {{ order.total_price }} ₽
+            </button>
+          </div>
         </div>
 
         <!-- СПИСОК ТОВАРОВ -->
@@ -80,6 +102,33 @@
         </div>
       </div>
     </div>
+
+    <!-- Модальное окно подтверждения оплаты -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showPaymentModal" class="modal-overlay" @click.self="closePaymentModal">
+          <div class="modal-card glass-card">
+            <button class="modal-close" @click="closePaymentModal" aria-label="Закрыть">✕</button>
+            <h2>Оплата заказа №{{ selectedOrder?.id }}</h2>
+            <div class="modal-body">
+              <p>Сумма к оплате: <strong>{{ selectedOrder?.total_price }} ₽</strong></p>
+              <p>После подтверждения средства будут списаны, а заказ перейдёт в статус «Оплачен».</p>
+              <div class="modal-actions">
+                <button 
+                  @click="confirmPayment" 
+                  class="btn btn-primary btn-lg" 
+                  :disabled="paymentLoading"
+                >
+                  <span v-if="paymentLoading" class="spinner" style="width:16px;height:16px;border-width:2px;margin-right:8px;"></span>
+                  Подтвердить оплату
+                </button>
+                <button @click="closePaymentModal" class="btn btn-outline btn-lg">Отмена</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -91,7 +140,11 @@ import { useCartStore } from '@/stores/cartStore';
 const cartStore = useCartStore();
 const orders = ref([]);
 const loading = ref(true);
+const loadingPayment = ref(false);
 const activeTab = ref('all');
+
+const showPaymentModal = ref(false);
+const selectedOrder = ref(null);
 
 const tabs = [
   { id: 'all', label: 'Все заказы' }, 
@@ -112,6 +165,34 @@ const loadOrders = async () => {
     console.error("Ошибка загрузки заказов:", e); 
   } finally { 
     loading.value = false; 
+  }
+};
+
+const openPaymentModal = (order) => {
+  selectedOrder.value = order;
+  showPaymentModal.value = true;
+};
+
+const closePaymentModal = () => {
+  showPaymentModal.value = false;
+  selectedOrder.value = null;
+  loadingPayment.value = false;
+};
+
+const confirmPayment = async () => {
+  if (!selectedOrder.value) return;
+  loadingPayment.value = true;
+  try {
+    await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/payment/confirm`, {
+      orderId: selectedOrder.value.id
+    });
+    // Обновляем локальный заказ
+    selectedOrder.value.payment_status = 'paid';
+    selectedOrder.value.payment_method = 'card';
+    closePaymentModal();
+  } catch (e) {
+    alert('Ошибка оплаты: ' + (e.response?.data?.error || e.message));
+    loadingPayment.value = false;
   }
 };
 
@@ -171,9 +252,57 @@ onMounted(loadOrders);
 </script>
 
 <style scoped>
-/* ==========================================================================
-   УНИКАЛЬНЫЕ СТИЛИ СТРАНИЦЫ ЗАКАЗОВ (глобальные классы применены)
-   ========================================================================== */
+/* ... все предыдущие стили ... */
+
+/* Модальное окно */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-card {
+  position: relative;
+  max-width: 480px;
+  width: 90%;
+  padding: 2rem;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+}
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.modal-body p {
+  margin-bottom: 1rem;
+}
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 1.5rem;
+}
+
+/* Анимация модалки */
+.modal-enter-active, .modal-leave-active {
+  transition: opacity 0.3s, transform 0.3s;
+}
+.modal-enter-from, .modal-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
 
 .orders-page {
   max-width: 1200px;
@@ -333,59 +462,33 @@ onMounted(loadOrders);
 /* Блок управления оплатой */
 .management-box {
   background: rgba(245, 158, 11, 0.05);
-  padding: 20px;
+  padding: 16px 20px;
   border-radius: var(--radius-md);
   margin-bottom: 24px;
   border: 1px solid rgba(245, 158, 11, 0.3);
-  transition: all 0.3s;
 }
 :global(.dark) .management-box {
   background: rgba(245, 158, 11, 0.1);
 }
 
-.info-row {
+.payment-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
-.method-select-group label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--warning);
-  margin-bottom: 6px;
-}
-
-.modern-select {
-  padding: 10px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-card);
+.payment-row strong {
   color: var(--text-main);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-:global(.dark) .modern-select {
-  background: #1e293b;
-  border-color: #475569;
-  color: #f8fafc;
-}
-.modern-select:focus {
-  border-color: var(--primary);
-  outline: none;
+  font-size: 1rem;
 }
 
-/* Кнопка оплаты (поверх глобального .btn-primary) */
 .pay-btn {
-  /* глобальные стили .btn уже дают отступы и размер */
   padding: 12px 24px;
   border-radius: 40px;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  white-space: nowrap;
 }
 
 /* Товары в заказе */
@@ -497,7 +600,7 @@ onMounted(loadOrders);
     flex-direction: column;
     align-items: flex-start;
   }
-  .info-row {
+  .payment-row {
     flex-direction: column;
     align-items: stretch;
   }
