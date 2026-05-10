@@ -57,11 +57,14 @@ const DEFAULT_AVATARS = [
 // --- Почта и шаблоны ---
 const transporter = nodemailer.createTransport({
     host: 'smtp.yandex.ru',
-    port: 465,                      // SSL
-    secure: true,                   // обязательно true для 465 порта
+    port: 587,
+    secure: false,                 // обязательно false для 587
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        user: process.env.EMAIL_USER,   // ваш ящик на Яндексе
+        pass: process.env.EMAIL_PASS    // пароль приложения
+    },
+    tls: {
+        rejectUnauthorized: false    // временно, если сертификат не принимается
     }
 });
 
