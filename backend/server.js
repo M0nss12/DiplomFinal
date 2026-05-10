@@ -5,15 +5,12 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const multer = require('multer');
-const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const https = require('https');
 const querystring = require('querystring');
-const sgMail = require('@sendgrid/mail');
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// 1. Настройка DNS
+// 1. Настройка DNS (IPv4 first)
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 
@@ -56,29 +53,7 @@ const DEFAULT_AVATARS = [
     `https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/3.png`
 ];
 
-// --- Почта и шаблоны ---
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        rejectUnauthorized: false
-    },
-    // Принудительно используем IPv4 (правильный способ)
-    dns: {
-        lookup: (hostname, options, callback) => {
-            dns.lookup(hostname, { family: 4, ...options }, callback);
-        }
-    },
-    connectionTimeout: 10000,   // 10 секунд
-    greetingTimeout: 10000,
-    socketTimeout: 15000
-});
-
+// --- Шаблоны писем ---
 const getEmailTemplate = (templateName, variables = {}) => {
     const templatePath = path.join(__dirname, 'email_templates', templateName);
     let html = '';
@@ -111,26 +86,43 @@ const writeLog = (filePath, data) => {
     fs.appendFile(filePath, entry, (err) => { if (err) console.error('Ошибка записи лога:', err); });
 };
 
+// --- Уведомления и email (Unisender Go) ---
 const notifyAndEmail = async ({ userId, type, title, message, email, templateName, templateVars = {} }) => {
     writeLog(NOTIFICATIONS_LOG, { userId, type, title, message, emailSentTo: email });
-    try {
-        if (userId) await supabase.from('notifications').insert([{ user_id: userId, type, title, message }]);
-    } catch (e) { console.error('Ошибка записи уведомления в БД:', e.message); }
 
+    // 1. Сохраняем уведомление на сайте (колокольчик)
+    try {
+        if (userId) {
+            await supabase.from('notifications').insert([{ user_id: userId, type, title, message }]);
+        }
+    } catch (e) {
+        console.error('Ошибка записи уведомления в БД:', e.message);
+    }
+
+    // 2. Отправляем письмо через Unisender Go, если указан email
     if (email) {
         try {
             const html = getEmailTemplate(
                 templateName || 'notification_general.html',
                 { title, message, ...templateVars }
             );
-            await sgMail.send({
-                to: email,
-                from: process.env.EMAIL_USER,   // ваш подтверждённый email в SendGrid
+
+            await axios.post('https://go.unisender.ru/api/v1/email/send', {
+                recipients: [{ email: email }],
                 subject: title,
-                html: html
+                body: html,
+                from_email: process.env.EMAIL_USER,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${process.env.UNISENDER_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 10000
             });
+
+            console.log(`✅ Письмо отправлено через Unisender на ${email}`);
         } catch (e) {
-            console.error("❌ ОШИБКА ОТПРАВКИ через SendGrid:", e.response?.body || e.message);
+            console.error('❌ Ошибка отправки через Unisender:', e.response?.data || e.message);
         }
     }
 };
@@ -289,7 +281,7 @@ app.get('/api/global-search', async (req, res) => {
 });
 
 // =====================================================================
-// API: КАЛЬКУЛЯТОР ДОСТАВКИ
+// API: КАЛЬКУЛЯТОР ДОСТАВКИ (публичный)
 // =====================================================================
 app.post('/api/shipping-calculator', async (req, res) => {
     const { warehouse_id, weight_kg, items_cost } = req.body;
@@ -297,7 +289,7 @@ app.post('/api/shipping-calculator', async (req, res) => {
         return res.status(400).json({ error: 'warehouse_id и weight_kg обязательны' });
     }
     try {
-        const sourceWarehouseId = 1; // центральный склад, обязательно должен существовать
+        const sourceWarehouseId = 1; // центральный склад (обязательно должен существовать)
 
         const { data: sourceWh } = await supabase
             .from('warehouses')
@@ -317,7 +309,6 @@ app.post('/api/shipping-calculator', async (req, res) => {
             return res.status(404).json({ error: 'Склад не найден' });
         }
 
-        // Защита от null
         const lat1 = sourceWh.cities?.lat;
         const lon1 = sourceWh.cities?.lon;
         const lat2 = targetWarehouse.cities?.lat;
@@ -372,7 +363,8 @@ app.post('/api/shipping-calculator', async (req, res) => {
 app.get('/api/wishlist/:userId', async (req, res) => {
     try {
         const { data, error } = await supabase.from('wishlists').select('*, products(*)').eq('user_id', req.params.userId);
-        if (error) throw error; res.json(data || []);
+        if (error) throw error;
+        res.json(data || []);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -380,14 +372,16 @@ app.post('/api/wishlist', async (req, res) => {
     try {
         const { user_id, product_id } = req.body;
         const { data, error } = await supabase.from('wishlists').insert([{ user_id, product_id }]).select().single();
-        if (error) throw error; res.json(data);
+        if (error) throw error;
+        res.json(data);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.delete('/api/wishlist/:userId/:productId', async (req, res) => {
     try {
         const { error } = await supabase.from('wishlists').delete().eq('user_id', req.params.userId).eq('product_id', req.params.productId);
-        if (error) throw error; res.json({ success: true });
+        if (error) throw error;
+        res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -399,10 +393,10 @@ app.post('/api/reviews', async (req, res) => {
 });
 
 app.post('/api/admin/reviews', verifyAdmin, async (req, res) => {
-  try {
-    const { data } = await supabase.from('reviews').insert([req.body]).select();
-    res.json(data[0]);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        const { data } = await supabase.from('reviews').insert([req.body]).select();
+        res.json(data[0]);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/reviews/:productId', async (req, res) => {
@@ -779,25 +773,25 @@ app.post('/api/orders', async (req, res) => {
             return res.status(500).json({ error: 'Не удалось сохранить позиции заказа' });
         }
 
-// Фоновое уведомление (не ждём)
-if (order && order[0]) {
-    const newOrder = order[0];
-    console.log('🔔 Планируем отправку уведомления о заказе на почту:', customer_email);
-    notifyAndEmail({
-        userId: req.headers['x-user-id'] || null,
-        type: 'order',
-        email: customer_email,
-        title: `Заказ №${newOrder.id} оформлен`,
-        message: `Ваш заказ на сумму ${finalTotal} ₽ принят в обработку.`,
-        templateName: 'order_created.html',
-        templateVars: {
-            order_id: newOrder.id,
-            total: finalTotal,
-            name: customer_name,
-            address: newOrder.delivery_address
+        // Фоновое уведомление (не ждём)
+        if (order && order[0]) {
+            const newOrder = order[0];
+            console.log('🔔 Планируем отправку уведомления о заказе на почту:', customer_email);
+            notifyAndEmail({
+                userId: req.headers['x-user-id'] || null,
+                type: 'order',
+                email: customer_email,
+                title: `Заказ №${newOrder.id} оформлен`,
+                message: `Ваш заказ на сумму ${finalTotal} ₽ принят в обработку.`,
+                templateName: 'order_created.html',
+                templateVars: {
+                    order_id: newOrder.id,
+                    total: finalTotal,
+                    name: customer_name,
+                    address: newOrder.delivery_address
+                }
+            }).catch(err => console.error('❌ Ошибка отправки уведомления:', err));
         }
-    }).catch(err => console.error('❌ Ошибка отправки уведомления:', err));
-}
 
         res.json({ orderId: order[0].id, total: finalTotal, distance_based_shipping: totalShipping });
     } catch (err) {
@@ -806,6 +800,30 @@ if (order && order[0]) {
     }
 });
 
+app.get('/api/orders/:userId', async (req, res) => {
+    const { data } = await supabase
+        .from('orders')
+        .select(`*, order_items (id, product_id, quantity, unit_price, warehouse_id, products (*))`)
+        .eq('user_id', req.params.userId)
+        .order('created_at', { ascending: false });
+    res.json(data || []);
+});
+
+app.post('/api/calculate-shipping', verifyAdmin, async (req, res) => {
+    const { warehouse_id, items } = req.body;
+    try {
+        const { data, error } = await supabase.rpc('calculate_order_shipping', {
+            target_warehouse_id: warehouse_id,
+            items_json: items
+        });
+        if (error) throw error;
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Тестовая оплата больше не нужна, но маршрут оставлен для обратной совместимости
 app.post('/api/payment/tinkoff-init', async (req, res) => {
     const { orderId } = req.body;
     const mockPaymentUrl = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/test-webhook?orderId=${orderId}&status=paid`;
@@ -819,9 +837,6 @@ app.get('/api/payment/test-webhook', async (req, res) => {
         res.redirect(`/order-success?orderId=${orderId}`);
     }
 });
-
-
-
 
 // =====================================================================
 // API: УПРАВЛЕНИЕ ФАЙЛАМИ
@@ -847,17 +862,24 @@ app.delete('/api/storage/:bucket/:filename', verifyAdmin, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Форма обратной связи (использует Unisender API для отправки админу)
 app.post('/api/feedback/send', async (req, res) => {
     const { name, contact, message } = req.body;
     if (!name || !contact || !message) {
         return res.status(400).json({ error: 'Все поля обязательны' });
     }
     try {
-        await transporter.sendMail({
-            from: `"ApexDrive Форма" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER,
+        await axios.post('https://go.unisender.ru/api/v1/email/send', {
+            recipients: [{ email: process.env.EMAIL_USER }],
             subject: `Новое сообщение от ${name}`,
-            html: `<p><b>Имя:</b> ${name}</p><p><b>Контакты:</b> ${contact}</p><p><b>Сообщение:</b></p><p>${message}</p>`
+            body: `<p><b>Имя:</b> ${name}</p><p><b>Контакты:</b> ${contact}</p><p><b>Сообщение:</b></p><p>${message}</p>`,
+            from_email: process.env.EMAIL_USER,
+        }, {
+            headers: {
+                'Authorization': `Bearer ${process.env.UNISENDER_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 10000
         });
         res.json({ success: true });
     } catch (e) {
