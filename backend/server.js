@@ -5,7 +5,6 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const multer = require('multer');
-const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const https = require('https');
@@ -54,27 +53,6 @@ const DEFAULT_AVATARS = [
     `https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/3.png`
 ];
 
-// --- Почтовый транспортёр (SMTP Unisender Go) ---
-const transporter = nodemailer.createTransport({
-    host: 'smtp.go2.unisender.ru',
-    port: 587,
-    secure: false,
-    auth: {
-        user: process.env.UNISENDER_SMTP_USER || '8191722',
-        pass: process.env.UNISENDER_SMTP_PASS || '6tikf7ycc5trrgnzdmr4okmrme97s7xbbdtq1zxa'
-    },
-    tls: {
-        rejectUnauthorized: false
-    },
-    dns: {
-        lookup: (hostname, options, callback) => {
-            dns.lookup(hostname, { family: 4, ...options }, callback);
-        }
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000
-});
 
 // --- Шаблоны писем ---
 const getEmailTemplate = (templateName, variables = {}) => {
@@ -123,14 +101,26 @@ const notifyAndEmail = async ({ userId, type, title, message, email, templateNam
                 templateName || 'notification_general.html',
                 { title, message, ...templateVars }
             );
-            await transporter.sendMail({
-                from: `"ApexDrive" <${process.env.EMAIL_USER}>`,
-                to: email,
-                subject: title,
-                html: html
+
+            await axios.post('https://goapi.unisender.ru/ru/transactional/api/v1/email/send.json', {
+                message: {
+                    recipients: [{ email: email }],
+                    subject: title,
+                    body: { html: html },
+                    from_email: process.env.EMAIL_USER
+                }
+            }, {
+                headers: {
+                    'X-API-KEY': process.env.UNISENDER_API_KEY,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                timeout: 10000
             });
-        } catch (e) { 
-            console.error("❌ ОШИБКА ПОЧТЫ (SMTP):", e.message); 
+
+            console.log(`✅ Письмо отправлено через Unisender на ${email}`);
+        } catch (e) {
+            console.error('❌ Ошибка отправки через Unisender:', e.response?.data || e.message);
         }
     }
 };
@@ -873,11 +863,22 @@ app.post('/api/feedback/send', async (req, res) => {
         return res.status(400).json({ error: 'Все поля обязательны' });
     }
     try {
-        await transporter.sendMail({
-            from: `"ApexDrive Форма" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER,
-            subject: `Новое сообщение от ${name}`,
-            html: `<p><b>Имя:</b> ${name}</p><p><b>Контакты:</b> ${contact}</p><p><b>Сообщение:</b></p><p>${message}</p>`
+        await axios.post('https://goapi.unisender.ru/ru/transactional/api/v1/email/send.json', {
+            message: {
+                recipients: [{ email: process.env.EMAIL_USER }],
+                subject: `Новое сообщение от ${name}`,
+                body: {
+                    html: `<p><b>Имя:</b> ${name}</p><p><b>Контакты:</b> ${contact}</p><p><b>Сообщение:</b></p><p>${message}</p>`
+                },
+                from_email: process.env.EMAIL_USER
+            }
+        }, {
+            headers: {
+                'X-API-KEY': process.env.UNISENDER_API_KEY,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            timeout: 10000
         });
         res.json({ success: true });
     } catch (e) {
