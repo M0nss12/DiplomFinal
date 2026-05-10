@@ -34,7 +34,13 @@
               </div>
               <div class="input-group">
                 <label>VIN-номер</label>
-                <input v-model="newCar.vin" placeholder="17 символов" maxlength="17" class="form-input vin-field" />
+                <input 
+                  v-model="newCar.vin" 
+                  @input="formatVin($event, 'new')" 
+                  placeholder="17 символов" 
+                  maxlength="17" 
+                  class="form-input vin-field" 
+                />
               </div>
               <div class="input-group">
                 <label>Объем двигателя (л)</label>
@@ -48,6 +54,7 @@
                 <span>Сделать основным</span>
               </label>
               <button type="submit" class="btn-submit" :disabled="loadingAdd">
+                <span v-if="loadingAdd" class="spinner-inline"></span>
                 {{ loadingAdd ? 'Сохранение...' : 'Добавить авто' }}
               </button>
             </div>
@@ -62,13 +69,15 @@
       </div>
 
       <div v-else-if="vehicles.length > 0" class="vehicles-grid">
-        <div v-for="car in vehicles" :key="car.id" class="car-card glass-card" :class="{ 'primary-border': car.is_primary }">
-          <div v-if="car.is_primary" class="primary-badge">Основной</div>
-          
-          <div class="car-info">
-            <div class="car-main-title">
-              <h2>{{ car.brand }} {{ car.model }}</h2>
-              <span class="car-year">{{ car.year }} г.в.</span>
+        <transition-group name="car-list">
+          <div v-for="car in vehicles" :key="car.id" class="car-card glass-card" :class="{ 'primary-border': car.is_primary }">
+            <div class="car-identity">
+              <div class="car-icon">🚙</div>
+              <div class="car-main-title">
+                <h2>{{ car.brand }} {{ car.model }}</h2>
+                <span class="car-year">{{ car.year || '—' }} г.в.</span>
+                <span v-if="car.is_primary" class="primary-star">⭐</span>
+              </div>
             </div>
             
             <div class="car-details">
@@ -81,13 +90,13 @@
                 <span class="val">{{ car.engine_volume ? car.engine_volume + ' л.' : '---' }}</span>
               </div>
             </div>
-          </div>
 
-          <div class="car-actions">
-            <button v-if="!car.is_primary" @click="setPrimary(car.id)" class="btn-set-primary">⭐ Сделать основным</button>
-            <button @click="deleteVehicle(car.id)" class="btn-delete">🗑️ Удалить</button>
+            <div class="car-actions">
+              <button v-if="!car.is_primary" @click="setPrimary(car.id)" class="btn-set-primary">⭐ Сделать основным</button>
+              <button @click="deleteVehicle(car.id)" class="btn-delete">🗑️ Удалить</button>
+            </div>
           </div>
-        </div>
+        </transition-group>
       </div>
 
       <div v-else class="empty-state glass-card">
@@ -115,11 +124,24 @@ const newCar = reactive({
   brand: '', model: '', year: null, vin: '', engine_volume: null, is_primary: false
 });
 
+// Вспомогательная функция для форматирования VIN (только A-Z, 0-9, без I,O,Q)
+const formatVin = (event, source) => {
+  const input = event.target;
+  let val = input.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '');
+  if (val.length > 17) val = val.substring(0, 17);
+  input.value = val;
+  if (source === 'new') newCar.vin = val;
+};
+
 const loadVehicles = async () => {
   if (!userId) return;
   try {
-    const res = await axios.get(`/api/admin/user_vehicles`); 
-    // Фильтруем на фронте (в идеале сделать эндпоинт /api/user_vehicles/:userId)
+    // Используем защищённый пользовательский эндпоинт, если он добавлен в server.js
+    // const res = await axios.get(`${API_URL}/api/user/vehicles`);
+    // Пока оставляем админский вариант с осторожностью
+    const res = await axios.get(`${API_URL}/api/admin/user_vehicles`, {
+      headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' }
+    });
     vehicles.value = res.data.filter(v => v.user_id === userId).sort((a, b) => b.is_primary - a.is_primary);
   } catch (e) {
     console.error("Ошибка загрузки гаража");
@@ -129,15 +151,25 @@ const loadVehicles = async () => {
 };
 
 const addVehicle = async () => {
+  if (!newCar.brand.trim() || !newCar.model.trim()) {
+    alert('Марка и модель обязательны');
+    return;
+  }
   loadingAdd.value = true;
   try {
-    const res = await axios.post(`/api/admin/user_vehicles`, { ...newCar, user_id: userId }, {
+    const res = await axios.post(`${API_URL}/api/admin/user_vehicles`, {
+      ...newCar,
+      user_id: userId
+    }, {
       headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' }
     });
     vehicles.value.unshift(res.data);
     Object.assign(newCar, { brand: '', model: '', year: null, vin: '', engine_volume: null, is_primary: false });
     showAddForm.value = false;
-    if (res.data.is_primary) await loadVehicles(); // Перезагрузка для обновления флагов
+    // Если новое авто основное, сбрасываем флаги у других
+    if (res.data.is_primary) {
+      vehicles.value.forEach(v => { if (v.id !== res.data.id) v.is_primary = false; });
+    }
   } catch (e) {
     alert("Ошибка при добавлении");
   } finally {
@@ -147,17 +179,17 @@ const addVehicle = async () => {
 
 const setPrimary = async (id) => {
   try {
-    await axios.put(`/api/admin/user_vehicles/${id}`, { is_primary: true }, {
+    await axios.put(`${API_URL}/api/admin/user_vehicles/${id}`, { is_primary: true }, {
       headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' }
     });
-    await loadVehicles();
+    vehicles.value.forEach(v => v.is_primary = v.id === id);
   } catch (e) { console.error(e); }
 };
 
 const deleteVehicle = async (id) => {
   if (!confirm("Удалить этот автомобиль из гаража?")) return;
   try {
-    await axios.delete(`/api/admin/user_vehicles/${id}`, {
+    await axios.delete(`${API_URL}/api/admin/user_vehicles/${id}`, {
       headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' }
     });
     vehicles.value = vehicles.value.filter(v => v.id !== id);
@@ -168,7 +200,8 @@ onMounted(loadVehicles);
 </script>
 
 <style scoped>
-.garage-page { padding: 40px 0 80px; animation: fadeIn 0.5s ease-out; }
+.garage-page { padding: 40px 0 80px; animation: fadeIn 0.5s ease-out; color: var(--text-main); }
+:global(.dark) .garage-page { color: #f8fafc; }
 .garage-container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
 
 .garage-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
@@ -177,6 +210,7 @@ onMounted(loadVehicles);
 .back-link { color: var(--primary); text-decoration: none; font-weight: 700; }
 
 .section-divider { border: none; height: 1px; background: var(--border-color); margin: 20px 0 40px; }
+:global(.dark) .section-divider { background: #334155; }
 
 /* СТЕКЛО */
 .glass-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: 0 4px 6px rgba(0,0,0,0.05); backdrop-filter: blur(8px); }
@@ -195,36 +229,50 @@ onMounted(loadVehicles);
 .vin-field { font-family: monospace; text-transform: uppercase; }
 
 .form-actions { display: flex; justify-content: space-between; align-items: center; }
-.btn-submit { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 40px; font-weight: 800; cursor: pointer; transition: 0.3s; }
-.btn-submit:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+.btn-submit { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 40px; font-weight: 800; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 8px; }
+.btn-submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
 
 /* КАРТОЧКИ МАШИН */
 .vehicles-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-.car-card { padding: 25px; display: flex; justify-content: space-between; align-items: center; position: relative; }
+.car-card { padding: 25px; position: relative; transition: transform 0.2s, box-shadow 0.2s; }
+.car-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
 .car-card.primary-border { border-left: 5px solid var(--success); }
-.primary-badge { position: absolute; top: 10px; right: 20px; background: var(--success); color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; }
-
-.car-main-title h2 { margin: 0; font-size: 1.5rem; color: var(--text-main); }
+.car-identity { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+.car-icon { font-size: 2rem; }
+.car-main-title h2 { margin: 0; font-size: 1.5rem; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
 :global(.dark) .car-main-title h2 { color: #fff; }
 .car-year { color: var(--text-muted); font-weight: 600; }
+.primary-star { font-size: 1.2rem; }
 
-.car-details { display: flex; gap: 30px; margin-top: 15px; }
+.car-details { display: flex; gap: 30px; margin-top: 10px; }
 .detail-item { display: flex; flex-direction: column; }
 .detail-item .label { font-size: 0.7rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; }
 .detail-item .val { font-weight: 700; color: var(--text-main); }
 :global(.dark) .detail-item .val { color: #e2e8f0; }
 
-.car-actions { display: flex; gap: 15px; }
-.btn-set-primary { background: transparent; border: 1px solid var(--primary); color: var(--primary); padding: 8px 16px; border-radius: 20px; font-weight: 700; cursor: pointer; }
-.btn-delete { color: var(--danger); background: transparent; border: none; font-weight: 700; cursor: pointer; }
+.car-actions { display: flex; gap: 15px; margin-top: 20px; }
+.btn-set-primary { background: transparent; border: 1px solid var(--primary); color: var(--primary); padding: 8px 16px; border-radius: 20px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+.btn-set-primary:hover { background: var(--primary); color: white; }
+.btn-delete { color: var(--danger); background: transparent; border: none; font-weight: 700; cursor: pointer; padding: 8px 16px; border-radius: 20px; transition: 0.2s; }
+.btn-delete:hover { background: rgba(239,68,68,0.1); }
 
 /* ПУСТОЕ СОСТОЯНИЕ */
 .empty-state { text-align: center; padding: 60px; color: var(--text-muted); }
 .empty-icon { font-size: 4rem; margin-bottom: 20px; opacity: 0.5; }
 
-/* АДАПТИВНОСТЬ */
+/* АНИМАЦИИ */
+.slide-enter-active, .slide-leave-active { transition: max-height 0.4s ease, opacity 0.4s ease; max-height: 500px; }
+.slide-enter-from, .slide-leave-to { max-height: 0; opacity: 0; overflow: hidden; }
+.car-list-enter-active, .car-list-leave-active { transition: all 0.3s ease; }
+.car-list-enter-from, .car-list-leave-to { opacity: 0; transform: translateX(-20px); }
+.spinner-inline { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-state { text-align: center; padding: 50px; }
+.loader { width: 40px; height: 40px; border: 4px solid var(--border-color); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 15px; }
+
 @media (max-width: 768px) {
-    .car-card { flex-direction: column; align-items: flex-start; gap: 20px; }
-    .car-actions { width: 100%; justify-content: space-between; }
+  .car-card { padding: 20px; }
+  .car-details { flex-direction: column; gap: 10px; }
+  .car-actions { flex-direction: column; gap: 10px; }
 }
 </style>

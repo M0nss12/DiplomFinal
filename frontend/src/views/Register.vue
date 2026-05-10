@@ -23,10 +23,26 @@
           </div>
         </div>
 
-        <!-- БЛОК: ГОРОД -->
-        <div class="input-wrapper full-width">
-          <label>📍 Ваш населенный пункт *</label>
-          <input v-model="form.city" placeholder="Напр. Москва" required class="form-input" />
+        <!-- БЛОК: ГОРОД (автодополнение) -->
+        <div class="input-wrapper full-width city-autocomplete">
+          <label>📍 Ваш населённый пункт *</label>
+          <input 
+            :value="cityInput"
+            @input="onCityInput"
+            @focus="showCitySuggestions = true"
+            @blur="onCityBlur"
+            placeholder="Начните вводить название..."
+            required
+            class="form-input"
+            autocomplete="off"
+          />
+          <transition name="dropdown-fade">
+            <ul v-if="showCitySuggestions && filteredCities.length" class="city-suggestions glass-card">
+              <li v-for="c in filteredCities" :key="c.id" @mousedown.prevent="selectCity(c)">
+                {{ c.name }}
+              </li>
+            </ul>
+          </transition>
           <small>Это поможет нам точнее рассчитывать сроки доставки</small>
         </div>
 
@@ -34,7 +50,7 @@
         <div class="input-grid-2">
           <div class="input-wrapper">
             <label>📞 Номер телефона</label>
-            <input v-model="form.phone" type="tel" placeholder="+7 999 000-00-00" class="form-input" />
+            <input :value="form.phone" type="tel" placeholder="+7 (999) 000-00-00" class="form-input" @input="onPhoneInput" />
           </div>
           <div class="input-wrapper">
             <label>✉️ Электронная почта</label>
@@ -65,7 +81,7 @@
           <div id="yandex-captcha"></div>
         </div>
 
-        <button type="submit" :disabled="loading" class="btn-register">
+        <button type="submit" :disabled="loading || googleLoading" class="btn-register">
           <span v-if="loading" class="spinner"></span>
           {{ loading ? 'Создание профиля...' : 'ЗАРЕГИСТРИРОВАТЬСЯ' }}
         </button>
@@ -83,9 +99,14 @@
       <div class="separator"><span>или</span></div>
 
       <!-- GOOGLE РЕГИСТРАЦИЯ -->
-      <button @click="socialRegister('google')" class="social-btn glass-btn">
-        <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" alt="Google">
-        <span>Быстрая регистрация через Google</span>
+      <button @click="socialRegister('google')" :disabled="loading || googleLoading" class="social-btn glass-btn">
+        <template v-if="googleLoading">
+          <span class="spinner"></span>
+        </template>
+        <template v-else>
+          <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" alt="Google">
+          <span>Быстрая регистрация через Google</span>
+        </template>
       </button>
 
       <p class="auth-footer">
@@ -96,7 +117,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue';
+import { ref, onMounted, reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { supabase } from '@/supabase';
@@ -120,42 +141,92 @@ const form = reactive({
   captchaToken: ''
 });
 
+// Google OAuth
+const googleLoading = ref(false);
+
+// Города автодополнение
+const cities = ref([]);
+const cityInput = ref('');
+const showCitySuggestions = ref(false);
+const filteredCities = computed(() => {
+  const q = cityInput.value.trim().toLowerCase();
+  if (!q) return [];
+  return cities.value.filter(c => c.name.toLowerCase().includes(q));
+});
+
+const onCityInput = (e) => {
+  cityInput.value = e.target.value;
+  showCitySuggestions.value = true;
+};
+const selectCity = (city) => {
+  cityInput.value = city.name;
+  form.city = city.name;
+  showCitySuggestions.value = false;
+};
+const onCityBlur = () => {
+  setTimeout(() => {
+    if (!cities.value.some(c => c.name === cityInput.value)) {
+      cityInput.value = form.city || '';
+    }
+    showCitySuggestions.value = false;
+  }, 150);
+};
+
+// Маска телефона
+const onPhoneInput = (e) => {
+  let value = e.target.value.replace(/[^\d]/g, '');
+  if (value.startsWith('7') || value.startsWith('8')) value = value.substring(1);
+  let formatted = '+7';
+  if (value.length > 0) formatted += ' (' + value.substring(0, 3);
+  if (value.length >= 4) formatted += ') ' + value.substring(3, 6);
+  if (value.length >= 7) formatted += '-' + value.substring(6, 8);
+  if (value.length >= 9) formatted += '-' + value.substring(8, 10);
+  form.phone = formatted;
+  e.target.value = formatted;
+};
+
+// Загрузка городов
+const loadCities = async () => {
+  try {
+    const res = await axios.get('/api/cities');
+    cities.value = res.data || [];
+  } catch (e) { /* ignore */ }
+};
+
+// Капча
 const initCaptcha = () => {
   if (window.smartCaptcha) {
     window.smartCaptcha.render('yandex-captcha', {
       sitekey: captchaSiteKey,
-      callback: (token) => { 
-        form.captchaToken = token; 
-        error.value = ''; 
-      }
+      callback: (token) => { form.captchaToken = token; error.value = ''; }
     });
   } else {
     setTimeout(initCaptcha, 500);
   }
 };
 
-onMounted(async () => { 
-  if (appStore.city) form.city = appStore.city; 
+onMounted(async () => {
+  loadCities();
+  if (appStore.city) {
+    form.city = appStore.city;
+    cityInput.value = appStore.city;
+  }
   initCaptcha();
 
   // --- ЛОГИКА АВТОВХОДА ПОСЛЕ GOOGLE ---
   const { data: { session } } = await supabase.auth.getSession();
   if (session && !localStorage.getItem('user_id')) {
     const sbUser = session.user;
-    
-    // Пытаемся получить профиль из нашей БД
     try {
       const res = await axios.get('/api/users/profile/' + sbUser.id);
       saveSession(res.data);
     } catch (e) {
-      // Если профиля еще нет (первая регистрация через Google), 
-      // создаем объект пользователя на лету (триггер в БД сам создаст запись)
       const newUserObj = {
         id: sbUser.id,
         email: sbUser.email,
         first_name: sbUser.user_metadata?.full_name?.split(' ')[0] || sbUser.user_metadata?.first_name || 'Пользователь',
         last_name: sbUser.user_metadata?.full_name?.split(' ')[1] || '',
-        avatar_url: sbUser.user_metadata?.avatar_url || DEFAULT_AVATARS[0],
+        avatar_url: sbUser.user_metadata?.avatar_url || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png',
         role: 'user'
       };
       saveSession(newUserObj);
@@ -166,11 +237,9 @@ onMounted(async () => {
 const handleRegister = async () => {
   if (!form.email && !form.phone) return error.value = 'Укажите Email или Телефон для связи';
   if (form.password.length < 6) return error.value = 'Пароль должен быть не менее 6 символов';
-  if (form.password !== form.confirmPassword) return error.value = 'Введенные пароли не совпадают';
-  
-  if (!form.captchaToken) {
-    return error.value = 'Пожалуйста, подтвердите, что вы не робот.';
-  }
+  if (form.password !== form.confirmPassword) return error.value = 'Введённые пароли не совпадают';
+  if (!form.city.trim()) return error.value = 'Укажите ваш город';
+  if (!form.captchaToken) return error.value = 'Пожалуйста, подтвердите, что вы не робот.';
 
   loading.value = true;
   error.value = '';
@@ -193,46 +262,36 @@ const handleRegister = async () => {
 };
 
 const socialRegister = async (provider) => {
-    loading.value = true;
-    try {
-        const { error: authError } = await supabase.auth.signInWithOAuth({
-            provider: provider,
-            options: { 
-                // Указываем редирект сразу в профиль
-                redirectTo: window.location.origin + '/profile' 
-            }
-        });
-        if (authError) throw authError;
-    } catch (err) {
-        error.value = "Ошибка Google: " + err.message;
-        loading.value = false;
-    }
+  googleLoading.value = true;
+  try {
+    const { error: authError } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin + '/profile' }
+    });
+    if (authError) throw authError;
+  } catch (err) {
+    error.value = 'Ошибка Google: ' + err.message;
+    googleLoading.value = false;
+  }
 };
 
 const saveSession = (user) => {
     localStorage.setItem('user_id', user.id);
     localStorage.setItem('role', user.role || 'user');
-    localStorage.setItem('user_name', `${user.last_name || ''} ${user.first_name || ''}`.trim());
+    localStorage.setItem('user_name', [user.last_name, user.first_name].filter(Boolean).join(' ') || 'Пользователь');
     localStorage.setItem('user_first_name', user.first_name || '');
     localStorage.setItem('user_avatar', user.avatar_url || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png');
     
-    router.push('/profile'); // Сразу в профиль
+    router.push('/profile');
     setTimeout(() => window.location.reload(), 100);
 };
 </script>
 
 <style scoped>
-/* Все стили остаются прежними, добавляем только правку для контейнера капчи */
-.captcha-container {
-  display: flex;
-  justify-content: center;
-  margin: 20px 0;
-  min-height: 100px;
-}
-
+/* ---------- базовые стили как у вас, плюс стили для автодополнения ---------- */
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(25px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+@keyframes shake { 0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)} }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .auth-page {
@@ -240,11 +299,9 @@ const saveSession = (user) => {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 40px 20px; animation: fadeIn 0.5s ease-out;
 }
-
 .auth-header { text-align: center; margin-bottom: 35px; animation: fadeSlideUp 0.6s ease-out; }
 .auth-header h1 { font-size: 2.5rem; font-weight: 900; color: var(--text-main, #0f172a); }
 :global(.dark) .auth-header h1 { color: #f8fafc; }
-
 .highlight {
   background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
@@ -257,12 +314,10 @@ const saveSession = (user) => {
 }
 :global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
 
-.auth-card { width: 100%; max-width: 700px; padding: 48px;   overflow: visible !important; /* Чтобы окно капчи не обрезалось */
-  position: relative; }
+.auth-card { width: 100%; max-width: 700px; padding: 48px; position: relative; }
 
 .input-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
 .input-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 24px; }
-
 .input-wrapper label { display: block; font-weight: 800; font-size: 0.75rem; color: var(--text-muted, #64748b); text-transform: uppercase; margin-bottom: 8px; }
 :global(.dark) .input-wrapper label { color: #94a3b8; }
 
@@ -277,16 +332,37 @@ const saveSession = (user) => {
 .pass-input-wrap { position: relative; display: flex; align-items: center; }
 .eye-btn { position: absolute; right: 12px; background: none; border: none; font-size: 1.2rem; cursor: pointer; opacity: 0.6; padding: 4px; }
 
+/* автодополнение города */
+.city-autocomplete { position: relative; }
+.city-suggestions {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+  max-height: 220px; overflow-y: auto; list-style: none; padding: 0; margin-top: 4px;
+  border-radius: var(--radius-md, 12px); background: var(--bg-card, #fff);
+  border: 1px solid var(--border-color, #e2e8f0); box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+:global(.dark) .city-suggestions { background: #1e293b; border-color: #334155; }
+.city-suggestions li {
+  padding: 12px 18px; cursor: pointer; color: var(--text-main, #0f172a);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+:global(.dark) .city-suggestions li { color: #f8fafc; border-color: #334155; }
+.city-suggestions li:hover { background: rgba(37,99,235,0.05); }
+
+.dropdown-fade-enter-active, .dropdown-fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.dropdown-fade-enter-from, .dropdown-fade-leave-to { opacity: 0; transform: translateY(-8px); }
+
+.captcha-container { display: flex; justify-content: center; margin: 20px 0; min-height: 100px; }
+
 .btn-register {
   width: 100%; padding: 16px; background: linear-gradient(135deg, var(--success, #10b981), #059669);
   color: white; border: none; border-radius: var(--radius-md, 8px); font-weight: 800; cursor: pointer; transition: all 0.3s;
   box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3); display: flex; align-items: center; justify-content: center; gap: 10px;
 }
-
+.btn-register:hover:not(:disabled) { transform: translateY(-2px); }
 .spinner { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
 
-.error-box { margin-top: 24px; padding: 14px 18px; background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); border-radius: var(--radius-md, 8px); text-align: center; font-weight: 700; border: 1px solid rgba(239, 68, 68, 0.3); animation: shake 0.4s ease-in-out; }
-.success-box { margin-top: 24px; padding: 14px 18px; background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); border-radius: var(--radius-md, 8px); text-align: center; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3); }
+.error-box { margin-top: 24px; padding: 14px 18px; background: rgba(239,68,68,0.1); color: var(--danger, #ef4444); border-radius: var(--radius-md, 8px); text-align: center; font-weight: 700; border: 1px solid rgba(239,68,68,0.3); animation: shake 0.4s ease-in-out; }
+.success-box { margin-top: 24px; padding: 14px 18px; background: rgba(16,185,129,0.1); color: var(--success, #10b981); border-radius: var(--radius-md, 8px); text-align: center; font-weight: 700; border: 1px solid rgba(16,185,129,0.3); }
 
 .separator { margin: 32px 0; position: relative; display: flex; align-items: center; justify-content: center; }
 .separator::before { content: ""; position: absolute; width: 100%; height: 1px; background: var(--border-color, #e2e8f0); }

@@ -359,9 +359,24 @@ app.post('/api/shipping-calculator', async (req, res) => {
 // =====================================================================
 app.get('/api/wishlist/:userId', async (req, res) => {
     try {
-        const { data, error } = await supabase.from('wishlists').select('*, products(*)').eq('user_id', req.params.userId);
-        if (error) throw error; res.json(data || []);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        const { data, error } = await supabase
+            .from('wishlists')
+            .select(`
+                id,
+                user_id,
+                product_id,
+                products (
+                    *,
+                    brands (name, logo_url),
+                    product_stocks (quantity, warehouses (cities (name)))
+                )
+            `)
+            .eq('user_id', req.params.userId);
+        if (error) throw error;
+        res.json(data || []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.post('/api/wishlist', async (req, res) => {

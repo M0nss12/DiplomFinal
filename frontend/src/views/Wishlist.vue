@@ -21,43 +21,53 @@
 
       <!-- СПИСОК ТОВАРОВ -->
       <div v-else-if="products.length > 0" class="wishlist-grid">
-        <div v-for="p in products" :key="p.id" class="product-card glass-card">
+        <div v-for="p in products" :key="p.wishlist_record_id" class="product-card glass-card">
           
           <!-- Удаление -->
-          <button @click="removeFromWishlist(p.wishlist_record_id)" class="btn-remove" title="Удалить из избранного">
-            &times;
+          <button 
+            @click="removeFromWishlist(p)" 
+            class="btn-remove" 
+            title="Удалить из избранного"
+            :disabled="p.removing"
+          >
+            <span v-if="p.removing" class="spinner-micro"></span>
+            <span v-else>&times;</span>
           </button>
 
-          <router-link :to="'/product/' + p.id" class="card-content-link">
-            <div class="image-wrapper">
-              <!-- Адаптировано под массив изображений -->
-              <img :src="p.images && p.images.length > 0 ? p.images[0] : '/assets/images/no-image.png'" :alt="p.name" class="product-img" />
-            </div>
-            
-            <h3 class="product-name">{{ p.name }}</h3>
-            
-            <div class="price-box">
-              <strong class="price-main">{{ p.discount_price || p.price }} ₽</strong>
-              <s v-if="p.discount_price" class="price-old">{{ p.price }} ₽</s>
-            </div>
+          <!-- Товар существует -->
+          <template v-if="p.id">
+            <router-link :to="'/product/' + p.id" class="card-content-link">
+              <div class="image-wrapper">
+                <img :src="p.images && p.images.length > 0 ? p.images[0] : '/assets/images/no-image.png'" :alt="p.name" class="product-img" />
+              </div>
+              <h3 class="product-name">{{ p.name }}</h3>
+              <div class="price-box">
+                <strong class="price-main">{{ p.discount_price || p.price }} ₽</strong>
+                <s v-if="p.discount_price" class="price-old">{{ p.price }} ₽</s>
+              </div>
+              <div class="stock-status-box">
+                 <div v-if="getStockInCity(p) > 0" class="status-badge local">
+                    ✅ В наличии: {{ getStockInCity(p) }} шт.
+                 </div>
+                 <div v-else-if="getTotalStock(p) > 0" class="status-badge intercity">
+                    🚛 Доставка (Межгород)
+                 </div>
+                 <div v-else class="status-badge out">
+                    ❌ Нет в наличии
+                 </div>
+              </div>
+            </router-link>
 
-            <!-- БЛОК НАЛИЧИЯ -->
-            <div class="stock-status-box">
-               <div v-if="getStockInCity(p) > 0" class="status-badge local">
-                  ✅ В наличии: {{ getStockInCity(p) }} шт.
-               </div>
-               <div v-else-if="getTotalStock(p) > 0" class="status-badge intercity">
-                  🚛 Доставка (Межгород)
-               </div>
-               <div v-else class="status-badge out">
-                  ❌ Нет в наличии
-               </div>
-            </div>
-          </router-link>
+            <button @click="addToCart(p)" class="btn-add-to-cart" :disabled="getTotalStock(p) === 0">
+              {{ getTotalStock(p) > 0 ? 'В корзину' : 'Нет в наличии' }}
+            </button>
+          </template>
 
-          <button @click="addToCart(p)" class="btn-add-to-cart" :disabled="getTotalStock(p) === 0">
-            {{ getTotalStock(p) > 0 ? 'В корзину' : 'Нет в наличии' }}
-          </button>
+          <!-- Товар удалён из каталога -->
+          <div v-else class="deleted-product">
+            <div class="deleted-icon">🗑️</div>
+            <p>Товар больше не доступен</p>
+          </div>
         </div>
       </div>
 
@@ -92,13 +102,16 @@ const loadWishlist = async () => {
 
   try {
     const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/wishlist/${userId}`);
+    // Сервер теперь возвращает { id, user_id, product_id, products: { ...товар с остатками... } }
     products.value = (res.data || []).map(row => {
-        const p = row.products || row.product;
+        const p = row.products;
+        if (!p) return { wishlist_record_id: row.id, removing: false }; // товар удалён
         return {
             ...p,
-            wishlist_record_id: row.id 
+            wishlist_record_id: row.id,
+            removing: false
         };
-    }).filter(p => p.id);
+    });
   } catch (e) {
     console.error("Ошибка загрузки:", e);
   } finally {
@@ -109,16 +122,12 @@ const loadWishlist = async () => {
 const getStockInCity = (p) => {
     if (!p || !p.product_stocks || !appStore.city) return 0;
     const searchCity = appStore.city.trim().toLowerCase();
-    
-    return p.product_stocks.reduce((total, stockRecord) => {
-        let wh = stockRecord.warehouses || stockRecord.warehouse;
-        if (Array.isArray(wh)) wh = wh[0];
-        
-        // Поддержка новой связи БД (cities.name)
-        const wCity = wh?.cities?.name || wh?.city_name;
-        
-        if (wCity && wCity.trim().toLowerCase() === searchCity) {
-            return total + (Number(stockRecord.quantity) || 0);
+    return p.product_stocks.reduce((total, stock) => {
+        const wh = stock.warehouses;
+        if (!wh) return total;
+        const wCity = wh.cities?.name || wh.city_name || '';
+        if (wCity.trim().toLowerCase() === searchCity) {
+            return total + (Number(stock.quantity) || 0);
         }
         return total;
     }, 0);
@@ -129,19 +138,23 @@ const getTotalStock = (p) => {
     return p.product_stocks.reduce((total, s) => total + (Number(s.quantity) || 0), 0);
 };
 
-const removeFromWishlist = async (wishlistId) => {
+const removeFromWishlist = async (product) => {
+  const userId = localStorage.getItem('user_id');
+  if (!userId || !product.id) return;
+  
+  product.removing = true;
   try {
-    await axios.delete(`${import.meta.env.VITE_API_URL || ''}/api/wishlist/${wishlistId}`);
-    products.value = products.value.filter(p => p.wishlist_record_id !== wishlistId);
+    await axios.delete(`${import.meta.env.VITE_API_URL || ''}/api/wishlist/${userId}/${product.id}`);
+    products.value = products.value.filter(p => p.wishlist_record_id !== product.wishlist_record_id);
     window.dispatchEvent(new Event('wishlist-updated'));
   } catch (e) {
     alert("Ошибка при удалении");
+    product.removing = false;
   }
 };
 
 const addToCart = (p) => {
   cartStore.addToCart(p);
-  // alert("Товар добавлен в корзину!"); // Закомментировано, чтобы не мешать
 };
 
 onMounted(loadWishlist);
@@ -160,7 +173,6 @@ onMounted(loadWishlist);
 
 .wishlist-container { max-width: 1400px; margin: 0 auto; padding: 0 24px; }
 
-/* Стеклянные карточки */
 .glass-card {
   background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
   border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
@@ -170,7 +182,6 @@ onMounted(loadWishlist);
 .glass-card:hover { box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1); transform: translateY(-4px); }
 :global(.dark) .glass-card:hover { box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.5); }
 
-/* ШАПКА */
 .wishlist-header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px; margin-bottom: 24px; }
 .header-left h1 {
   font-size: 2.4rem; font-weight: 800; margin: 0 0 8px 0;
@@ -192,23 +203,24 @@ onMounted(loadWishlist);
 .section-divider { border: none; height: 1px; background: var(--border-color, #e2e8f0); margin: 20px 0 40px; }
 :global(.dark) .section-divider { background: #334155; }
 
-/* ГРИД КАРТОЧЕК */
 .wishlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 32px; }
 
 .product-card { padding: 24px; display: flex; flex-direction: column; position: relative; }
 
-/* КНОПКА УДАЛЕНИЯ */
 .btn-remove {
   position: absolute; top: 16px; right: 16px; width: 36px; height: 36px; border-radius: 50%;
   background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); display: flex; align-items: center; justify-content: center;
   font-size: 20px; cursor: pointer; z-index: 10; border: 1px solid rgba(239, 68, 68, 0.2); transition: all 0.2s;
 }
-.btn-remove:hover { background: var(--danger, #ef4444); color: white; transform: rotate(90deg) scale(1.1); box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3); }
+.btn-remove:hover:not(:disabled) { background: var(--danger, #ef4444); color: white; transform: rotate(90deg) scale(1.1); box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3); }
+.btn-remove:disabled { opacity: 0.7; cursor: wait; }
 
-/* ССЫЛКА-КОНТЕНТ */
+.spinner-micro {
+  width: 14px; height: 14px; border: 2px solid rgba(239,68,68,0.3); border-top-color: var(--danger, #ef4444); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block;
+}
+
 .card-content-link { text-decoration: none; color: inherit; flex: 1; display: flex; flex-direction: column; }
 
-/* ИЗОБРАЖЕНИЕ */
 .image-wrapper {
   height: 200px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
   background: #fff; border-radius: var(--radius-md, 12px); padding: 12px; border: 1px solid var(--border-color, #e2e8f0);
@@ -217,7 +229,6 @@ onMounted(loadWishlist);
 .product-img { max-width: 100%; max-height: 170px; object-fit: contain; transition: transform 0.4s; }
 .product-card:hover .product-img { transform: scale(1.08); }
 
-/* НАЗВАНИЕ */
 .product-name {
   font-size: 1.05rem; font-weight: 700; line-height: 1.4; height: 2.8em; overflow: hidden;
   margin-bottom: 12px; color: var(--text-main, #0f172a); transition: color 0.2s;
@@ -225,12 +236,10 @@ onMounted(loadWishlist);
 :global(.dark) .product-name { color: #f8fafc; }
 .card-content-link:hover .product-name { color: var(--primary, #2563eb); }
 
-/* ЦЕНЫ */
 .price-box { margin-bottom: 16px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
 .price-main { font-size: 1.5rem; font-weight: 800; color: var(--danger, #ef4444); }
 .price-old { color: var(--text-muted, #64748b); text-decoration: line-through; font-size: 0.95rem; font-weight: 600; }
 
-/* СТАТУС НАЛИЧИЯ */
 .stock-status-box { margin-bottom: 20px; margin-top: auto; }
 .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 40px; font-size: 0.8rem; font-weight: 700; }
 .status-badge.local { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); border: 1px solid rgba(16, 185, 129, 0.2); }
@@ -238,7 +247,6 @@ onMounted(loadWishlist);
 .status-badge.out { background: rgba(0,0,0,0.05); color: var(--text-muted, #64748b); border: 1px solid var(--border-color, #e2e8f0); }
 :global(.dark) .status-badge.out { background: rgba(255,255,255,0.05); border-color: #475569; color: #94a3b8; }
 
-/* КНОПКА В КОРЗИНУ */
 .btn-add-to-cart {
   width: 100%; padding: 14px; background: linear-gradient(135deg, var(--success, #10b981), #059669);
   color: white; border: none; border-radius: var(--radius-md, 8px); font-weight: 800; font-size: 0.95rem;
@@ -247,6 +255,13 @@ onMounted(loadWishlist);
 .btn-add-to-cart:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(16, 185, 129, 0.4); }
 .btn-add-to-cart:disabled { background: rgba(0,0,0,0.05); color: var(--text-muted, #94a3b8); cursor: not-allowed; box-shadow: none; transform: none; }
 :global(.dark) .btn-add-to-cart:disabled { background: rgba(255,255,255,0.05); }
+
+/* Товар удалён */
+.deleted-product {
+  text-align: center; padding: 30px 0; color: var(--text-muted); flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.deleted-icon { font-size: 3rem; margin-bottom: 10px; opacity: 0.5; }
+.deleted-product p { font-weight: 600; color: var(--text-muted); }
 
 /* ПУСТОЕ СОСТОЯНИЕ */
 .empty-state { text-align: center; padding: 80px 20px; max-width: 600px; margin: 40px auto; border: 2px dashed var(--border-color, #cbd5e1); }

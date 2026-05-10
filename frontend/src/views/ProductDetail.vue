@@ -1,11 +1,35 @@
 <template>
   <div v-if="product" class="product-detail-page">
-    
+
+    <!-- ХЛЕБНЫЕ КРОШКИ -->
+    <nav v-if="product.categories" class="breadcrumbs">
+      <router-link to="/catalog">Каталог</router-link>
+      <span v-for="crumb in breadcrumbs" :key="crumb.id" class="breadcrumb-item">
+        <span class="separator">/</span>
+        <router-link :to="'/catalog/' + crumb.id">{{ crumb.name }}</router-link>
+      </span>
+      <span class="separator">/</span>
+      <router-link :to="'/category/' + product.category_id" class="current-category">
+        {{ product.categories?.name || 'Категория' }}
+      </router-link>
+      <span class="separator">/</span>
+      <span class="current-product">{{ product.name }}</span>
+    </nav>
+
     <h1 class="product-main-title">{{ product.name }}</h1>
+
+    <!-- РЕЙТИНГ ТОВАРА -->
+    <div v-if="reviews.length > 0" class="product-rating-overview">
+      <div class="stars-display">
+        <span v-for="n in 5" :key="n" class="star" :class="{ filled: n <= Math.round(averageRating) }">★</span>
+      </div>
+      <span class="rating-value">{{ averageRating }} / 5</span>
+      <span class="reviews-count">({{ reviews.length }} отзывов)</span>
+    </div>
 
     <div class="product-core-grid">
       
-      <!-- ЛЕВАЯ КОЛОНКА: ФОТО (Галлерея) -->
+      <!-- ЛЕВАЯ КОЛОНКА: ФОТО -->
       <div class="product-gallery">
         <div class="image-card glass-card">
           <button @click="toggleWishlist" class="wishlist-float-btn" :class="{ 'is-active': isFavorite }" title="В избранное">
@@ -15,7 +39,6 @@
           <img :src="activeImage" class="main-image" @click="previewImage(activeImage)" />
         </div>
 
-        <!-- Если картинок несколько, показываем миниатюры -->
         <div v-if="product.images && product.images.length > 1" class="gallery-thumbnails">
           <img 
             v-for="(img, idx) in product.images" 
@@ -28,19 +51,18 @@
         </div>
       </div>
 
-      <!-- ЦЕНТРАЛЬНАЯ КОЛОНКА: ИНФО -->
+      <!-- ЦЕНТРАЛЬНАЯ КОЛОНКА: ХАРАКТЕРИСТИКИ -->
       <div class="product-info-column">
         <div class="brand-header">
           <div class="sku-badge">Артикул: <b>{{ product.sku }}</b></div>
           <img :src="product.brands?.logo_url" class="brand-mini-logo glass-card" v-if="product.brands?.logo_url" />
         </div>
-        
+
         <div class="specs-section glass-card">
           <h3>Характеристики</h3>
           <ul class="specs-list">
             <li v-if="product.weight_kg"><span>📦 Вес</span> <b>{{ product.weight_kg }} кг</b></li>
             <li v-if="product.warranty_months"><span>🛡️ Гарантия</span> <b>{{ product.warranty_months }} мес.</b></li>
-            <!-- Динамические характеристики из JSONB -->
             <li v-for="(val, key) in product.characteristics" :key="key">
                <span>{{ key }}</span> <b>{{ val }}</b>
             </li>
@@ -52,7 +74,7 @@
           
           <div v-if="localStocks.length > 0" class="city-stock-card">
             <div class="city-header">
-               📍 В г. {{ appStore.city }}: <b>{{ totalLocalStock }} шт.</b>
+               📍 В {{ appStore.city || 'вашем городе' }}: <b>{{ totalLocalStock }} шт.</b>
             </div>
             <table class="stock-table">
               <tbody>
@@ -65,7 +87,7 @@
           </div>
 
           <div v-else class="stock-alert">
-             ⚠️ В г. {{ appStore.city }} нет в наличии. Доступно под заказ.
+             ⚠️ В {{ appStore.city || 'вашем городе' }} нет в наличии. Доступно под заказ.
           </div>
 
           <div v-if="groupedOtherCityStocks.length > 0" class="other-cities-wrap">
@@ -120,15 +142,13 @@
       </aside>
     </div>
 
-    <!-- ОПИСАНИЕ ТОВАРА (Если есть) -->
+    <!-- ОПИСАНИЕ ТОВАРА -->
     <section v-if="product.description" class="product-description-section glass-card">
         <h2>Описание</h2>
         <p>{{ product.description }}</p>
     </section>
 
-    <!-- ==============================================
-         СЕКЦИЯ ОТЗЫВОВ 
-         ============================================== -->
+    <!-- СЕКЦИЯ ОТЗЫВОВ -->
     <section class="reviews-section">
       <div class="reviews-header">
         <h2>Отзывы покупателей <span class="reviews-count-badge">{{ reviews.length }}</span></h2>
@@ -159,7 +179,6 @@
 
           <textarea v-model="newReview.comment" placeholder="Напишите подробнее о качестве детали..." rows="4" class="form-textarea"></textarea>
           
-          <!-- ЗОНА ЗАГРУЗКИ ФОТО -->
           <div class="client-photo-upload-zone">
             <p class="upload-label">Прикрепить фото (макс. 5 шт):</p>
             <div class="images-preview-grid">
@@ -212,7 +231,6 @@
             <div v-if="review.cons" class="cons"><b>−</b> {{ review.cons }}</div>
           </div>
 
-          <!-- ГАЛЕРЕЯ ФОТОГРАФИЙ ОТЗЫВА -->
           <div v-if="review.images && review.images.length > 0" class="review-gallery">
             <img v-for="(img, i) in review.images" :key="i" :src="img" @click="previewImage(img)" class="gallery-thumb" />
           </div>
@@ -273,11 +291,26 @@ const newReview = reactive({
     images: []
 });
 
-// ЕДИНЫЙ СЛЕДЫТЬ ЗА ID (Исправляет баг пустых страниц)
+// Хлебные крошки (упрощённо – только текущая категория)
+const breadcrumbs = computed(() => {
+  const crumbs = [];
+  if (!product.value?.categories) return crumbs;
+  let parentId = product.value.categories.parent_id;
+  // Для полной цепочки нужен запрос всех категорий, но пока оставим только текущую
+  return crumbs;
+});
+
+// Рейтинг товара
+const averageRating = computed(() => {
+  if (!reviews.value.length) return 0;
+  const sum = reviews.value.reduce((acc, r) => acc + r.rating, 0);
+  return (sum / reviews.value.length).toFixed(1);
+});
+
+// Срабатывает при смене ID
 watch(
   () => route.params.id, 
   async (newId) => {
-    // Срабатывает только если мы на странице товара
     if (newId && route.name === 'product-detail') {
       await loadData();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -296,7 +329,6 @@ const isSameCity = (city1) => {
     return city1.trim().toLowerCase() === appStore.city.trim().toLowerCase();
 };
 
-// --- ВЫЧИСЛЯЕМЫЕ СВОЙСТВА ---
 const localStocks = computed(() => {
     if (!product.value?.product_stocks) return [];
     return product.value.product_stocks.filter(s => {
@@ -324,7 +356,6 @@ const groupedOtherCityStocks = computed(() => {
 const totalStockCount = computed(() => product.value?.product_stocks?.reduce((sum, s) => sum + s.quantity, 0) || 0);
 const isFavorite = computed(() => wishlistId.value !== null);
 
-// --- ЗАГРУЗКА ДАННЫХ ---
 const loadData = async () => {
   const pId = route.params.id;
   if (!pId) return;
@@ -351,6 +382,8 @@ const loadData = async () => {
         order.delivery_status === 'delivered' && 
         order.order_items.some(item => Number(item.product_id) === Number(pId))
       );
+    } else {
+      canUserLeaveReview.value = false;
     }
   } catch (e) { console.error("Ошибка загрузки:", e); }
 };
@@ -383,7 +416,6 @@ const toggleWishlist = async () => {
   } catch (e) { console.error(e); }
 };
 
-// --- ОТЗЫВЫ ---
 const prepareCreate = () => {
     isEditing.value = false;
     Object.assign(newReview, { id: null, rating: 5, comment: '', pros: '', cons: '', images: [] });
@@ -443,9 +475,8 @@ onMounted(loadData);
 
 <style scoped>
 /* ==========================================================================
-   ОБЩИЕ СТИЛИ (ПОДДЕРЖКА СВЕТЛОЙ/ТЕМНОЙ ТЕМЫ И СТЕКЛА)
+   ОБЩИЕ СТИЛИ
    ========================================================================== */
-
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(25px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -455,54 +486,59 @@ onMounted(loadData);
 }
 :global(.dark) .product-detail-page { color: #f8fafc; }
 
-/* Стеклянные карточки */
 .glass-card {
   background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
   border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
   backdrop-filter: blur(8px); transition: transform 0.3s, box-shadow 0.3s;
 }
 :global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
-.glass-card:hover { box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1); transform: translateY(-2px); }
-:global(.dark) .glass-card:hover { box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.5); }
+
+/* ХЛЕБНЫЕ КРОШКИ */
+.breadcrumbs {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-bottom: 20px; font-size: 0.9rem; color: var(--text-muted, #64748b);
+}
+.breadcrumbs a { color: var(--primary, #2563eb); text-decoration: none; font-weight: 600; }
+.breadcrumbs a:hover { text-decoration: underline; }
+.separator { margin: 0 4px; color: var(--border-color, #cbd5e1); }
+.current-product { color: var(--text-main, #0f172a); font-weight: 700; }
 
 .product-main-title {
-  font-size: 2.5rem; font-weight: 900; margin-bottom: 32px;
+  font-size: 2.2rem; font-weight: 900; margin-bottom: 16px;
   background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
 
+/* РЕЙТИНГ */
+.product-rating-overview {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 32px; flex-wrap: wrap;
+}
+.stars-display .star {
+  font-size: 1.6rem; color: #e2e8f0; margin-right: 2px;
+}
+.stars-display .star.filled { color: #f59e0b; }
+.rating-value { font-weight: 800; color: var(--text-main, #0f172a); font-size: 1.1rem; }
+:global(.dark) .rating-value { color: #f8fafc; }
+.reviews-count { color: var(--text-muted, #64748b); font-size: 0.9rem; }
+
 .product-core-grid { display: grid; grid-template-columns: 1fr 1.2fr 0.8fr; gap: 32px; align-items: flex-start; }
 
-/* ГАЛЕРЕЯ (ЛЕВАЯ КОЛОНКА) */
+/* ГАЛЕРЕЯ */
 .product-gallery { display: flex; flex-direction: column; gap: 15px; }
-.product-gallery .image-card {
-  padding: 40px; display: flex; align-items: center; justify-content: center;
-  min-height: 400px; position: relative; cursor: zoom-in;
-}
-.main-image { max-width: 100%; max-height: 400px; object-fit: contain; transition: transform 0.4s; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.05)); }
-:global(.dark) .main-image { filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); }
-.image-card:hover .main-image { transform: scale(1.05); }
-
-.gallery-thumbnails { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
-.gallery-thumbnails::-webkit-scrollbar { display: none; }
-.thumb-img {
-  width: 70px; height: 70px; object-fit: contain; padding: 5px; cursor: pointer;
-  border-radius: var(--radius-sm, 8px); opacity: 0.6; transition: all 0.2s;
-}
+.image-card { padding: 20px; display: flex; align-items: center; justify-content: center; min-height: 350px; position: relative; }
+.main-image { max-width: 100%; max-height: 350px; object-fit: contain; cursor: zoom-in; }
+.gallery-thumbnails { display: flex; gap: 8px; overflow-x: auto; }
+.thumb-img { width: 60px; height: 60px; object-fit: contain; padding: 4px; cursor: pointer; opacity: 0.6; border: 2px solid transparent; border-radius: 8px; }
 .thumb-img.active, .thumb-img:hover { opacity: 1; border-color: var(--primary, #2563eb); }
 
-/* ИЗБРАННОЕ */
 .wishlist-float-btn {
-  position: absolute; top: 15px; right: 15px; width: 50px; height: 50px;
-  border-radius: 50%; background: var(--bg-card, #fff); border: 1px solid var(--border-color, #e2e8f0);
-  font-size: 1.6rem; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: all 0.3s; color: var(--text-muted, #94a3b8); z-index: 10;
+  position: absolute; top: 10px; right: 10px; width: 40px; height: 40px;
+  border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-color);
+  font-size: 1.4rem; display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
-:global(.dark) .wishlist-float-btn { background: #1e293b; border-color: #334155; }
-.wishlist-float-btn:hover { transform: scale(1.15) rotate(5deg); background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); border-color: var(--danger, #ef4444); }
-.wishlist-float-btn.is-active { color: var(--danger, #ef4444); border-color: var(--danger, #ef4444); background: rgba(239, 68, 68, 0.1); }
+.wishlist-float-btn.is-active { color: var(--danger); border-color: var(--danger); }
 
-/* ЦЕНТРАЛЬНАЯ КОЛОНКА (ХАРАКТЕРИСТИКИ) */
+/* ЦЕНТР */
 .brand-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
 .sku-badge { background: rgba(0,0,0,0.05); padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; font-weight: 700; color: var(--text-muted, #64748b); }
 :global(.dark) .sku-badge { background: rgba(255,255,255,0.05); color: #94a3b8; }
@@ -523,7 +559,7 @@ onMounted(loadData);
 .product-description-section p { line-height: 1.6; color: var(--text-muted, #64748b); font-size: 1rem; }
 :global(.dark) .product-description-section p { color: #cbd5e1; }
 
-/* НАЛИЧИЕ И СКЛАДЫ */
+/* НАЛИЧИЕ */
 .city-stock-card { background: rgba(16, 185, 129, 0.05); border: 1px solid var(--success, #10b981); border-radius: var(--radius-md, 8px); overflow: hidden; margin-top: 16px; }
 .city-header { padding: 12px 16px; background: rgba(16, 185, 129, 0.1); font-weight: 800; color: var(--success, #10b981); }
 .stock-table { width: 100%; border-collapse: collapse; }
@@ -533,13 +569,13 @@ onMounted(loadData);
 
 .stock-alert { padding: 14px; background: rgba(245, 158, 11, 0.1); border-radius: var(--radius-md, 8px); color: var(--warning, #d97706); font-weight: 700; margin-top: 16px; }
 
-.btn-outline-small { margin-top: 16px; padding: 8px 18px; background: transparent; border: 1px solid var(--border-color, #cbd5e1); border-radius: 40px; font-size: 0.85rem; font-weight: 700; color: var(--text-muted, #64748b); cursor: pointer; transition: all 0.2s; }
+.btn-outline-small { margin-top: 16px; padding: 8px 18px; background: transparent; border: 1px solid var(--border-color, #cbd5e1); border-radius: 40px; font-size: 0.85rem; font-weight: 700; color: var(--text-muted, #64748b); cursor: pointer; }
 :global(.dark) .btn-outline-small { border-color: #475569; color: #94a3b8; }
-.btn-outline-small:hover { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); background: rgba(37, 99, 235, 0.05); transform: translateY(-2px); }
+.btn-outline-small:hover { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); background: rgba(37, 99, 235, 0.05); }
 
 .other-cities-list { margin-top: 12px; overflow: hidden; }
 
-/* ПРАВАЯ КОЛОНКА – ПОКУПКА */
+/* ПРАВАЯ */
 .product-buy-card { padding: 28px; position: sticky; top: 100px; }
 .price-container { margin-bottom: 20px; }
 .new-price { font-size: 2.8rem; font-weight: 900; color: var(--danger, #ef4444); line-height: 1; }
@@ -554,13 +590,13 @@ onMounted(loadData);
   border: none; border-radius: var(--radius-md, 12px); font-size: 1.1rem; font-weight: 800;
   cursor: pointer; transition: all 0.3s; box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
 }
-.main-cart-btn:hover:not(.disabled) { transform: translateY(-3px); background: var(--primary-hover, #1d4ed8); }
+.main-cart-btn:hover:not(.disabled) { transform: translateY(-3px); background: #1d4ed8; }
 .main-cart-btn.disabled { background: rgba(0,0,0,0.05); color: var(--text-muted, #94a3b8); cursor: not-allowed; box-shadow: none; }
 :global(.dark) .main-cart-btn.disabled { background: rgba(255,255,255,0.05); }
 
 .trust-icons { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem; color: var(--text-muted, #64748b); }
 
-/* СЕКЦИЯ ОТЗЫВОВ */
+/* ОТЗЫВЫ */
 .reviews-section { margin-top: 60px; padding-top: 48px; }
 .reviews-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
 .reviews-header h2 { font-size: 1.8rem; font-weight: 900; color: var(--text-main, #0f172a); }
@@ -569,21 +605,19 @@ onMounted(loadData);
 
 .btn-write-review {
   background: var(--text-main, #0f172a); color: white; border: none; padding: 12px 28px;
-  border-radius: 40px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+  border-radius: 40px; font-weight: 700; cursor: pointer;
 }
 :global(.dark) .btn-write-review { background: #f8fafc; color: #0f172a; }
 .btn-write-review:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
 
-/* ФОРМА ОТЗЫВА */
 .review-form-card { padding: 28px; margin-bottom: 40px; }
 .review-form-card h3 { font-size: 1.3rem; font-weight: 800; margin-bottom: 20px; color: var(--text-main, #0f172a); }
 :global(.dark) .review-form-card h3 { color: #f8fafc; }
 
 .rating-picker { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; font-weight: 700; color: var(--text-muted, #64748b); }
-.stars button { font-size: 2.2rem; background: none; border: none; color: #e2e8f0; cursor: pointer; transition: transform 0.2s; padding: 0 5px; }
+.stars button { font-size: 2.2rem; background: none; border: none; color: #e2e8f0; cursor: pointer; padding: 0 5px; }
 :global(.dark) .stars button { color: #334155; }
 .stars button.active { color: #f59e0b; }
-.stars button:hover { transform: scale(1.2); }
 
 .review-inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
 .form-input, .form-textarea {
@@ -603,16 +637,16 @@ onMounted(loadData);
 .client-preview-img { width: 100%; height: 100%; object-fit: cover; }
 .client-remove-img-btn { position: absolute; top: -5px; right: -5px; width: 22px; height: 22px; background: var(--danger, #ef4444); color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 
-.client-upload-btn { width: 70px; height: 70px; border: 2px dashed var(--border-color, #cbd5e1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--text-muted, #94a3b8); cursor: pointer; transition: all 0.2s; background: transparent; }
+.client-upload-btn { width: 70px; height: 70px; border: 2px dashed var(--border-color, #cbd5e1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--text-muted, #94a3b8); cursor: pointer; }
 :global(.dark) .client-upload-btn { border-color: #475569; }
 .client-upload-btn:hover { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); background: rgba(37, 99, 235, 0.05); }
 
 .form-actions { display: flex; gap: 16px; margin-top: 24px; }
-.btn-submit-review { background: var(--success, #10b981); color: white; border: none; padding: 14px 32px; border-radius: 40px; font-weight: 800; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
+.btn-submit-review { background: var(--success, #10b981); color: white; border: none; padding: 14px 32px; border-radius: 40px; font-weight: 800; font-size: 1rem; cursor: pointer; }
 .btn-submit-review:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3); background: #059669; }
 .btn-submit-review:disabled { opacity: 0.7; cursor: not-allowed; }
 
-.btn-cancel { background: transparent; border: 2px solid var(--border-color, #cbd5e1); padding: 12px 28px; border-radius: 40px; font-weight: 700; color: var(--text-main, #0f172a); cursor: pointer; transition: all 0.2s; }
+.btn-cancel { background: transparent; border: 2px solid var(--border-color, #cbd5e1); padding: 12px 28px; border-radius: 40px; font-weight: 700; color: var(--text-main, #0f172a); cursor: pointer; }
 :global(.dark) .btn-cancel { border-color: #475569; color: #f8fafc; }
 .btn-cancel:hover { background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); border-color: var(--danger, #ef4444); }
 
@@ -622,7 +656,7 @@ onMounted(loadData);
 :global(.dark) .review-item.is-mine { background: linear-gradient(145deg, #1e293b, rgba(37, 99, 235, 0.05)); }
 
 .my-review-actions { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 5; }
-.btn-action { background: rgba(0,0,0,0.03); border: none; font-size: 0.75rem; font-weight: 800; cursor: pointer; padding: 6px 12px; border-radius: 30px; transition: all 0.2s; }
+.btn-action { background: rgba(0,0,0,0.03); border: none; font-size: 0.75rem; font-weight: 800; cursor: pointer; padding: 6px 12px; border-radius: 30px; }
 :global(.dark) .btn-action { background: rgba(255,255,255,0.05); }
 .btn-action.edit { color: var(--primary, #2563eb); }
 .btn-action.edit:hover { background: rgba(37, 99, 235, 0.1); transform: translateY(-2px); }
@@ -649,7 +683,7 @@ onMounted(loadData);
 .cons b { color: var(--danger, #ef4444); font-size: 1.2rem; line-height: 1; }
 
 .review-gallery { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
-.gallery-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 12px; cursor: zoom-in; border: 1px solid var(--border-color, #e2e8f0); transition: all 0.2s; }
+.gallery-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 12px; cursor: zoom-in; border: 1px solid var(--border-color, #e2e8f0); }
 :global(.dark) .gallery-thumb { border-color: #334155; }
 .gallery-thumb:hover { transform: scale(1.05); border-color: var(--primary, #2563eb); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
 
@@ -660,10 +694,10 @@ onMounted(loadData);
 .spinner { width: 60px; height: 60px; border: 4px solid var(--border-color, #e2e8f0); border-top-color: var(--primary, #2563eb); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
 :global(.dark) .spinner { border-color: #334155; }
 
-/* ФУЛЛСКРИН ПРОСМОТР ФОТО */
-.fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: zoom-out; animation: fadeIn 0.2s; }
+/* ФУЛЛСКРИН */
+.fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: zoom-out; }
 .fullscreen-img { max-width: 90%; max-height: 90vh; border-radius: var(--radius-md, 12px); box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5); object-fit: contain; }
-.fullscreen-close { position: absolute; top: 20px; right: 30px; background: none; border: none; color: white; font-size: 2.5rem; cursor: pointer; transition: transform 0.2s; }
+.fullscreen-close { position: absolute; top: 20px; right: 30px; background: none; border: none; color: white; font-size: 2.5rem; cursor: pointer; }
 .fullscreen-close:hover { transform: scale(1.1); color: var(--danger, #ef4444); }
 
 /* АДАПТИВНОСТЬ */
