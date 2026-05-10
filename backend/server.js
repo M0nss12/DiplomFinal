@@ -761,55 +761,29 @@ app.post('/api/orders', async (req, res) => {
             return res.status(500).json({ error: 'Не удалось сохранить позиции заказа' });
         }
 
+        // Фоновое уведомление (не ждём)
         if (order && order[0]) {
             const newOrder = order[0];
-            try {
-                await notifyAndEmail({
-                    userId: req.headers['x-user-id'] || null,
-                    type: 'order',
-                    email: customer_email,
-                    title: `Заказ №${newOrder.id} оформлен`,
-                    message: `Ваш заказ на сумму ${finalTotal} ₽ принят в обработку.`,
-                    templateName: 'order_created.html',
-                    templateVars: {
-                        order_id: newOrder.id,
-                        total: finalTotal,
-                        name: customer_name,
-                        address: newOrder.delivery_address
-                    }
-                });
-            } catch (notifyErr) {
-                console.error('Ошибка отправки уведомления:', notifyErr);
-            }
+            notifyAndEmail({
+                userId: req.headers['x-user-id'] || null,
+                type: 'order',
+                email: customer_email,
+                title: `Заказ №${newOrder.id} оформлен`,
+                message: `Ваш заказ на сумму ${finalTotal} ₽ принят в обработку.`,
+                templateName: 'order_created.html',
+                templateVars: {
+                    order_id: newOrder.id,
+                    total: finalTotal,
+                    name: customer_name,
+                    address: newOrder.delivery_address
+                }
+            }).catch(err => console.error('Ошибка отправки уведомления о заказе:', err));
         }
 
         res.json({ orderId: order[0].id, total: finalTotal, distance_based_shipping: totalShipping });
     } catch (err) {
         console.error('Общая ошибка в POST /api/orders:', err);
         res.status(500).json({ error: 'Внутренняя ошибка сервера' });
-    }
-});
-
-app.get('/api/orders/:userId', async (req, res) => {
-    const { data } = await supabase
-        .from('orders')
-        .select(`*, order_items (id, product_id, quantity, unit_price, warehouse_id, products (*))`)
-        .eq('user_id', req.params.userId)
-        .order('created_at', { ascending: false });
-    res.json(data || []);
-});
-
-app.post('/api/calculate-shipping', verifyAdmin, async (req, res) => {
-    const { warehouse_id, items } = req.body;
-    try {
-        const { data, error } = await supabase.rpc('calculate_order_shipping', {
-            target_warehouse_id: warehouse_id,
-            items_json: items
-        });
-        if (error) throw error;
-        res.json(data);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
     }
 });
 

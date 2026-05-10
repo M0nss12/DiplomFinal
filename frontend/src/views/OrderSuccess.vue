@@ -4,10 +4,6 @@
       <div class="icon-wrap">🎉</div>
       <h1>Заказ успешно оформлен!</h1>
       <p class="order-num" v-if="orderId">Номер вашего заказа: <b>#{{ orderId }}</b></p>
-      
-      <div class="info-box glass-card">
-        <p>Мы отправили подтверждение на вашу почту. В ближайшее время менеджер свяжется с вами или статус заказа обновится в личном кабинете.</p>
-      </div>
 
       <div class="actions">
         <router-link to="/orders" class="btn-primary">Мои заказы</router-link>

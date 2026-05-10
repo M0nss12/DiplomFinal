@@ -149,9 +149,9 @@
             <div v-if="shippingData.details && shippingData.details.some(d => !d.in_stock)" class="intercity-alert">
               <div class="alert-title">🚚 Часть товаров поедет межгородом</div>
               <ul class="intercity-list">
-<li v-for="d in shippingData.details.filter(x => !x.in_stock)" :key="d.product_id">
-  {{ getProductName(d.product_id) }} ({{ d.quantity }} шт.) — расстояние {{ d.distance_km }} км, {{ d.shipping_cost }} ₽
-</li>
+                <li v-for="d in shippingData.details.filter(x => !x.in_stock)" :key="d.product_id">
+                  {{ getProductName(d.product_id) }} ({{ d.quantity }} шт.) — расстояние {{ d.distance_km }} км, {{ d.shipping_cost }} ₽
+                </li>
               </ul>
             </div>
 
@@ -164,23 +164,18 @@
       </aside>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО ПОДТВЕРЖДЕНИЯ ОПЛАТЫ ОНЛАЙН -->
+    <!-- МОДАЛЬНОЕ ОКНО ПОДТВЕРЖДЕНИЯ ОПЛАТЫ (ТОЛЬКО ДЛЯ КАРТЫ) -->
     <div v-if="showPaymentModal" class="modal-overlay" @click.self="closePaymentModal">
       <div class="modal-content glass-card">
         <button class="modal-close" @click="closePaymentModal">&times;</button>
-        <h2>Подтверждение оплаты</h2>
-        <p>Вы собираетесь оплатить <strong>{{ finalTotal }} ₽</strong> онлайн.</p>
+        <h2>Подтверждение заказа</h2>
+        <p>Вы собираетесь оплатить <strong>{{ finalTotal }} ₽</strong> банковской картой.</p>
         <p class="modal-hint">Тестовый платёж — средства не списываются.</p>
-
-        <div v-if="paymentError" class="error-block">
-          {{ paymentError }}
-        </div>
-
         <div class="modal-actions">
           <button @click="closePaymentModal" class="btn-cancel">ОТМЕНА</button>
-          <button @click="processCardPayment" :disabled="paymentProcessing" class="btn-submit">
-            <span v-if="paymentProcessing" class="spinner-inline">⏳</span>
-            {{ paymentProcessing ? 'ОПЛАТА...' : 'ОПЛАТИТЬ' }}
+          <button @click="confirmAndCreateOrder" :disabled="loading" class="btn-submit">
+            <span v-if="loading" class="spinner-inline">⏳</span>
+            {{ loading ? 'ОБРАБОТКА...' : 'ОПЛАТИТЬ' }}
           </button>
         </div>
       </div>
@@ -340,16 +335,13 @@ const getProductName = (id) => {
   return item ? item.name : 'Товар';
 };
 
-// ---- МОДАЛЬНОЕ ОКНО ОПЛАТЫ ----
+// ---- МОДАЛЬНОЕ ОКНО (ТОЛЬКО ДЛЯ КАРТЫ) ----
 const showPaymentModal = ref(false);
-const paymentProcessing = ref(false);
-const paymentError = ref('');
 
 const onSubmitClick = () => {
   if (isSubmitDisabled.value) return;
   if (form.value.payment_method === 'card') {
     showPaymentModal.value = true;
-    paymentError.value = '';
   } else {
     createOrderAndRedirect('cash');
   }
@@ -357,12 +349,9 @@ const onSubmitClick = () => {
 
 const closePaymentModal = () => {
   showPaymentModal.value = false;
-  paymentProcessing.value = false;
 };
 
-const processCardPayment = async () => {
-  paymentProcessing.value = true;
-  paymentError.value = '';
+const confirmAndCreateOrder = async () => {
   await createOrderAndRedirect('card');
   showPaymentModal.value = false;
 };
@@ -385,25 +374,12 @@ const createOrderAndRedirect = async (paymentMethod) => {
     const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/orders`, orderPayload);
     const orderId = res.data.orderId;
 
-    // Сразу очищаем корзину – заказ уже создан
+    // Очищаем корзину сразу после успешного создания заказа
     cartStore.clearCart();
 
-    if (paymentMethod === 'card') {
-      // Попытка тестовой оплаты
-      try {
-        const payRes = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/payment/tinkoff-init`, { orderId });
-        window.location.href = payRes.data.confirmation_url; // редирект на тестовый вебхук
-      } catch (payError) {
-        console.warn('Не удалось инициировать оплату, перенаправляем на страницу заказа:', payError);
-        // Если оплата не сработала – всё равно идём на страницу успеха, заказ уже есть
-        router.push(`/order-success?orderId=${orderId}&status=unpaid`);
-      }
-    } else {
-      // Наличные – сразу на страницу успеха
-      router.push(`/order-success?orderId=${orderId}`);
-    }
+    // Переходим на страницу успеха
+    router.push(`/order-success?orderId=${orderId}`);
   } catch (e) {
-    // Ошибка создания заказа
     alert(e.response?.data?.error || 'Ошибка при создании заказа');
   } finally {
     loading.value = false;
