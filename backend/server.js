@@ -53,7 +53,6 @@ const DEFAULT_AVATARS = [
     `https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/3.png`
 ];
 
-
 // --- Шаблоны писем ---
 const getEmailTemplate = (templateName, variables = {}) => {
     const templatePath = path.join(__dirname, 'email_templates', templateName);
@@ -87,7 +86,7 @@ const writeLog = (filePath, data) => {
     fs.appendFile(filePath, entry, (err) => { if (err) console.error('Ошибка записи лога:', err); });
 };
 
-// --- Уведомления и email (SMTP Unisender) ---
+// --- Уведомления и email (Unisender Go REST API) ---
 const notifyAndEmail = async ({ userId, type, title, message, email, templateName, templateVars = {} }) => {
     writeLog(NOTIFICATIONS_LOG, { userId, type, title, message, emailSentTo: email });
 
@@ -856,7 +855,7 @@ app.delete('/api/storage/:bucket/:filename', verifyAdmin, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Форма обратной связи (SMTP Unisender)
+// Форма обратной связи (API Unisender)
 app.post('/api/feedback/send', async (req, res) => {
     const { name, contact, message } = req.body;
     if (!name || !contact || !message) {
