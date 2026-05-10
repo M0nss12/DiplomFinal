@@ -329,10 +329,10 @@ app.post('/api/shipping-calculator', async (req, res) => {
         let shipping = distanceKm * weight_kg * rate + base;
 
         let maxShipping = null;
-if (items_cost > 0) {
-    maxShipping = parseFloat((items_cost * 0.22).toFixed(2));
-    if (shipping > maxShipping) shipping = maxShipping;
-}
+        if (items_cost > 0) {
+            maxShipping = parseFloat((items_cost * 0.22).toFixed(2));
+            if (shipping > maxShipping) shipping = maxShipping;
+        }
 
         res.json({
             city: targetWarehouse.cities?.name || 'Неизвестно',
@@ -345,8 +345,8 @@ if (items_cost > 0) {
                 distance_km: Math.round(distanceKm),
                 raw_shipping: Math.round(distanceKm * weight_kg * rate + base)
             },
-ax_shipping: maxShipping ? parseFloat(maxShipping.toFixed(2)) : null,
-total_shipping: parseFloat(shipping.toFixed)
+            max_shipping: maxShipping ? parseFloat(maxShipping.toFixed(0)) : null,
+            total_shipping: parseFloat(shipping.toFixed(0))
         });
     } catch (e) {
         console.error('Ошибка в shipping-calculator:', e);
