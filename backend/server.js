@@ -57,14 +57,17 @@ const DEFAULT_AVATARS = [
 // --- Почта и шаблоны ---
 const transporter = nodemailer.createTransport({
     host: 'smtp.yandex.ru',
-    port: 587,
-    secure: false,                 // обязательно false для 587
+    port: 587,                     // или 465, если используете SSL
+    secure: false,                 // true для 465
     auth: {
-        user: process.env.EMAIL_USER,   // ваш ящик на Яндексе
-        pass: process.env.EMAIL_PASS    // пароль приложения
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     },
     tls: {
-        rejectUnauthorized: false    // временно, если сертификат не принимается
+        rejectUnauthorized: false  // иногда нужно для Яндекса
+    },
+    connection: {
+        family: 4                  // <-- ТОЛЬКО IPv4
     }
 });
 
@@ -747,7 +750,7 @@ app.post('/api/orders', async (req, res) => {
             user_id: req.headers['x-user-id'] || crypto.randomUUID(),
             warehouse_id, 
             payment_method,
-            payment_status: 'unpaid', 
+            payment_status: payment_method === 'card' ? 'paid' : 'unpaid',
             delivery_status: 'processing',
             shipping_cost: totalShipping, 
             total_price: finalTotal,
@@ -808,6 +811,9 @@ app.get('/api/payment/test-webhook', async (req, res) => {
         res.redirect(`/order-success?orderId=${orderId}`);
     }
 });
+
+
+
 
 // =====================================================================
 // API: УПРАВЛЕНИЕ ФАЙЛАМИ
