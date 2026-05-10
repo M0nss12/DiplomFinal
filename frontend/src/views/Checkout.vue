@@ -12,38 +12,41 @@
     </div>
 
     <div v-else class="checkout-layout">
-      
       <div class="checkout-main">
         <!-- 1. КОНТАКТЫ И ГОРОД -->
         <section class="checkout-section glass-card">
           <h3><span class="section-icon">👤</span> Контактные данные</h3>
-          
+
           <!-- ГОРОД (автодополнение) -->
           <div class="input-group full-width-group">
-             <label>📍 Ваш Город (населённый пункт) *</label>
-             <div class="city-autocomplete">
-               <input
-                 :value="cityInput"
-                 @input="onCityInput"
-                 @focus="showCitySuggestions = true"
-                 @blur="onCityBlur"
-                 placeholder="Введите название города..."
-                 autocomplete="off"
-               />
-               <transition name="dropdown-fade">
-                 <ul v-if="showCitySuggestions && filteredCities.length" class="city-suggestions glass-card">
-                   <li
-                     v-for="c in filteredCities"
-                     :key="c.id"
-                     @mousedown.prevent="selectCity(c)"
-                     :class="{ active: appStore.city === c.name }"
-                   >
-                     {{ c.name }}
-                   </li>
-                 </ul>
-               </transition>
-             </div>
-             <span class="city-hint">Выберите город из списка</span>
+            <label>📍 Ваш Город (населённый пункт) *</label>
+            <div class="city-autocomplete">
+              <input
+                :value="cityInput"
+                @input="onCityInput"
+                @focus="showCitySuggestions = true"
+                @blur="onCityBlur"
+                placeholder="Начните вводить название города..."
+                autocomplete="off"
+              />
+              <transition name="dropdown-fade">
+                <ul
+                  v-if="showCitySuggestions && filteredCities.length"
+                  class="city-suggestions glass-card"
+                >
+                  <li
+                    v-for="c in filteredCities"
+                    :key="c.id"
+                    @mousedown.prevent="selectCity(c)"
+                    :class="{ active: appStore.city === c.name }"
+                  >
+                    {{ c.name }}
+                  </li>
+                </ul>
+              </transition>
+            </div>
+            <span class="city-hint" v-if="citiesLoading">Загрузка городов...</span>
+            <span class="city-hint" v-else>Выберите город из выпадающего списка.</span>
           </div>
 
           <div class="form-grid">
@@ -67,7 +70,7 @@
         <!-- 2. ПВЗ -->
         <section class="checkout-section glass-card">
           <h3><span class="section-icon">📍</span> Пункт выдачи в г. {{ appStore.city || '…' }}</h3>
-          
+
           <div v-if="localWarehouses.length > 0">
             <select v-model="selectedWarehouseId" class="warehouse-select" @change="refreshShipping">
               <option :value="null">-- Выберите адрес --</option>
@@ -85,9 +88,12 @@
         <section class="checkout-section glass-card">
           <h3><span class="section-icon">💳</span> Способ оплаты</h3>
           <div class="payment-methods-grid">
-            <label v-for="m in paymentMethods" :key="m.id" 
-                   class="payment-method-card"
-                   :class="{ active: form.payment_method === m.id }">
+            <label
+              v-for="m in paymentMethods"
+              :key="m.id"
+              class="payment-method-card"
+              :class="{ active: form.payment_method === m.id }"
+            >
               <input type="radio" :value="m.id" v-model="form.payment_method" />
               <div class="method-icon">{{ m.icon }}</div>
               <strong>{{ m.label }}</strong>
@@ -99,12 +105,14 @@
         <!-- КНОПКИ ДЕЙСТВИЯ -->
         <div class="action-footer">
           <button @click="cancelOrder" class="btn-cancel">ОТМЕНИТЬ</button>
-          <button @click="handleOrderProcess" 
-                  :disabled="isSubmitDisabled" 
-                  class="btn-submit"
-                  :style="{ opacity: isSubmitDisabled ? 0.5 : 1 }">
+          <button
+            @click="onSubmitClick"
+            :disabled="isSubmitDisabled"
+            class="btn-submit"
+            :style="{ opacity: isSubmitDisabled ? 0.5 : 1 }"
+          >
             <span v-if="loading" class="spinner-inline">⏳</span>
-            {{ loading ? 'ОБРАБОТКА...' : (form.payment_method === 'card' ? '✔ ПЕРЕЙТИ К ОПЛАТЕ' : '✔ ПОДТВЕРДИТЬ ЗАКАЗ') }}
+            {{ loading ? 'ОБРАБОТКА...' : submitButtonText }}
           </button>
         </div>
       </div>
@@ -155,6 +163,28 @@
         </div>
       </aside>
     </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО ПОДТВЕРЖДЕНИЯ ОПЛАТЫ ОНЛАЙН -->
+    <div v-if="showPaymentModal" class="modal-overlay" @click.self="closePaymentModal">
+      <div class="modal-content glass-card">
+        <button class="modal-close" @click="closePaymentModal">&times;</button>
+        <h2>Подтверждение оплаты</h2>
+        <p>Вы собираетесь оплатить <strong>{{ finalTotal }} ₽</strong> онлайн.</p>
+        <p class="modal-hint">Тестовый платёж — средства не списываются.</p>
+
+        <div v-if="paymentError" class="error-block">
+          {{ paymentError }}
+        </div>
+
+        <div class="modal-actions">
+          <button @click="closePaymentModal" class="btn-cancel">ОТМЕНА</button>
+          <button @click="processCardPayment" :disabled="paymentProcessing" class="btn-submit">
+            <span v-if="paymentProcessing" class="spinner-inline">⏳</span>
+            {{ paymentProcessing ? 'ОПЛАТА...' : 'ОПЛАТИТЬ' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -176,6 +206,7 @@ const selectedWarehouseId = ref(null);
 
 // ---- ГОРОД (автодополнение) ----
 const cities = ref([]);
+const citiesLoading = ref(true);
 const cityInput = ref('');
 const showCitySuggestions = ref(false);
 const filteredCities = computed(() => {
@@ -192,8 +223,8 @@ const onCityInput = (event) => {
 const selectCity = async (city) => {
   cityInput.value = city.name;
   showCitySuggestions.value = false;
-  await appStore.setCity(city.name);   // обновляем глобально
-  selectedWarehouseId.value = null;    // сбрасываем ПВЗ
+  await appStore.setCity(city.name);
+  selectedWarehouseId.value = null;
   const uid = localStorage.getItem('user_id');
   if (uid) {
     try {
@@ -203,7 +234,6 @@ const selectCity = async (city) => {
 };
 
 const onCityBlur = () => {
-  // Если пользователь ввёл текст, но не выбрал город из списка – сбрасываем на текущий
   setTimeout(() => {
     if (!cities.value.some(c => c.name === cityInput.value)) {
       cityInput.value = appStore.city || '';
@@ -253,6 +283,10 @@ const isSubmitDisabled = computed(() => {
   const hasContact = form.value.phone.trim() || form.value.email.trim();
   const hasCity = appStore.city && selectedWarehouseId.value;
   return !form.value.name.trim() || !hasContact || !hasCity || loading.value || !emailValid.value;
+});
+
+const submitButtonText = computed(() => {
+  return form.value.payment_method === 'card' ? '✔ ПЕРЕЙТИ К ОПЛАТЕ' : '✔ ПОДТВЕРДИТЬ ЗАКАЗ';
 });
 
 // ---- ПВЗ ----
@@ -306,61 +340,98 @@ const getProductName = (id) => {
   return item ? item.name : 'Товар';
 };
 
-// ---- ОФОРМЛЕНИЕ ----
-const handleOrderProcess = async () => {
+// ---- МОДАЛЬНОЕ ОКНО ОПЛАТЫ ----
+const showPaymentModal = ref(false);
+const paymentProcessing = ref(false);
+const paymentError = ref('');
+
+const onSubmitClick = () => {
   if (isSubmitDisabled.value) return;
+  if (form.value.payment_method === 'card') {
+    showPaymentModal.value = true;
+    paymentError.value = '';
+  } else {
+    createOrderAndRedirect('cash');
+  }
+};
+
+const closePaymentModal = () => {
+  showPaymentModal.value = false;
+  paymentProcessing.value = false;
+};
+
+const processCardPayment = async () => {
+  paymentProcessing.value = true;
+  paymentError.value = '';
+  try {
+    await createOrderAndRedirect('card');
+    showPaymentModal.value = false;
+  } catch (e) {
+    paymentError.value = e.response?.data?.error || 'Ошибка оплаты';
+  } finally {
+    paymentProcessing.value = false;
+  }
+};
+
+// ---- СОЗДАНИЕ ЗАКАЗА И РЕДИРЕКТ ----
+const createOrderAndRedirect = async (paymentMethod) => {
   loading.value = true;
   try {
-    const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/orders`, {
-      ...form.value, 
-      customer_name: form.value.name, 
+    const orderPayload = {
+      customer_name: form.value.name,
       customer_phone: form.value.phone,
-      customer_email: form.value.email, 
+      customer_email: form.value.email,
       customer_city: appStore.city,
       warehouse_id: selectedWarehouseId.value,
-      payment_method: form.value.payment_method,
+      payment_method: paymentMethod,
       shipping_cost: shippingData.value.total,
       items: cartStore.items.map(i => ({ product_id: i.id, quantity: i.quantity }))
-    });
+    };
 
+    const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/orders`, orderPayload);
     const orderId = res.data.orderId;
 
-    if (form.value.payment_method === 'card') {
+    cartStore.clearCart();
+
+    if (paymentMethod === 'card') {
       const payRes = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/payment/tinkoff-init`, { orderId });
-      cartStore.clearCart(); 
-      window.location.href = payRes.data.confirmation_url; 
+      window.location.href = payRes.data.confirmation_url;
     } else {
-      cartStore.clearCart();
       router.push(`/order-success?orderId=${orderId}`);
     }
-  } catch (e) { 
-    alert(e.response?.data?.error || "Ошибка при оформлении заказа"); 
+  } catch (e) {
+    alert(e.response?.data?.error || 'Ошибка при создании заказа');
+  } finally {
     loading.value = false;
-  } 
+  }
 };
 
 const cancelOrder = () => router.push('/cart');
 
 // ---- ИНИЦИАЛИЗАЦИЯ ----
 onMounted(async () => {
-  // Загружаем список городов
   try {
+    citiesLoading.value = true;
     const cRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/cities`);
     cities.value = cRes.data || [];
-  } catch (e) { console.warn('Не удалось загрузить города'); }
+  } catch (e) {
+    console.warn('Не удалось загрузить города');
+  } finally {
+    citiesLoading.value = false;
+  }
 
   cityInput.value = appStore.city || '';
   const uid = localStorage.getItem('user_id');
-  
+
   try {
-    const wRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/admin/warehouses`, { 
-      headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' } 
+    const wRes = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/admin/warehouses`, {
+      headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' }
     });
     warehouses.value = wRes.data;
 
     if (uid) {
       const u = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${uid}`);
-      form.value.name = [u.data.first_name, u.data.last_name].filter(Boolean).join(' ') || '';
+      form.value.name = u.data.first_name || '';
       form.value.phone = u.data.phone_number || '';
       form.value.email = u.data.email || '';
     }
@@ -373,41 +444,6 @@ watch([selectedWarehouseId, () => cartStore.items.map(i => i.quantity).join(',')
 </script>
 
 <style scoped>
-/* Все стили из предыдущей версии без изменений, добавляется только автодополнение */
-/* Полный CSS скопируйте из предыдущего ответа */
-/* ... (весь блок <style scoped> из предыдущего сообщения) ... */
-
-/* ДОБАВЛЕННЫЕ СТИЛИ ДЛЯ АВТОДОПОЛНЕНИЯ */
-.city-autocomplete { position: relative; }
-.city-autocomplete input {
-  width: 100%; padding: 14px 18px; font-size: 1.1rem; font-weight: 600;
-  border-radius: var(--radius-sm, 8px); border: 2px solid var(--border-color, #cbd5e1);
-  background: var(--bg-card, #fff); color: var(--text-main, #0f172a); transition: all 0.3s;
-}
-:global(.dark) .city-autocomplete input { background: #0f172a; border-color: #475569; color: #f8fafc; }
-.city-autocomplete input:focus { border-color: var(--primary, #2563eb); outline: none; }
-
-.city-suggestions {
-  position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
-  max-height: 220px; overflow-y: auto; list-style: none; padding: 0; margin-top: 4px;
-  border-radius: var(--radius-md, 12px); background: var(--bg-card, #fff);
-  border: 1px solid var(--border-color, #e2e8f0); box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-}
-:global(.dark) .city-suggestions { background: #1e293b; border-color: #334155; }
-.city-suggestions li {
-  padding: 12px 18px; cursor: pointer; font-size: 0.95rem; color: var(--text-main, #0f172a);
-  border-bottom: 1px solid var(--border-color, #e2e8f0); transition: background 0.2s;
-}
-:global(.dark) .city-suggestions li { color: #f8fafc; border-color: #334155; }
-.city-suggestions li:hover, .city-suggestions li.active {
-  background: rgba(37, 99, 235, 0.05); color: var(--primary, #2563eb);
-}
-:global(.dark) .city-suggestions li:hover, :global(.dark) .city-suggestions li.active { background: rgba(37, 99, 235, 0.15); }
-
-/* Анимация появления/скрытия */
-.dropdown-fade-enter-active, .dropdown-fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
-.dropdown-fade-enter-from, .dropdown-fade-leave-to { opacity: 0; transform: translateY(-8px); }
-
 @keyframes fadeSlideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -488,13 +524,35 @@ watch([selectedWarehouseId, () => cartStore.items.map(i => i.quantity).join(',')
 :global(.dark) .full-width-group { background: rgba(255,255,255,0.02); border-color: #334155; }
 
 .city-input-wrap { position: relative; }
-.city-input-wrap input {
+.city-autocomplete { position: relative; }
+.city-autocomplete input {
   width: 100%; padding: 14px 18px; font-size: 1.1rem; font-weight: 600;
   border-radius: var(--radius-sm, 8px); border: 2px solid var(--border-color, #cbd5e1);
   background: var(--bg-card, #fff); color: var(--text-main, #0f172a); transition: all 0.3s;
 }
-:global(.dark) .city-input-wrap input { background: #0f172a; border-color: #475569; color: #f8fafc; }
-.city-input-wrap input:focus { border-color: var(--primary, #2563eb); outline: none; }
+:global(.dark) .city-autocomplete input { background: #0f172a; border-color: #475569; color: #f8fafc; }
+.city-autocomplete input:focus { border-color: var(--primary, #2563eb); outline: none; }
+
+.city-suggestions {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+  max-height: 220px; overflow-y: auto; list-style: none; padding: 0; margin-top: 4px;
+  border-radius: var(--radius-md, 12px); background: var(--bg-card, #fff);
+  border: 1px solid var(--border-color, #e2e8f0); box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+:global(.dark) .city-suggestions { background: #1e293b; border-color: #334155; }
+.city-suggestions li {
+  padding: 12px 18px; cursor: pointer; font-size: 0.95rem; color: var(--text-main, #0f172a);
+  border-bottom: 1px solid var(--border-color, #e2e8f0); transition: background 0.2s;
+}
+:global(.dark) .city-suggestions li { color: #f8fafc; border-color: #334155; }
+.city-suggestions li:hover, .city-suggestions li.active {
+  background: rgba(37, 99, 235, 0.05); color: var(--primary, #2563eb);
+}
+:global(.dark) .city-suggestions li:hover, :global(.dark) .city-suggestions li.active { background: rgba(37, 99, 235, 0.15); }
+
+.dropdown-fade-enter-active, .dropdown-fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.dropdown-fade-enter-from, .dropdown-fade-leave-to { opacity: 0; transform: translateY(-8px); }
+
 .city-hint { display: block; font-size: 0.75rem; color: var(--text-muted, #64748b); margin-top: 8px; }
 
 .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
@@ -510,6 +568,9 @@ watch([selectedWarehouseId, () => cartStore.items.map(i => i.quantity).join(',')
 }
 :global(.dark) .input-group input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
 .input-group input:focus { border-color: var(--primary, #2563eb); outline: none; background: transparent; }
+
+.error-hint { color: var(--danger, #ef4444); font-size: 0.8rem; margin-top: 5px; }
+.hint-note { color: var(--text-muted); font-size: 0.85rem; margin-top: 15px; }
 
 /* ПВЗ */
 .warehouse-select {
@@ -592,13 +653,6 @@ watch([selectedWarehouseId, () => cartStore.items.map(i => i.quantity).join(',')
 .intercity-list { list-style: none; padding: 0; margin: 0; }
 .intercity-list li { padding: 4px 0; font-size: 0.8rem; }
 
-.weight-alert {
-  background: rgba(0,0,0,0.02); padding: 10px 14px; border-radius: var(--radius-sm, 8px);
-  display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 15px; border: 1px solid var(--border-color, #e2e8f0); color: var(--text-main, #0f172a);
-}
-:global(.dark) .weight-alert { background: rgba(255,255,255,0.02); border-color: #334155; color: #f8fafc; }
-.surcharge { color: var(--danger, #ef4444); font-weight: 800; }
-
 .final-price {
   display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px;
   padding-top: 20px; border-top: 2px solid var(--border-color, #cbd5e1); font-size: 1.5rem; font-weight: 800; color: var(--text-main, #0f172a);
@@ -614,6 +668,30 @@ watch([selectedWarehouseId, () => cartStore.items.map(i => i.quantity).join(',')
 :global(.dark) .empty-cart-state h2 { color: #f8fafc; }
 .btn-primary { background: var(--primary, #2563eb); color: white; padding: 14px 32px; border-radius: 40px; font-weight: 800; border: none; margin-top: 20px; cursor: pointer; transition: transform 0.2s; }
 .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+
+/* МОДАЛЬНОЕ ОКНО */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center; z-index: 2000;
+}
+.modal-content {
+  width: 90%; max-width: 480px; padding: 30px; position: relative;
+  text-align: center;
+}
+.modal-close {
+  position: absolute; top: 15px; right: 15px; width: 36px; height: 36px;
+  border-radius: 50%; background: rgba(0,0,0,0.05); border: none; font-size: 24px;
+  cursor: pointer; transition: all 0.2s; color: var(--text-main, #0f172a);
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: rgba(239,68,68,0.1); color: var(--danger, #ef4444); transform: rotate(90deg); }
+.modal-content h2 { color: var(--text-main); margin-bottom: 15px; }
+:global(.dark) .modal-content h2 { color: #f8fafc; }
+.modal-content p { color: var(--text-muted); margin-bottom: 10px; }
+.modal-hint { font-size: 0.85rem; color: var(--primary, #2563eb); }
+.modal-actions { display: flex; gap: 15px; margin-top: 25px; justify-content: center; }
+.error-block { background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); padding: 10px; border-radius: 8px; margin-top: 15px; font-size: 0.9rem; }
 
 /* Адаптивность */
 @media (max-width: 992px) {

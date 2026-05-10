@@ -279,7 +279,6 @@ app.post('/api/shipping-calculator', async (req, res) => {
         return res.status(400).json({ error: 'warehouse_id и weight_kg обязательны' });
     }
     try {
-        // Центральный склад-отправитель (Москва, id=1 – замените при необходимости)
         const sourceWarehouseId = 1;
 
         const { data: sourceWh } = await supabase
@@ -455,7 +454,6 @@ app.post('/api/users/register', async (req, res) => {
     } catch (e) { logError(e, req); res.status(500).json({ error: e.message }); }
 });
 
-// Создание пользователя администратором (без капчи, с письмом подтверждения)
 app.post('/api/admin/users', verifyAdmin, async (req, res) => {
     try {
         const { email, phone_number, password, first_name, last_name, otchestvo, city, role } = req.body;
@@ -852,6 +850,7 @@ app.delete('/api/storage/:bucket/:filename', verifyAdmin, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Форма обратной связи
 app.post('/api/feedback/send', async (req, res) => {
     const { name, contact, message } = req.body;
     if (!name || !contact || !message) {
@@ -860,7 +859,7 @@ app.post('/api/feedback/send', async (req, res) => {
     try {
         await transporter.sendMail({
             from: `"ApexDrive Форма" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER,   // или специальный ящик для заявок
+            to: process.env.EMAIL_USER,
             subject: `Новое сообщение от ${name}`,
             html: `<p><b>Имя:</b> ${name}</p><p><b>Контакты:</b> ${contact}</p><p><b>Сообщение:</b></p><p>${message}</p>`
         });
@@ -870,9 +869,9 @@ app.post('/api/feedback/send', async (req, res) => {
     }
 });
 
-// Предварительный расчёт доставки (публичный, без verifyAdmin)
+// Предварительный расчёт доставки (публичный)
 app.post('/api/public/shipping-estimate', async (req, res) => {
-    const { warehouse_id, items } = req.body;  // items: [{ product_id, quantity }]
+    const { warehouse_id, items } = req.body;
     if (!warehouse_id || !items || !items.length) {
         return res.status(400).json({ error: 'warehouse_id и items обязательны' });
     }
@@ -949,7 +948,6 @@ app.put('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Специальный обработчик удаления заказа (с возвратом остатков)
 app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
     const orderId = req.params.id;
 
