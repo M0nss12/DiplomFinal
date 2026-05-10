@@ -762,23 +762,29 @@ app.post('/api/orders', async (req, res) => {
         }
 
         // Фоновое уведомление (не ждём)
-        if (order && order[0]) {
-            const newOrder = order[0];
-            notifyAndEmail({
-                userId: req.headers['x-user-id'] || null,
-                type: 'order',
-                email: customer_email,
-                title: `Заказ №${newOrder.id} оформлен`,
-                message: `Ваш заказ на сумму ${finalTotal} ₽ принят в обработку.`,
-                templateName: 'order_created.html',
-                templateVars: {
-                    order_id: newOrder.id,
-                    total: finalTotal,
-                    name: customer_name,
-                    address: newOrder.delivery_address
-                }
-            }).catch(err => console.error('Ошибка отправки уведомления о заказе:', err));
-        }
+if (order && order[0]) {
+    const newOrder = order[0];
+    try {
+        console.log('🔔 Отправка уведомления о заказе на почту:', customer_email);
+        await notifyAndEmail({
+            userId: req.headers['x-user-id'] || null,
+            type: 'order',
+            email: customer_email,
+            title: `Заказ №${newOrder.id} оформлен`,
+            message: `Ваш заказ на сумму ${finalTotal} ₽ принят в обработку.`,
+            templateName: 'order_created.html',
+            templateVars: {
+                order_id: newOrder.id,
+                total: finalTotal,
+                name: customer_name,
+                address: newOrder.delivery_address
+            }
+        });
+        console.log('✅ Уведомление отправлено успешно');
+    } catch (notifyErr) {
+        console.error('❌ Ошибка отправки уведомления:', notifyErr);
+    }
+}
 
         res.json({ orderId: order[0].id, total: finalTotal, distance_based_shipping: totalShipping });
     } catch (err) {
