@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const multer = require('multer');
+const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const https = require('https');
@@ -53,6 +54,28 @@ const DEFAULT_AVATARS = [
     `https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/3.png`
 ];
 
+// --- Почтовый транспортёр (SMTP Unisender Go) ---
+const transporter = nodemailer.createTransport({
+    host: 'smtp.go2.unisender.ru',
+    port: 587,
+    secure: false,
+    auth: {
+        user: process.env.UNISENDER_SMTP_USER || '8191722',
+        pass: process.env.UNISENDER_SMTP_PASS || '6tikf7ycc5trrgnzdmr4okmrme97s7xbbdtq1zxa'
+    },
+    tls: {
+        rejectUnauthorized: false
+    },
+    dns: {
+        lookup: (hostname, options, callback) => {
+            dns.lookup(hostname, { family: 4, ...options }, callback);
+        }
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000
+});
+
 // --- Шаблоны писем ---
 const getEmailTemplate = (templateName, variables = {}) => {
     const templatePath = path.join(__dirname, 'email_templates', templateName);
@@ -86,43 +109,28 @@ const writeLog = (filePath, data) => {
     fs.appendFile(filePath, entry, (err) => { if (err) console.error('Ошибка записи лога:', err); });
 };
 
-// --- Уведомления и email (Unisender Go) ---
+// --- Уведомления и email (SMTP Unisender) ---
 const notifyAndEmail = async ({ userId, type, title, message, email, templateName, templateVars = {} }) => {
     writeLog(NOTIFICATIONS_LOG, { userId, type, title, message, emailSentTo: email });
 
-    // 1. Сохраняем уведомление на сайте (колокольчик)
     try {
-        if (userId) {
-            await supabase.from('notifications').insert([{ user_id: userId, type, title, message }]);
-        }
-    } catch (e) {
-        console.error('Ошибка записи уведомления в БД:', e.message);
-    }
+        if (userId) await supabase.from('notifications').insert([{ user_id: userId, type, title, message }]);
+    } catch (e) { console.error('Ошибка записи уведомления в БД:', e.message); }
 
-    // 2. Отправляем письмо через Unisender Go, если указан email
     if (email) {
         try {
             const html = getEmailTemplate(
                 templateName || 'notification_general.html',
                 { title, message, ...templateVars }
             );
-
-            await axios.post('https://go.unisender.ru/api/v1/email/send', {
-                recipients: [{ email: email }],
+            await transporter.sendMail({
+                from: `"ApexDrive" <${process.env.EMAIL_USER}>`,
+                to: email,
                 subject: title,
-                body: html,
-                from_email: process.env.EMAIL_USER,
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${process.env.UNISENDER_API_KEY}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 10000
+                html: html
             });
-
-            console.log(`✅ Письмо отправлено через Unisender на ${email}`);
-        } catch (e) {
-            console.error('❌ Ошибка отправки через Unisender:', e.response?.data || e.message);
+        } catch (e) { 
+            console.error("❌ ОШИБКА ПОЧТЫ (SMTP):", e.message); 
         }
     }
 };
@@ -289,7 +297,7 @@ app.post('/api/shipping-calculator', async (req, res) => {
         return res.status(400).json({ error: 'warehouse_id и weight_kg обязательны' });
     }
     try {
-        const sourceWarehouseId = 1; // центральный склад (обязательно должен существовать)
+        const sourceWarehouseId = 1;
 
         const { data: sourceWh } = await supabase
             .from('warehouses')
@@ -363,8 +371,7 @@ app.post('/api/shipping-calculator', async (req, res) => {
 app.get('/api/wishlist/:userId', async (req, res) => {
     try {
         const { data, error } = await supabase.from('wishlists').select('*, products(*)').eq('user_id', req.params.userId);
-        if (error) throw error;
-        res.json(data || []);
+        if (error) throw error; res.json(data || []);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -372,16 +379,14 @@ app.post('/api/wishlist', async (req, res) => {
     try {
         const { user_id, product_id } = req.body;
         const { data, error } = await supabase.from('wishlists').insert([{ user_id, product_id }]).select().single();
-        if (error) throw error;
-        res.json(data);
+        if (error) throw error; res.json(data);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.delete('/api/wishlist/:userId/:productId', async (req, res) => {
     try {
         const { error } = await supabase.from('wishlists').delete().eq('user_id', req.params.userId).eq('product_id', req.params.productId);
-        if (error) throw error;
-        res.json({ success: true });
+        if (error) throw error; res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -393,10 +398,10 @@ app.post('/api/reviews', async (req, res) => {
 });
 
 app.post('/api/admin/reviews', verifyAdmin, async (req, res) => {
-    try {
-        const { data } = await supabase.from('reviews').insert([req.body]).select();
-        res.json(data[0]);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const { data } = await supabase.from('reviews').insert([req.body]).select();
+    res.json(data[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/reviews/:productId', async (req, res) => {
@@ -823,7 +828,6 @@ app.post('/api/calculate-shipping', verifyAdmin, async (req, res) => {
     }
 });
 
-// Тестовая оплата больше не нужна, но маршрут оставлен для обратной совместимости
 app.post('/api/payment/tinkoff-init', async (req, res) => {
     const { orderId } = req.body;
     const mockPaymentUrl = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/test-webhook?orderId=${orderId}&status=paid`;
@@ -862,24 +866,18 @@ app.delete('/api/storage/:bucket/:filename', verifyAdmin, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Форма обратной связи (использует Unisender API для отправки админу)
+// Форма обратной связи (SMTP Unisender)
 app.post('/api/feedback/send', async (req, res) => {
     const { name, contact, message } = req.body;
     if (!name || !contact || !message) {
         return res.status(400).json({ error: 'Все поля обязательны' });
     }
     try {
-        await axios.post('https://go.unisender.ru/api/v1/email/send', {
-            recipients: [{ email: process.env.EMAIL_USER }],
+        await transporter.sendMail({
+            from: `"ApexDrive Форма" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER,
             subject: `Новое сообщение от ${name}`,
-            body: `<p><b>Имя:</b> ${name}</p><p><b>Контакты:</b> ${contact}</p><p><b>Сообщение:</b></p><p>${message}</p>`,
-            from_email: process.env.EMAIL_USER,
-        }, {
-            headers: {
-                'Authorization': `Bearer ${process.env.UNISENDER_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            timeout: 10000
+            html: `<p><b>Имя:</b> ${name}</p><p><b>Контакты:</b> ${contact}</p><p><b>Сообщение:</b></p><p>${message}</p>`
         });
         res.json({ success: true });
     } catch (e) {
