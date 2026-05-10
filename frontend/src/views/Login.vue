@@ -128,7 +128,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { supabase } from '@/supabase';
@@ -142,11 +142,7 @@ const loading = ref(false);
 const error = ref('');
 const isPasswordVisible = ref(false);
 const emailVerifiedMessage = ref('');
-
-const form = ref({
-  login: '',
-  password: ''
-});
+const form = ref({ login: '', password: '' });
 
 // Состояния для Google OAuth
 const googleLoading = ref(false);
@@ -158,6 +154,8 @@ const resetEmail = ref('');
 const resetLoading = ref(false);
 const resetMessage = ref('');
 const resetError = ref('');
+
+let authListener = null;
 
 // 1. СОХРАНЕНИЕ СЕССИИ (localStorage)
 const saveSession = (user) => {
@@ -172,32 +170,51 @@ const saveSession = (user) => {
     setTimeout(() => window.location.reload(), 100);
 };
 
-// 2. ОБЫЧНЫЙ ВХОД
-const handleLogin = async () => {
-  error.value = '';
-  loading.value = true;
+// 2. ОБРАБОТКА ВОЗВРАТА ОТ GOOGLE
+const processGoogleLogin = async (session) => {
+  if (!session || !session.user) return;
+  googleLoading.value = true;
+  
+  const sbUser = session.user;
+  console.log("✅ Google вернул пользователя:", sbUser.email);
+
   try {
-    const response = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/users/login`, {
-      login: form.value.login,
-      password: form.value.password
+    // Ждем 1 секунду, чтобы триггер БД точно успел отработать
+    await new Promise(r => setTimeout(r, 1000));
+    const res = await axios.get(`/api/users/profile/${sbUser.id}`);
+    console.log("✅ Профиль найден в БД. Выполняю вход.");
+    saveSession(res.data);
+  } catch (e) {
+    console.warn("⚠️ Профиля еще нет в БД, создаю локальную сессию.");
+    saveSession({
+      id: sbUser.id, 
+      email: sbUser.email,
+      first_name: sbUser.user_metadata?.full_name?.split(' ')[0] || sbUser.user_metadata?.first_name || 'Пользователь',
+      last_name: sbUser.user_metadata?.full_name?.split(' ')[1] || '',
+      avatar_url: sbUser.user_metadata?.avatar_url, 
+      role: 'user'
     });
-    saveSession(response.data);
-  } catch (err) {
-    error.value = err.response?.data?.error || 'Неверный логин или пароль';
-  } finally {
-    loading.value = false;
   }
 };
 
-// 3. СБРОС ПАРОЛЯ
+// 3. ОБЫЧНЫЙ ВХОД
+const handleLogin = async () => {
+  error.value = ''; loading.value = true;
+  try {
+    const res = await axios.post('/api/users/login', form.value);
+    saveSession(res.data);
+  } catch (err) {
+    error.value = err.response?.data?.error || 'Неверный логин или пароль';
+  } finally { loading.value = false; }
+};
+
+// 4. СБРОС ПАРОЛЯ
 const handlePasswordReset = async () => {
   resetError.value = '';
   resetMessage.value = '';
   resetLoading.value = true;
   try {
-    await axios.post('/api/users/request-password-reset', {
-      email: resetEmail.value
-    });
+    await axios.post('/api/users/request-password-reset', { email: resetEmail.value });
     resetMessage.value = 'Письмо отправлено! Проверьте папку "Входящие" или "Спам".';
     resetEmail.value = '';
   } catch (err) {
@@ -214,16 +231,13 @@ const closeResetModal = () => {
   resetMessage.value = '';
 };
 
-// 4. ВХОД ЧЕРЕЗ GOOGLE
+// 5. ВХОД ЧЕРЕЗ GOOGLE (КЛИК ПО КНОПКЕ)
 const socialAuth = async (provider) => {
-  googleLoading.value = true;
-  googleError.value = '';
+  googleLoading.value = true; googleError.value = '';
   try {
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: provider,
-      options: {
-        redirectTo: window.location.origin + '/login',
-      },
+      options: { redirectTo: window.location.origin + route.path },
     });
     if (authError) throw authError;
   } catch (err) {
@@ -232,30 +246,32 @@ const socialAuth = async (provider) => {
   }
 };
 
-// 5. ОБРАБОТКА ВОЗВРАТА ОТ GOOGLE И ПОДТВЕРЖДЕНИЯ ПОЧТЫ
+// 6. ИНИЦИАЛИЗАЦИЯ И СЛУШАТЕЛИ
 onMounted(async () => {
   if (route.query.verified === 'true') {
     emailVerifiedMessage.value = 'Ваша почта успешно подтверждена! Теперь вы можете войти.';
   }
 
-  // Проверка сессии Google
+  // Принудительная проверка сессии при загрузке (если редирект был быстрым)
   const { data: { session } } = await supabase.auth.getSession();
   if (session && !localStorage.getItem('user_id')) {
-    const sbUser = session.user;
-    try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/users/profile/${sbUser.id}`);
-      saveSession(res.data);
-    } catch (e) {
-      const newUser = {
-        id: sbUser.id,
-        email: sbUser.email,
-        first_name: sbUser.user_metadata?.full_name || sbUser.user_metadata?.first_name || 'Пользователь',
-        avatar_url: sbUser.user_metadata?.avatar_url || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png',
-        role: 'user'
-      };
-      saveSession(newUser);
-    }
+    console.log("🔍 Найдена активная сессия при загрузке!");
+    await processGoogleLogin(session);
   }
+
+  // Слушатель изменения состояния авторизации
+  const { data } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    if (event === 'SIGNED_IN' && currentSession) {
+      if (localStorage.getItem('user_id') === currentSession.user.id) return; 
+      console.log("🔍 Сработало событие SIGNED_IN!");
+      await processGoogleLogin(currentSession);
+    }
+  });
+  authListener = data.subscription;
+});
+
+onUnmounted(() => {
+  if (authListener) authListener.unsubscribe();
 });
 </script>
 

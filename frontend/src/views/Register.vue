@@ -117,13 +117,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, reactive, computed, onUnmounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { supabase } from '@/supabase';
 import { useAppStore } from '@/stores/appStore';
 
 const router = useRouter();
+const route = useRoute();
 const appStore = useAppStore();
 
 const loading = ref(false);
@@ -141,33 +142,25 @@ const form = reactive({
   captchaToken: ''
 });
 
-// Google OAuth
 const googleLoading = ref(false);
+let authListener = null;
 
 // Города автодополнение
 const cities = ref([]);
 const cityInput = ref('');
 const showCitySuggestions = ref(false);
+
 const filteredCities = computed(() => {
   const q = cityInput.value.trim().toLowerCase();
   if (!q) return [];
   return cities.value.filter(c => c.name.toLowerCase().includes(q));
 });
 
-const onCityInput = (e) => {
-  cityInput.value = e.target.value;
-  showCitySuggestions.value = true;
-};
-const selectCity = (city) => {
-  cityInput.value = city.name;
-  form.city = city.name;
-  showCitySuggestions.value = false;
-};
+const onCityInput = (e) => { cityInput.value = e.target.value; showCitySuggestions.value = true; };
+const selectCity = (city) => { cityInput.value = city.name; form.city = city.name; showCitySuggestions.value = false; };
 const onCityBlur = () => {
   setTimeout(() => {
-    if (!cities.value.some(c => c.name === cityInput.value)) {
-      cityInput.value = form.city || '';
-    }
+    if (!cities.value.some(c => c.name === cityInput.value)) cityInput.value = form.city || '';
     showCitySuggestions.value = false;
   }, 150);
 };
@@ -185,7 +178,6 @@ const onPhoneInput = (e) => {
   e.target.value = formatted;
 };
 
-// Загрузка городов
 const loadCities = async () => {
   try {
     const res = await axios.get('/api/cities');
@@ -205,45 +197,48 @@ const initCaptcha = () => {
   }
 };
 
-onMounted(async () => {
-  loadCities();
-  if (appStore.city) {
-    form.city = appStore.city;
-    cityInput.value = appStore.city;
-  }
-  initCaptcha();
+// 1. СОХРАНЕНИЕ СЕССИИ (localStorage)
+const saveSession = (user) => {
+    localStorage.setItem('user_id', user.id);
+    localStorage.setItem('role', user.role || 'user');
+    localStorage.setItem('user_name', [user.last_name, user.first_name].filter(Boolean).join(' ') || 'Пользователь');
+    localStorage.setItem('user_first_name', user.first_name || '');
+    localStorage.setItem('user_avatar', user.avatar_url || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png');
+    
+    router.push('/');
+    setTimeout(() => window.location.reload(), 100);
+};
 
-  // --- ЛОГИКА АВТОВХОДА ПОСЛЕ GOOGLE ---
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session && !localStorage.getItem('user_id')) {
-    const sbUser = session.user;
-    try {
-      const res = await axios.get('/api/users/profile/' + sbUser.id);
-      saveSession(res.data);
-    } catch (e) {
-      const newUserObj = {
-        id: sbUser.id,
-        email: sbUser.email,
-        first_name: sbUser.user_metadata?.full_name?.split(' ')[0] || sbUser.user_metadata?.first_name || 'Пользователь',
-        last_name: sbUser.user_metadata?.full_name?.split(' ')[1] || '',
-        avatar_url: sbUser.user_metadata?.avatar_url || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png',
-        role: 'user'
-      };
-      saveSession(newUserObj);
-    }
+// 2. ОБРАБОТКА ВОЗВРАТА ОТ GOOGLE
+const processGoogleLogin = async (session) => {
+  if (!session || !session.user) return;
+  googleLoading.value = true;
+  
+  const sbUser = session.user;
+  try {
+    await new Promise(r => setTimeout(r, 1000));
+    const res = await axios.get(`/api/users/profile/${sbUser.id}`);
+    saveSession(res.data);
+  } catch (e) {
+    saveSession({
+      id: sbUser.id, email: sbUser.email,
+      first_name: sbUser.user_metadata?.full_name?.split(' ')[0] || 'Пользователь',
+      last_name: sbUser.user_metadata?.full_name?.split(' ')[1] || '',
+      avatar_url: sbUser.user_metadata?.avatar_url, role: 'user'
+    });
   }
-});
+};
 
+// 3. ОБЫЧНАЯ РЕГИСТРАЦИЯ
 const handleRegister = async () => {
   if (!form.email && !form.phone) return error.value = 'Укажите Email или Телефон для связи';
   if (form.password.length < 6) return error.value = 'Пароль должен быть не менее 6 символов';
   if (form.password !== form.confirmPassword) return error.value = 'Введённые пароли не совпадают';
   if (!form.city.trim()) return error.value = 'Укажите ваш город';
-  if (!form.captchaToken) return error.value = 'Пожалуйста, подтвердите, что вы не робот.';
+  
+  if (!form.captchaToken && !import.meta.env.DEV) return error.value = 'Пожалуйста, подтвердите, что вы не робот.';
 
-  loading.value = true;
-  error.value = '';
-  successMessage.value = '';
+  loading.value = true; error.value = ''; successMessage.value = '';
 
   try {
     const res = await axios.post('/api/users/register', form);
@@ -261,12 +256,13 @@ const handleRegister = async () => {
   }
 };
 
+// 4. РЕГИСТРАЦИЯ ЧЕРЕЗ GOOGLE
 const socialRegister = async (provider) => {
   googleLoading.value = true;
   try {
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin + '/profile' }
+      options: { redirectTo: window.location.origin + route.path }
     });
     if (authError) throw authError;
   } catch (err) {
@@ -275,16 +271,29 @@ const socialRegister = async (provider) => {
   }
 };
 
-const saveSession = (user) => {
-    localStorage.setItem('user_id', user.id);
-    localStorage.setItem('role', user.role || 'user');
-    localStorage.setItem('user_name', [user.last_name, user.first_name].filter(Boolean).join(' ') || 'Пользователь');
-    localStorage.setItem('user_first_name', user.first_name || '');
-    localStorage.setItem('user_avatar', user.avatar_url || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png');
-    
-    router.push('/profile');
-    setTimeout(() => window.location.reload(), 100);
-};
+// 5. ИНИЦИАЛИЗАЦИЯ И СЛУШАТЕЛИ
+onMounted(async () => {
+  loadCities();
+  if (appStore.city) { form.city = appStore.city; cityInput.value = appStore.city; }
+  initCaptcha();
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session && !localStorage.getItem('user_id')) {
+    await processGoogleLogin(session);
+  }
+
+  const { data } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    if (event === 'SIGNED_IN' && currentSession) {
+      if (localStorage.getItem('user_id') === currentSession.user.id) return;
+      await processGoogleLogin(currentSession);
+    }
+  });
+  authListener = data.subscription;
+});
+
+onUnmounted(() => {
+  if (authListener) authListener.unsubscribe();
+});
 </script>
 
 <style scoped>
