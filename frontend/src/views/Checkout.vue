@@ -149,9 +149,9 @@
             <div v-if="shippingData.details && shippingData.details.some(d => !d.in_stock)" class="intercity-alert">
               <div class="alert-title">🚚 Часть товаров поедет межгородом</div>
               <ul class="intercity-list">
-                <li v-for="d in shippingData.details.filter(x => !x.in_stock)" :key="d.product_id">
-                  {{ getProductName(d.product_id) }} — расстояние {{ d.distance_km }} км, {{ d.shipping_cost }} ₽
-                </li>
+<li v-for="d in shippingData.details.filter(x => !x.in_stock)" :key="d.product_id">
+  {{ getProductName(d.product_id) }} ({{ d.quantity }} шт.) — расстояние {{ d.distance_km }} км, {{ d.shipping_cost }} ₽
+</li>
               </ul>
             </div>
 
@@ -363,14 +363,8 @@ const closePaymentModal = () => {
 const processCardPayment = async () => {
   paymentProcessing.value = true;
   paymentError.value = '';
-  try {
-    await createOrderAndRedirect('card');
-    showPaymentModal.value = false;
-  } catch (e) {
-    paymentError.value = e.response?.data?.error || 'Ошибка оплаты';
-  } finally {
-    paymentProcessing.value = false;
-  }
+  await createOrderAndRedirect('card');
+  showPaymentModal.value = false;
 };
 
 // ---- СОЗДАНИЕ ЗАКАЗА И РЕДИРЕКТ ----
@@ -391,15 +385,25 @@ const createOrderAndRedirect = async (paymentMethod) => {
     const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/orders`, orderPayload);
     const orderId = res.data.orderId;
 
+    // Сразу очищаем корзину – заказ уже создан
     cartStore.clearCart();
 
     if (paymentMethod === 'card') {
-      const payRes = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/payment/tinkoff-init`, { orderId });
-      window.location.href = payRes.data.confirmation_url;
+      // Попытка тестовой оплаты
+      try {
+        const payRes = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/payment/tinkoff-init`, { orderId });
+        window.location.href = payRes.data.confirmation_url; // редирект на тестовый вебхук
+      } catch (payError) {
+        console.warn('Не удалось инициировать оплату, перенаправляем на страницу заказа:', payError);
+        // Если оплата не сработала – всё равно идём на страницу успеха, заказ уже есть
+        router.push(`/order-success?orderId=${orderId}&status=unpaid`);
+      }
     } else {
+      // Наличные – сразу на страницу успеха
       router.push(`/order-success?orderId=${orderId}`);
     }
   } catch (e) {
+    // Ошибка создания заказа
     alert(e.response?.data?.error || 'Ошибка при создании заказа');
   } finally {
     loading.value = false;

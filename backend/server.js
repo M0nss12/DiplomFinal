@@ -279,7 +279,7 @@ app.post('/api/shipping-calculator', async (req, res) => {
         return res.status(400).json({ error: 'warehouse_id и weight_kg обязательны' });
     }
     try {
-        const sourceWarehouseId = 1;
+        const sourceWarehouseId = 1; // центральный склад, обязательно должен существовать
 
         const { data: sourceWh } = await supabase
             .from('warehouses')
@@ -287,7 +287,7 @@ app.post('/api/shipping-calculator', async (req, res) => {
             .eq('id', sourceWarehouseId)
             .maybeSingle();
         if (!sourceWh || !sourceWh.cities) {
-            return res.status(500).json({ error: 'Не удалось получить координаты склада-отправителя' });
+            return res.status(500).json({ error: 'Не удалось получить координаты склада-отправителя. Проверьте склад ID=1' });
         }
 
         const { data: targetWarehouse, error: whError } = await supabase
@@ -299,10 +299,11 @@ app.post('/api/shipping-calculator', async (req, res) => {
             return res.status(404).json({ error: 'Склад не найден' });
         }
 
-        const lat1 = sourceWh.cities.lat;
-        const lon1 = sourceWh.cities.lon;
-        const lat2 = targetWarehouse.cities.lat;
-        const lon2 = targetWarehouse.cities.lon;
+        // Защита от null
+        const lat1 = sourceWh.cities?.lat;
+        const lon1 = sourceWh.cities?.lon;
+        const lat2 = targetWarehouse.cities?.lat;
+        const lon2 = targetWarehouse.cities?.lon;
 
         if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
             return res.status(500).json({ error: 'Некорректные координаты складов' });
@@ -328,7 +329,7 @@ app.post('/api/shipping-calculator', async (req, res) => {
         }
 
         res.json({
-            city: targetWarehouse.cities.name,
+            city: targetWarehouse.cities?.name || 'Неизвестно',
             address: targetWarehouse.address,
             distance_km: Math.round(distanceKm),
             formula_details: {
@@ -850,7 +851,6 @@ app.delete('/api/storage/:bucket/:filename', verifyAdmin, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Форма обратной связи
 app.post('/api/feedback/send', async (req, res) => {
     const { name, contact, message } = req.body;
     if (!name || !contact || !message) {
