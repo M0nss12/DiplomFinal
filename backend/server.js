@@ -56,19 +56,25 @@ const DEFAULT_AVATARS = [
 
 // --- Почта и шаблоны ---
 const transporter = nodemailer.createTransport({
-    host: 'smtp.yandex.ru',
-    port: 587,                     // или 465, если используете SSL
-    secure: false,                 // true для 465
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        rejectUnauthorized: false  // иногда нужно для Яндекса
+        rejectUnauthorized: false
     },
-    connection: {
-        family: 4                  // <-- ТОЛЬКО IPv4
-    }
+    // Принудительно используем IPv4 (правильный способ)
+    dns: {
+        lookup: (hostname, options, callback) => {
+            dns.lookup(hostname, { family: 4, ...options }, callback);
+        }
+    },
+    connectionTimeout: 10000,   // 10 секунд
+    greetingTimeout: 10000,
+    socketTimeout: 15000
 });
 
 const getEmailTemplate = (templateName, variables = {}) => {
