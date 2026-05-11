@@ -46,10 +46,43 @@ app.use(cors({
 
 app.use(express.json());
 
+// --- 4. Системное Логирование ---
+const LOGS_DIR = path.join(__dirname, 'logs');
+const ERROR_LOG = path.join(LOGS_DIR, 'errors.log');
+const ACTIONS_LOG = path.join(LOGS_DIR, 'actions.log');
+const NOTIFICATIONS_LOG = path.join(LOGS_DIR, 'notifications.log');
+
+if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR);
+[ERROR_LOG, ACTIONS_LOG, NOTIFICATIONS_LOG].forEach(f => { 
+    if (!fs.existsSync(f)) fs.writeFileSync(f, ''); 
+});
+
+const writeLog = (filePath, data) => {
+    const entry = JSON.stringify({
+        id: crypto.randomBytes(4).toString('hex'),
+        timestamp: new Date().toLocaleString('ru-RU'),
+        ...data
+    }) + '\n';
+    fs.appendFile(filePath, entry, (err) => { 
+        if (err) console.error('Ошибка записи лога:', err); 
+    });
+};
+
+const logError = (err, req = null) => {
+    writeLog(ERROR_LOG, {
+        type: 'ERROR', 
+        message: err.message,
+        stack: err.stack, 
+        url: req ? req.originalUrl : 'SYSTEM',
+        method: req ? req.method : 'N/A',
+        user: req ? (req.headers['x-user-id'] || 'guest') : 'system',
+        ip: req ? req.ip : '127.0.0.1'
+    });
+};
+
+// --- Middleware для логирования действий (Actions) ---
 app.use((req, res, next) => {
-    // Логируем только методы, изменяющие данные
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-        // Перехватываем завершение запроса, чтобы знать, был ли он успешен
         res.on('finish', () => {
             if (res.statusCode >= 200 && res.statusCode < 300) {
                 writeLog(ACTIONS_LOG, {
@@ -92,37 +125,6 @@ const getEmailTemplate = (templateName, variables = {}) => {
     return html;
 };
 
-// --- Логирование ---
-const LOGS_DIR = path.join(__dirname, 'logs');
-const ERROR_LOG = path.join(LOGS_DIR, 'errors.log');
-const ACTIONS_LOG = path.join(LOGS_DIR, 'actions.log');
-const NOTIFICATIONS_LOG = path.join(LOGS_DIR, 'notifications.log');
-
-if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR);
-[ERROR_LOG, ACTIONS_LOG, NOTIFICATIONS_LOG].forEach(f => { if (!fs.existsSync(f)) fs.writeFileSync(f, ''); });
-
-const writeLog = (filePath, data) => {
-    const entry = JSON.stringify({
-        id: crypto.randomBytes(4).toString('hex'),
-        timestamp: new Date().toLocaleString('ru-RU'),
-        ...data
-    }) + '\n';
-    // Используем appendFileSync для надежности или убедимся, что поток не блокируется
-    fs.appendFile(filePath, entry, (err) => { if (err) console.error('Ошибка записи лога:', err); });
-};
-
-const logError = (err, req = null) => {
-    writeLog(ERROR_LOG, {
-        type: 'ERROR', 
-        message: err.message,
-        stack: err.stack, // Добавляем стек для анализа в модалке
-        url: req ? req.originalUrl : 'SYSTEM',
-        method: req ? req.method : 'N/A',
-        user: req ? (req.headers['x-user-id'] || 'guest') : 'system',
-        ip: req ? req.ip : '127.0.0.1'
-    });
-};
-
 // --- Уведомления и email (Unisender Go REST API) ---
 const notifyAndEmail = async ({ userId, type, title, message, email, templateName, templateVars = {} }) => {
     writeLog(NOTIFICATIONS_LOG, { userId, type, title, message, emailSentTo: email });
@@ -159,14 +161,6 @@ const notifyAndEmail = async ({ userId, type, title, message, email, templateNam
             console.error('❌ Ошибка отправки через Unisender:', e.response?.data || e.message);
         }
     }
-};
-
-const logError = (err, req = null) => {
-    writeLog(ERROR_LOG, {
-        type: 'ERROR', message: err.message,
-        url: req ? req.url : 'SYSTEM',
-        user: req ? (req.headers['x-user-id'] || 'guest') : 'system'
-    });
 };
 
 // --- Утилиты ---
@@ -331,7 +325,7 @@ app.post('/api/shipping-calculator', async (req, res) => {
             .eq('id', sourceWarehouseId)
             .maybeSingle();
         if (!sourceWh || !sourceWh.cities) {
-            return res.status(500).json({ error: 'Не удалось получить координаты склада-отправителя. Проверьте склад ID=1' });
+            return res.status(500).json({ error: 'Не удалось получить координаты склада-отправителя' });
         }
 
         const { data: targetWarehouse, error: whError } = await supabase
@@ -386,7 +380,7 @@ app.post('/api/shipping-calculator', async (req, res) => {
             total_shipping: parseFloat(shipping.toFixed(0))
         });
     } catch (e) {
-        console.error('Ошибка в shipping-calculator:', e);
+        logError(e, req);
         res.status(500).json({ error: e.message });
     }
 });
@@ -399,14 +393,8 @@ app.get('/api/wishlist/:userId', async (req, res) => {
         const { data, error } = await supabase
             .from('wishlists')
             .select(`
-                id,
-                user_id,
-                product_id,
-                products (
-                    *,
-                    brands (name, logo_url),
-                    product_stocks (quantity, warehouses (cities (name)))
-                )
+                id, user_id, product_id,
+                products (*, brands (name, logo_url), product_stocks (quantity, warehouses (cities (name))))
             `)
             .eq('user_id', req.params.userId);
         if (error) throw error;
@@ -594,7 +582,7 @@ app.post('/api/admin/users', verifyAdmin, async (req, res) => {
 
         res.json(newUser);
     } catch (e) {
-        console.error('Ошибка создания пользователя админом:', e);
+        logError(e, req);
         res.status(500).json({ error: e.message || 'Внутренняя ошибка сервера' });
     }
 });
@@ -607,7 +595,10 @@ app.get('/api/users/verify-email', async (req, res) => {
         await supabase.from('users').update({ is_email_verified: true }).eq('id', tData.user_id);
         await supabase.from('password_reset_tokens').update({ used: true }).eq('id', tData.id);
         res.redirect('/login?verified=true'); 
-    } catch (e) { res.status(500).send('Ошибка подтверждения'); }
+    } catch (e) { 
+        logError(e, req);
+        res.status(500).send('Ошибка подтверждения'); 
+    }
 });
 
 app.post('/api/users/login', async (req, res) => {
@@ -626,52 +617,45 @@ app.get('/api/users/profile/:id', async (req, res) => {
 });
 
 app.put('/api/users/profile/:id', async (req, res) => {
-    // Извлекаем спец. поля, чтобы контролировать их запись
     const { city, city_id, role, password_hash, ...updateData } = req.body;
     const isAdmin = req.headers['x-admin-key'] === process.env.ADMIN_SECRET;
 
     try {
-        // 1. Логика города: приоритет у ID, если нет — ищем/создаем по названию
         if (city_id) {
             updateData.saved_city_id = city_id;
         } else if (city) {
             updateData.saved_city_id = await getOrCreateCity(city);
         }
 
-        // 2. Безопасность РОЛИ: менять роль может ТОЛЬКО админ с ключом
         if (role) {
             if (isAdmin) {
                 updateData.role = role;
             } else {
-                // Если не админ пытается сменить роль — игнорируем или выдаем ошибку
                 console.warn(`Попытка несанкционированной смены роли для ID: ${req.params.id}`);
             }
         }
         
-        // 3. Безопасность ПАРОЛЯ: если пришел пароль, бэкенд его обновит 
-        // (триггер в БД сам захеширует его, если он не захеширован)
         if (password_hash) {
             updateData.password_hash = password_hash;
         }
 
-        // 4. Обновление в БД
         const { data, error } = await supabase
             .from('users')
             .update(updateData)
             .eq('id', req.params.id)
-            .select('*, cities(name)') // Сразу возвращаем с названием города
+            .select('*, cities(name)')
             .single();
 
         if (error) throw error;
-        
         if (!data) return res.status(404).json({ error: 'Пользователь не найден' });
 
         res.json(data);
     } catch (e) {
-        console.error('Ошибка при обновлении профиля:', e.message);
+        logError(e, req);
         res.status(500).json({ error: 'Ошибка сервера при обновлении профиля' });
     }
 });
+
 // =====================================================================
 // API: УВЕДОМЛЕНИЯ И СБРОС ПАРОЛЯ
 // =====================================================================
@@ -713,7 +697,10 @@ app.post('/api/users/reset-password', async (req, res) => {
         await supabase.from('users').update({ password_hash: newPassword }).eq('id', tData.user_id);
         await supabase.from('password_reset_tokens').update({ used: true }).eq('id', tData.id);
         res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: 'Ошибка сброса' }); }
+    } catch (e) { 
+        logError(e, req);
+        res.status(500).json({ error: 'Ошибка сброса' }); 
+    }
 });
 
 // =====================================================================
@@ -723,15 +710,12 @@ app.post('/api/orders', async (req, res) => {
     const { customer_name, customer_email, customer_phone, items, warehouse_id, payment_method } = req.body;
     
     try {
-        console.log('Создание заказа: данные получены', { customer_name, customer_email, items, warehouse_id });
-
         const { data: targetWh, error: whError } = await supabase
             .from('warehouses')
             .select('*, cities(id, name, lat, lon)')
             .eq('id', warehouse_id)
             .single();
         if (whError || !targetWh) {
-            console.error('Ошибка получения склада:', whError);
             return res.status(400).json({ error: 'Склад не найден' });
         }
         const targetCityId = targetWh.cities.id;
@@ -741,7 +725,6 @@ app.post('/api/orders', async (req, res) => {
             items_json: items
         });
         if (shipErr) {
-            console.error('Ошибка RPC calculate_order_shipping:', shipErr);
             return res.status(500).json({ error: 'Ошибка расчёта доставки' });
         }
         const totalShipping = shippingData.total;
@@ -756,7 +739,6 @@ app.post('/api/orders', async (req, res) => {
                 .eq('id', item.product_id)
                 .single();
             if (productErr || !product) {
-                console.error('Товар не найден:', item.product_id, productErr);
                 return res.status(400).json({ error: `Товар ID ${item.product_id} не найден` });
             }
             const price = product.discount_price || product.price;
@@ -796,9 +778,7 @@ app.post('/api/orders', async (req, res) => {
                 if (intercityStock) {
                     sourceWarehouseId = intercityStock.warehouse_id;
                 } else {
-                    return res.status(400).json({
-                        error: `Товар "${item.product_id}" недоступен в нужном количестве`
-                    });
+                    return res.status(400).json({ error: `Товар "${item.product_id}" недоступен в нужном количестве` });
                 }
             }
 
@@ -809,9 +789,7 @@ app.post('/api/orders', async (req, res) => {
                 .eq('warehouse_id', sourceWarehouseId)
                 .single();
             if (!currentStock || currentStock.quantity < item.quantity) {
-                return res.status(409).json({
-                    error: `Недостаточно остатков для товара ${item.product_id} на складе ${sourceWarehouseId}`
-                });
+                return res.status(409).json({ error: `Недостаточно остатков для товара на складе ${sourceWarehouseId}` });
             }
 
             const { error: updateErr } = await supabase
@@ -820,7 +798,6 @@ app.post('/api/orders', async (req, res) => {
                 .eq('product_id', item.product_id)
                 .eq('warehouse_id', sourceWarehouseId);
             if (updateErr) {
-                console.error('Ошибка списания:', updateErr);
                 return res.status(500).json({ error: 'Ошибка при списании остатков' });
             }
 
@@ -847,7 +824,6 @@ app.post('/api/orders', async (req, res) => {
         }]).select();
 
         if (oErr) {
-            console.error('Ошибка создания заказа:', oErr);
             return res.status(500).json({ error: 'Не удалось создать заказ' });
         }
 
@@ -855,14 +831,11 @@ app.post('/api/orders', async (req, res) => {
             itemsData.map(i => ({ ...i, order_id: order[0].id }))
         );
         if (itemsErr) {
-            console.error('Ошибка вставки позиций заказа:', itemsErr);
             return res.status(500).json({ error: 'Не удалось сохранить позиции заказа' });
         }
 
-        // Фоновое уведомление (не ждём)
         if (order && order[0]) {
             const newOrder = order[0];
-            console.log('🔔 Планируем отправку уведомления о заказе на почту:', customer_email);
             notifyAndEmail({
                 userId: req.headers['x-user-id'] || null,
                 type: 'order',
@@ -881,21 +854,24 @@ app.post('/api/orders', async (req, res) => {
 
         res.json({ orderId: order[0].id, total: finalTotal, distance_based_shipping: totalShipping });
     } catch (err) {
-        console.error('Общая ошибка в POST /api/orders:', err);
+        logError(err, req);
         res.status(500).json({ error: 'Внутренняя ошибка сервера' });
     }
 });
 
 app.get('/api/orders/:userId', async (req, res) => {
-    const { data } = await supabase
-        .from('orders')
-        .select(`*, order_items (id, product_id, quantity, unit_price, warehouse_id, products (*))`)
-        .eq('user_id', req.params.userId)
-        .order('created_at', { ascending: false });
-    res.json(data || []);
+    try {
+        const { data } = await supabase
+            .from('orders')
+            .select(`*, order_items (id, product_id, quantity, unit_price, warehouse_id, products (*))`)
+            .eq('user_id', req.params.userId)
+            .order('created_at', { ascending: false });
+        res.json(data || []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
-// Подтверждение оплаты (заглушка для модального окна)
 app.post('/api/payment/confirm', async (req, res) => {
     const { orderId } = req.body;
     try {
@@ -907,7 +883,6 @@ app.post('/api/payment/confirm', async (req, res) => {
         if (fetchErr || !order) return res.status(404).json({ error: 'Заказ не найден' });
         if (order.payment_status === 'paid') return res.status(400).json({ error: 'Заказ уже оплачен' });
 
-        // Меняем метод и статус
         await supabase.from('orders').update({
             payment_method: 'card',
             payment_status: 'paid'
@@ -915,6 +890,7 @@ app.post('/api/payment/confirm', async (req, res) => {
 
         res.json({ success: true });
     } catch (e) {
+        logError(e, req);
         res.status(500).json({ error: e.message });
     }
 });
@@ -943,7 +919,6 @@ app.patch('/api/orders/:id', async (req, res) => {
             return res.status(400).json({ error: 'Невозможно отменить данный заказ' });
         }
 
-        // Возвращаем списанные остатки
         const { data: items } = await supabase
             .from('order_items')
             .select('product_id, quantity, warehouse_id')
@@ -969,7 +944,6 @@ app.patch('/api/orders/:id', async (req, res) => {
             }
         }
 
-        // Обновляем статус
         const { data: updated, error: updateErr } = await supabase
             .from('orders')
             .update({ delivery_status: 'cancelled' })
@@ -980,7 +954,7 @@ app.patch('/api/orders/:id', async (req, res) => {
 
         res.json(updated);
     } catch (e) {
-        console.error('Ошибка отмены заказа:', e);
+        logError(e, req);
         res.status(500).json({ error: e.message });
     }
 });
@@ -995,6 +969,7 @@ app.post('/api/calculate-shipping', verifyAdmin, async (req, res) => {
         if (error) throw error;
         res.json(data);
     } catch (e) {
+        logError(e, req);
         res.status(500).json({ error: e.message });
     }
 });
@@ -1013,13 +988,12 @@ app.get('/api/payment/test-webhook', async (req, res) => {
     }
 });
 
-
-// --- Специализированный роут для создания возврата ---
+// =====================================================================
+// API: ВОЗВРАТЫ (Пользователь и Админ)
+// =====================================================================
 app.post('/api/admin/return_requests', verifyAdmin, async (req, res) => {
     const { order_id, user_id, reason } = req.body;
-
     try {
-        // 1. Проверяем, нет ли уже активной заявки (на всякий случай, кроме индекса в БД)
         const { data: existing } = await supabase
             .from('return_requests')
             .select('id, status')
@@ -1028,12 +1002,9 @@ app.post('/api/admin/return_requests', verifyAdmin, async (req, res) => {
             .maybeSingle();
 
         if (existing) {
-            return res.status(400).json({ 
-                error: `Для заказа #${order_id} уже существует активная заявка в статусе: ${existing.status}` 
-            });
+            return res.status(400).json({ error: `Для заказа #${order_id} уже существует активная заявка в статусе: ${existing.status}` });
         }
 
-        // 2. Создаем заявку
         const { data, error } = await supabase
             .from('return_requests')
             .insert([{ order_id, user_id, reason, status: 'pending' }])
@@ -1043,18 +1014,16 @@ app.post('/api/admin/return_requests', verifyAdmin, async (req, res) => {
         if (error) throw error;
         res.json(data);
     } catch (e) {
+        logError(e, req);
         res.status(500).json({ error: e.message });
     }
 });
 
-// --- Специализированный роут для обновления статуса возврата ---
-// Обновление статуса возврата админом (Одобрение/Отклонение)
 app.put('/api/admin/return_requests/:id', verifyAdmin, async (req, res) => {
-    const { status } = req.body; // 'approved' или 'rejected'
+    const { status } = req.body;
     const requestId = req.params.id;
 
     try {
-        // 1. Получаем данные о заявке, чтобы знать кому отправлять уведомление
         const { data: request, error: fetchErr } = await supabase
             .from('return_requests')
             .select('*, users(email, first_name)')
@@ -1063,7 +1032,6 @@ app.put('/api/admin/return_requests/:id', verifyAdmin, async (req, res) => {
 
         if (fetchErr || !request) return res.status(404).json({ error: 'Заявка не найдена' });
 
-        // 2. Если статус 'approved', возвращаем товар на склад (как делали раньше)
         if (status === 'approved' && request.status !== 'approved') {
             const { data: items } = await supabase
                 .from('order_items')
@@ -1087,11 +1055,9 @@ app.put('/api/admin/return_requests/:id', verifyAdmin, async (req, res) => {
                     }
                 }
             }
-            // Обновляем статус заказа
             await supabase.from('orders').update({ delivery_status: 'returned' }).eq('id', request.order_id);
         }
 
-        // 3. Обновляем статус самой заявки
         const { data: updated, error: updateErr } = await supabase
             .from('return_requests')
             .update({ status })
@@ -1101,31 +1067,26 @@ app.put('/api/admin/return_requests/:id', verifyAdmin, async (req, res) => {
 
         if (updateErr) throw updateErr;
 
-        // 4. ОТПРАВКА УВЕДОМЛЕНИЯ ПОЛЬЗОВАТЕЛЮ
         const isApproved = status === 'approved';
         await notifyAndEmail({
             userId: request.user_id,
-            type: 'system', // или 'order'
-            email: request.users?.email, // Отправит и на почту, если email есть
+            type: 'system',
+            email: request.users?.email,
             title: isApproved ? '✅ Возврат одобрен' : '❌ Возврат отклонен',
             message: isApproved 
                 ? `Ваша заявка на возврат по заказу №${request.order_id} одобрена. Товар принят обратно.`
                 : `Ваша заявка на возврат по заказу №${request.order_id} была отклонена менеджером.`,
-            templateName: 'notification_general.html', // шаблон письма
-            templateVars: {
-                first_name: request.users?.first_name || 'Клиент'
-            }
+            templateName: 'notification_general.html',
+            templateVars: { first_name: request.users?.first_name || 'Клиент' }
         });
 
         res.json(updated);
     } catch (e) {
-        console.error('Ошибка обработки возврата:', e);
+        logError(e, req);
         res.status(500).json({ error: e.message });
     }
 });
 
-
-// Оформление возврата пользователем
 app.post('/api/orders/:id/return', async (req, res) => {
     const orderId = req.params.id;
     const userId = req.headers['x-user-id'];
@@ -1135,7 +1096,6 @@ app.post('/api/orders/:id/return', async (req, res) => {
     if (!reason || reason.length < 5) return res.status(400).json({ error: 'Укажите причину возврата (минимум 5 символов)' });
 
     try {
-        // 1. Проверяем заказ: должен быть выдан, оплачен и принадлежать юзеру
         const { data: order, error: orderErr } = await supabase
             .from('orders')
             .select('*')
@@ -1149,7 +1109,6 @@ app.post('/api/orders/:id/return', async (req, res) => {
             return res.status(400).json({ error: 'Возврат возможен только для оплаченных и полученных заказов' });
         }
 
-        // 2. Проверяем, нет ли уже активной заявки
         const { data: existing } = await supabase
             .from('return_requests')
             .select('id')
@@ -1159,16 +1118,12 @@ app.post('/api/orders/:id/return', async (req, res) => {
 
         if (existing) return res.status(400).json({ error: 'Заявка на возврат уже подана' });
 
-        // 3. Создаем заявку на возврат
-        const { data: returnReq, error: returnErr } = await supabase
+        const { error: returnErr } = await supabase
             .from('return_requests')
-            .insert([{ order_id: orderId, user_id: userId, reason, status: 'pending' }])
-            .select()
-            .single();
+            .insert([{ order_id: orderId, user_id: userId, reason, status: 'pending' }]);
 
         if (returnErr) throw returnErr;
 
-        // 4. Создаем уведомление для пользователя в БД
         await supabase.from('notifications').insert([{
             user_id: userId,
             type: 'system',
@@ -1178,6 +1133,7 @@ app.post('/api/orders/:id/return', async (req, res) => {
 
         res.json({ success: true, message: 'Заявка создана' });
     } catch (e) {
+        logError(e, req);
         res.status(500).json({ error: e.message });
     }
 });
@@ -1194,7 +1150,10 @@ app.post('/api/upload/:folder', upload.single('file'), async (req, res) => {
         if (error) throw error;
         const { data: urlData } = supabase.storage.from(req.params.folder).getPublicUrl(safeName);
         res.json({ url: urlData.publicUrl });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        logError(err, req);
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
 app.delete('/api/storage/:bucket/:filename', verifyAdmin, async (req, res) => {
@@ -1203,10 +1162,13 @@ app.delete('/api/storage/:bucket/:filename', verifyAdmin, async (req, res) => {
         const { error } = await supabase.storage.from(bucket).remove([filename]);
         if (error) throw error;
         res.json({ success: true, message: 'Файл удален' });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        logError(err, req);
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
-// Форма обратной связи (API Unisender)
+// Форма обратной связи
 app.post('/api/feedback/send', async (req, res) => {
     const { name, contact, message } = req.body;
     if (!name || !contact || !message) {
@@ -1232,11 +1194,11 @@ app.post('/api/feedback/send', async (req, res) => {
         });
         res.json({ success: true });
     } catch (e) {
+        logError(e, req);
         res.status(500).json({ error: 'Ошибка отправки' });
     }
 });
 
-// Предварительный расчёт доставки (публичный)
 app.post('/api/public/shipping-estimate', async (req, res) => {
     const { warehouse_id, items } = req.body;
     if (!warehouse_id || !items || !items.length) {
@@ -1250,7 +1212,7 @@ app.post('/api/public/shipping-estimate', async (req, res) => {
         if (error) throw error;
         res.json(data);
     } catch (e) {
-        console.error('Ошибка расчёта доставки:', e);
+        logError(e, req);
         res.status(500).json({ error: e.message });
     }
 });
@@ -1262,8 +1224,12 @@ app.get('/api/admin/system/logs', verifyAdmin, (req, res) => {
     const { type } = req.query;
     const file = type === 'errors' ? 'errors.log' : type === 'notifications' ? 'notifications.log' : 'actions.log';
     if (!fs.existsSync(path.join(LOGS_DIR, file))) return res.json([]);
-    const lines = fs.readFileSync(path.join(LOGS_DIR, file), 'utf8').trim().split('\n').filter(Boolean);
-    res.json(lines.map(l => JSON.parse(l)).reverse());
+    try {
+        const lines = fs.readFileSync(path.join(LOGS_DIR, file), 'utf8').trim().split('\n').filter(Boolean);
+        res.json(lines.map(l => JSON.parse(l)).reverse());
+    } catch (e) {
+        res.json([]);
+    }
 });
 
 app.get('/api/admin/wishlists', verifyAdmin, async (req, res) => {
@@ -1280,24 +1246,39 @@ app.get('/api/admin/wishlists', verifyAdmin, async (req, res) => {
         if (error) throw error;
         res.json(data || []);
     } catch (e) {
+        logError(e, req);
         res.status(500).json({ error: e.message });
     }
 });
 
 app.get('/api/admin/:table', verifyAdmin, async (req, res) => {
     try {
-        let query = supabase.from(req.params.table).select('*');
-        if (req.params.table === 'warehouses') query = supabase.from('warehouses').select('*, cities(name)');
-        if (req.params.table === 'notifications') query = supabase.from('notifications').select('*, users(first_name, last_name)');
-        if (req.params.table === 'product_stocks') query = supabase.from('product_stocks').select('*, products(name, sku), warehouses(*, cities(name))');
-        if (req.params.table === 'user_vehicles') query = supabase.from('user_vehicles').select('*, users(first_name, last_name)');
-        if (req.params.table === 'return_requests') query = supabase.from('return_requests').select('*, users(first_name, last_name)');
-        if (req.params.table === 'order_items') 
-  query = supabase.from('order_items').select('*, products(name, sku, images)');
+        let query;
+        if (req.params.table === 'users') {
+            query = supabase.from('users').select('*, cities(name)');
+        } else if (req.params.table === 'warehouses') {
+            query = supabase.from('warehouses').select('*, cities(name)');
+        } else if (req.params.table === 'notifications') {
+            query = supabase.from('notifications').select('*, users(first_name, last_name)');
+        } else if (req.params.table === 'product_stocks') {
+            query = supabase.from('product_stocks').select('*, products(name, sku), warehouses(*, cities(name))');
+        } else if (req.params.table === 'user_vehicles') {
+            query = supabase.from('user_vehicles').select('*, users(first_name, last_name)');
+        } else if (req.params.table === 'return_requests') {
+            query = supabase.from('return_requests').select('*, users(first_name, last_name)');
+        } else if (req.params.table === 'order_items') {
+            query = supabase.from('order_items').select('*, products(name, sku, images)');
+        } else {
+            query = supabase.from(req.params.table).select('*');
+        }
+        
         const { data, error } = await query.order('id', { ascending: false });
         if (error) throw error;
         res.json(data || []);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) { 
+        logError(e, req);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
 app.post('/api/admin/:table', verifyAdmin, async (req, res) => {
@@ -1305,7 +1286,10 @@ app.post('/api/admin/:table', verifyAdmin, async (req, res) => {
         const { data, error } = await supabase.from(req.params.table).insert([req.body]).select();
         if (error) throw error;
         res.json(data[0] || data);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) { 
+        logError(e, req);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
 app.put('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
@@ -1313,7 +1297,10 @@ app.put('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
         const { data, error } = await supabase.from(req.params.table).update(req.body).eq('id', req.params.id).select();
         if (error) throw error;
         res.json(data[0]);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) { 
+        logError(e, req);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
 app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
@@ -1330,25 +1317,20 @@ app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
         if (items && items.length > 0) {
             for (const item of items) {
                 if (item.warehouse_id) {
-                    const { data: stockData, error: stockErr } = await supabase
+                    const { data: stockData } = await supabase
                         .from('product_stocks')
                         .select('quantity')
                         .eq('product_id', item.product_id)
                         .eq('warehouse_id', item.warehouse_id)
                         .maybeSingle();
 
-                    if (stockErr) {
-                        console.error('Ошибка получения остатка при возврате:', stockErr);
-                        continue;
-                    }
-                    const newQty = (stockData?.quantity || 0) + item.quantity;
-                    const { error: updateErr } = await supabase
-                        .from('product_stocks')
-                        .update({ quantity: newQty })
-                        .eq('product_id', item.product_id)
-                        .eq('warehouse_id', item.warehouse_id);
-                    if (updateErr) {
-                        console.error('Ошибка возврата остатков при удалении заказа:', updateErr);
+                    if (stockData) {
+                        const newQty = (stockData.quantity || 0) + item.quantity;
+                        await supabase
+                            .from('product_stocks')
+                            .update({ quantity: newQty })
+                            .eq('product_id', item.product_id)
+                            .eq('warehouse_id', item.warehouse_id);
                     }
                 }
             }
@@ -1359,7 +1341,7 @@ app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
 
         res.json({ success: true, message: 'Заказ удалён, остатки возвращены' });
     } catch (e) {
-        console.error('Ошибка удаления заказа:', e);
+        logError(e, req);
         res.status(500).json({ error: 'Ошибка при удалении заказа' });
     }
 });
@@ -1369,7 +1351,10 @@ app.delete('/api/admin/:table/:id', verifyAdmin, async (req, res) => {
         const { error } = await supabase.from(req.params.table).delete().eq('id', req.params.id);
         if (error) throw error;
         res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) { 
+        logError(e, req);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
 app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
@@ -1467,6 +1452,7 @@ app.patch('/api/admin/orders/:id/status', verifyAdmin, async (req, res) => {
 
         res.json(updatedOrder);
     } catch (e) {
+        logError(e, req);
         res.status(500).json({ error: e.message });
     }
 });
@@ -1480,9 +1466,9 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Глобальный обработчик ошибок (ставится ПОСЛЕ всех роутов)
+// Глобальный обработчик ошибок (ОБЯЗАТЕЛЬНО в самом конце)
 app.use((err, req, res, next) => {
-    logError(err, req); // Записываем в файл
+    logError(err, req);
     console.error('🔴 System Error:', err.message);
     res.status(500).json({ error: 'Внутренняя ошибка сервера. Информация сохранена в журнале.' });
 });
