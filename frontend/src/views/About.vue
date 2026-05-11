@@ -152,7 +152,7 @@
       </div>
     </section>
 
-    <!-- 5. ИНТЕГРАЦИЯ API: ФИНАНСОВЫЙ РАДАР -->
+    <!-- 5. ИНТЕГРАЦИЯ API: ФИНАНСОВЫЙ РАДАР (ИСПРАВЛЕН) -->
     <section class="currency-radar-section glass-card">
       <div class="currency-content">
         <h2>Финансовый радар закупок</h2>
@@ -243,7 +243,6 @@ import { useAppStore } from '@/stores/appStore';
 
 const appStore = useAppStore();
 
-// Статистика
 const loadingStats = ref(true);
 const stats = ref({ totalProducts: 0, totalBrands: 0, brandsList: [] });
 
@@ -263,7 +262,6 @@ const loadAboutData = async () => {
   }
 };
 
-// Валютный радар
 const currencyData = ref(null);
 const loadingCurrency = ref(true);
 
@@ -287,7 +285,6 @@ const priceIndex = computed(() => {
   return { status: 'normal', icon: '🛡️', title: 'Цены заморожены', desc: 'Мы зафиксировали цены на складские остатки. Текущий курс не влияет на детали в наличии.' };
 });
 
-// FAQ
 const faqs = ref([
   { question: 'Что делать, если деталь мне не подошла?', answer: 'Мы понимаем, что подбор автозапчастей — сложный процесс. Если деталь не подошла к вашему авто, вы можете вернуть ее в любой из наших ПВЗ в течение 14 дней без объяснения причин. Средства вернутся на вашу карту.' },
   { question: 'Как работает гарантия на запчасти?', answer: 'Мы предоставляем официальную гарантию от 6 до 24 месяцев (в зависимости от производителя). При выявлении заводского брака мы бесплатно обменяем деталь или вернем деньги.' },
@@ -297,7 +294,6 @@ const faqs = ref([
 const activeFaq = ref(null);
 const toggleFaq = (index) => { activeFaq.value = activeFaq.value === index ? null : index; };
 
-// Калькулятор доставки
 const cities = ref([]);
 const warehouses = ref([]);
 const calcCityId = ref(null);
@@ -348,7 +344,6 @@ const calculateShipping = async () => {
   }
 };
 
-// Яндекс-карта
 const initMap = () => {
   if (window.ymaps) {
     window.ymaps.ready(() => {
@@ -379,14 +374,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Общие анимации и уникальные стили страницы, совместимые с глобальной темой */
 .about-page {
   max-width: 1400px;
   margin: 0 auto;
   padding: 20px 16px 60px;
 }
 
-/* Hero */
 .hero-about {
   display: flex;
   align-items: center;
@@ -461,7 +454,6 @@ onMounted(() => {
   left: 0;
 }
 
-/* Калькулятор */
 .calculator-section {
   margin: 4rem 0;
   padding: 3rem;
@@ -532,7 +524,6 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
-/* Статистика */
 .stats-section {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -566,7 +557,6 @@ onMounted(() => {
   margin-top: 8px;
 }
 
-/* Логистика */
 .logistics-section {
   margin: 4rem 0;
   padding: 3rem;
@@ -638,28 +628,24 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
-/* Валютный радар (акцентный блок) */
+/* ИСПРАВЛЕНО: убраны фиксированные цвета */
 .currency-radar-section {
   margin: 4rem 0;
   padding: 3rem;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  color: white;
-  border-color: #334155;
-}
-
-:global(.dark) .currency-radar-section {
-  background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--primary-light) 100%);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
 }
 
 .currency-content h2 {
-  color: white !important;
+  color: var(--text-main) !important;
   margin-bottom: 10px;
   font-size: 2.2rem;
   font-weight: 800;
 }
 
 .currency-content p {
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-bottom: 30px;
   font-size: 1.1rem;
   max-width: 800px;
@@ -672,16 +658,16 @@ onMounted(() => {
 }
 
 .c-metric {
-  background: rgba(255,255,255,0.05);
+  background: var(--bg-card);
   padding: 20px;
   border-radius: var(--radius-md);
   text-align: center;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid var(--border-color);
   transition: transform 0.2s, background 0.2s;
 }
 
 .c-metric:hover {
-  background: rgba(255,255,255,0.1);
+  background: var(--primary-light);
   transform: translateY(-3px);
 }
 
@@ -694,12 +680,12 @@ onMounted(() => {
 .c-val {
   font-size: 1.8rem;
   font-weight: 800;
-  color: white;
+  color: var(--text-main);
 }
 
 .c-lbl {
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   text-transform: uppercase;
   margin-top: 5px;
   font-weight: 700;
@@ -715,31 +701,22 @@ onMounted(() => {
 }
 
 .price-index-box.normal {
-  background: rgba(59, 130, 246, 0.15);
-  border: 1px solid rgba(59, 130, 246, 0.4);
+  background: var(--primary-light);
+  border: 1px solid var(--primary);
 }
-
-.price-index-box.normal strong {
-  color: #60a5fa;
-}
+.price-index-box.normal strong { color: var(--primary); }
 
 .price-index-box.danger {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: var(--danger-light);
+  border: 1px solid var(--danger);
 }
-
-.price-index-box.danger strong {
-  color: #fb7185;
-}
+.price-index-box.danger strong { color: var(--danger); }
 
 .price-index-box.success {
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: var(--success-light);
+  border: 1px solid var(--success);
 }
-
-.price-index-box.success strong {
-  color: #34d399;
-}
+.price-index-box.success strong { color: var(--success); }
 
 .i-icon {
   font-size: 2.5rem;
@@ -749,11 +726,10 @@ onMounted(() => {
 .price-index-box p {
   margin: 5px 0 0 0;
   font-size: 0.95rem;
-  color: #cbd5e1;
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
-/* Бренды */
 .brands-section {
   margin: 4rem 0;
   text-align: center;
@@ -826,7 +802,6 @@ onMounted(() => {
   line-height: 1.1;
 }
 
-/* FAQ */
 .faq-section {
   margin: 5rem auto;
   max-width: 800px;
@@ -883,7 +858,6 @@ onMounted(() => {
   padding-top: 20px;
 }
 
-/* Карта */
 .map-section {
   margin: 4rem 0;
   padding: 2rem;
@@ -906,23 +880,9 @@ onMounted(() => {
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--border-color);
-  filter: grayscale(0.2);
-  transition: filter 0.3s;
 }
 
-.map-container:hover {
-  filter: grayscale(0);
-}
 
-:global(.dark) .map-container {
-  filter: invert(0.9) hue-rotate(180deg) grayscale(0.5);
-}
-
-:global(.dark) .map-container:hover {
-  filter: invert(0.9) hue-rotate(180deg) grayscale(0.2);
-}
-
-/* Адаптивность */
 @media (max-width: 950px) {
   .hero-about {
     flex-direction: column;
