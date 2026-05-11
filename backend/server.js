@@ -936,6 +936,114 @@ app.get('/api/payment/test-webhook', async (req, res) => {
     }
 });
 
+
+// --- Специализированный роут для создания возврата ---
+app.post('/api/admin/return_requests', verifyAdmin, async (req, res) => {
+    const { order_id, user_id, reason } = req.body;
+
+    try {
+        // 1. Проверяем, нет ли уже активной заявки (на всякий случай, кроме индекса в БД)
+        const { data: existing } = await supabase
+            .from('return_requests')
+            .select('id, status')
+            .eq('order_id', order_id)
+            .in('status', ['pending', 'approved'])
+            .maybeSingle();
+
+        if (existing) {
+            return res.status(400).json({ 
+                error: `Для заказа #${order_id} уже существует активная заявка в статусе: ${existing.status}` 
+            });
+        }
+
+        // 2. Создаем заявку
+        const { data, error } = await supabase
+            .from('return_requests')
+            .insert([{ order_id, user_id, reason, status: 'pending' }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// --- Специализированный роут для обновления статуса возврата ---
+app.put('/api/admin/return_requests/:id', verifyAdmin, async (req, res) => {
+    const { status } = req.body; // 'approved' или 'rejected'
+    const requestId = req.params.id;
+
+    try {
+        // 1. Получаем текущую заявку
+        const { data: request, error: reqErr } = await supabase
+            .from('return_requests')
+            .select('*')
+            .eq('id', requestId)
+            .single();
+        
+        if (reqErr || !request) return res.status(404).json({ error: 'Заявка не найдена' });
+        
+        // Если статус уже одобрен, ничего не делаем (защита от повторного возврата остатков)
+        if (request.status === 'approved' && status === 'approved') {
+            return res.json(request);
+        }
+
+        // 2. Если статус меняется на 'approved', возвращаем товар на склады
+        if (status === 'approved') {
+            const { data: items } = await supabase
+                .from('order_items')
+                .select('product_id, quantity, warehouse_id')
+                .eq('order_id', request.order_id);
+
+            if (items) {
+                for (const item of items) {
+                    if (item.warehouse_id) {
+                        // Получаем текущий остаток
+                        const { data: stock } = await supabase
+                            .from('product_stocks')
+                            .select('quantity')
+                            .eq('product_id', item.product_id)
+                            .eq('warehouse_id', item.warehouse_id)
+                            .maybeSingle();
+                        
+                        if (stock) {
+                            // Прибавляем количество обратно
+                            await supabase
+                                .from('product_stocks')
+                                .update({ quantity: stock.quantity + item.quantity })
+                                .eq('product_id', item.product_id)
+                                .eq('warehouse_id', item.warehouse_id);
+                        }
+                    }
+                }
+            }
+            
+            // Также логично обновить статус самого заказа
+            await supabase
+                .from('orders')
+                .update({ delivery_status: 'returned' })
+                .eq('id', request.order_id);
+        }
+
+        // 3. Обновляем статус заявки
+        const { data: updated, error: updateErr } = await supabase
+            .from('return_requests')
+            .update({ status })
+            .eq('id', requestId)
+            .select()
+            .single();
+
+        if (updateErr) throw updateErr;
+        res.json(updated);
+
+    } catch (e) {
+        console.error('Ошибка при обработке возврата:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // =====================================================================
 // API: УПРАВЛЕНИЕ ФАЙЛАМИ
 // =====================================================================

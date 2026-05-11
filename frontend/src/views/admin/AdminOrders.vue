@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-orders">
+  <div class="admin-orders animate-fade-in">
     <!-- ШАПКА -->
     <div class="header-row">
       <div class="header-left">
@@ -20,9 +20,9 @@
       </div>
       <form @submit.prevent="createOrder" class="admin-form">
         <div class="input-grid">
-          <div class="input-group">
+          <div class="form-group">
             <label>👤 Выберите клиента</label>
-            <select v-model="newOrder.user_id" class="form-input">
+            <select v-model="newOrder.user_id">
               <option :value="null">-- Оформить как гостя --</option>
               <option v-for="u in users" :key="u.id" :value="u.id">
                 {{ u.last_name || '' }} {{ u.first_name }} ({{ u.email || u.phone_number }})
@@ -30,9 +30,9 @@
             </select>
           </div>
 
-          <div class="input-group">
+          <div class="form-group">
             <label>📍 Пункт выдачи (ПВЗ)</label>
-            <select v-model="newOrder.warehouse_id" required class="form-input" @change="handleWarehouseChange">
+            <select v-model="newOrder.warehouse_id" required @change="handleWarehouseChange">
               <option :value="null">-- Выберите склад/ПВЗ --</option>
               <option v-for="w in warehouses" :key="w.id" :value="w.id">
                 {{ w.cities?.name || w.city_name }} — {{ w.address }}
@@ -40,9 +40,9 @@
             </select>
           </div>
 
-          <div class="input-group">
+          <div class="form-group">
             <label>💳 Способ оплаты</label>
-            <select v-model="newOrder.payment_method" class="form-input">
+            <select v-model="newOrder.payment_method">
               <option value="card">Банковская карта</option>
               <option value="cash">Наличные / QR</option>
             </select>
@@ -54,35 +54,31 @@
           <h4>🛒 Состав чека:</h4>
           <div v-for="(item, index) in selectedProducts" :key="index" class="selector-row-advanced glass-card">
             <div class="sel-main">
-                <select v-model="item.product_id" @change="updateItemData(index)" class="form-input prod-select">
-                    <option :value="null">-- Выберите товар --</option>
-                    <option v-for="p in products" :key="p.id" :value="p.id">
-                        {{ p.name }} | Арт: {{ p.sku }} | ({{ p.weight_kg }} кг)
-                    </option>
-                </select>
-                <div class="item-sub-info" v-if="item.product_id">
-                    <span>Вес ед.: <b>{{ item.weight }} кг</b></span>
-                    <span>Цена ед.: <b>{{ item.price.toLocaleString() }} ₽</b></span>
-                    <span :class="item.isLocal ? 'status-local' : 'status-intercity'">
-                      {{ item.isLocal ? '📍 В наличии в городе' : `🚚 Межгород (~${item.distance || 0} км)` }}
-                    </span>
-                </div>
+              <select v-model="item.product_id" @change="updateItemData(index)" class="prod-select">
+                <option :value="null">-- Выберите товар --</option>
+                <option v-for="p in products" :key="p.id" :value="p.id">
+                  {{ p.name }} | Арт: {{ p.sku }} | ({{ p.weight_kg }} кг)
+                </option>
+              </select>
+              <div class="item-sub-info" v-if="item.product_id">
+                <span>Вес ед.: <b>{{ item.weight }} кг</b></span>
+                <span>Цена ед.: <b>{{ item.price.toLocaleString() }} ₽</b></span>
+                <span :class="item.isLocal ? 'status-local' : 'status-intercity'">
+                  {{ item.isLocal ? '📍 В наличии в городе' : `🚚 Межгород (~${item.distance || 0} км)` }}
+                </span>
+              </div>
             </div>
-            
             <div class="sel-qty">
-                <label>Кол-во:</label>
-                <input v-model.number="item.quantity" type="number" min="1" @input="autoCalcShipping" class="form-input qty-input" />
+              <label>Кол-во:</label>
+              <input v-model.number="item.quantity" type="number" min="1" @input="autoCalcShipping" class="qty-input" />
             </div>
-
             <div class="sel-total">
-                <div class="st-price">{{ (item.price * item.quantity).toLocaleString() }} ₽</div>
-                <div class="st-weight">{{ (item.weight * item.quantity).toFixed(1) }} кг</div>
+              <div class="st-price">{{ (item.price * item.quantity).toLocaleString() }} ₽</div>
+              <div class="st-weight">{{ (item.weight * item.quantity).toFixed(1) }} кг</div>
             </div>
-
             <button type="button" @click="removeProductFromNewOrder(index)" class="btn-remove-char">✕</button>
           </div>
-          
-          <button type="button" @click="addProductToNewOrder" class="btn-add-prod">
+          <button type="button" @click="addProductToNewOrder" class="btn btn-outline btn-sm mt-2">
             ➕ Добавить позицию
           </button>
         </div>
@@ -93,21 +89,18 @@
             <div class="pill">Общий вес: <strong>{{ totals.weight.toFixed(1) }} кг</strong></div>
             <div class="pill">Товаров на: <strong>{{ totals.itemsPrice.toLocaleString() }} ₽</strong></div>
           </div>
-
           <div class="shipping-adjustment">
             <label>🚚 Стоимость доставки:</label>
             <div class="ship-input-wrap">
-                <input v-model.number="newOrder.shipping_cost" type="number" class="shipping-input-main" />
-                <span class="currency">₽</span>
+              <input v-model.number="newOrder.shipping_cost" type="number" class="shipping-input-main" />
+              <span class="currency">₽</span>
             </div>
           </div>
-
           <div class="grand-total">
             <label>ИТОГО К ОПЛАТЕ</label>
             <div class="total-val">{{ (totals.itemsPrice + newOrder.shipping_cost).toLocaleString() }} ₽</div>
           </div>
-          
-          <button type="submit" class="btn-primary-lg" :disabled="selectedProducts.length === 0 || !newOrder.warehouse_id">
+          <button type="submit" class="btn btn-primary btn-lg" :disabled="selectedProducts.length === 0 || !newOrder.warehouse_id">
             ✅ Создать заказ
           </button>
         </div>
@@ -116,6 +109,9 @@
 
     <!-- ТАБЛИЦА ЗАКАЗОВ -->
     <div class="table-container">
+      <div class="table-meta text-muted mb-2">
+        Показано {{ paginatedOrders.length }} из {{ filteredOrders.length }} заказов (страница {{ currentPage }} из {{ totalPages }})
+      </div>
       <div class="admin-table-wrapper glass-card">
         <table class="admin-table">
           <thead>
@@ -135,10 +131,16 @@
                   <div class="order-id-badge">#{{ order.id }}</div>
                   <div class="date-sub">{{ formatDate(order.created_at) }}</div>
                 </td>
+                <!-- НОВОЕ ОТОБРАЖЕНИЕ КЛИЕНТА -->
                 <td>
                   <div class="user-cell">
-                    <strong>{{ getUserFullName(order) }}</strong>
-                    <small>{{ order.customer_email || order.customer_phone }}</small>
+                    <div class="user-name-row">
+                      <strong>{{ getUserInfo(order).fullName }}</strong>
+                    </div>
+                    <div class="user-contacts">
+                      <small v-if="getUserInfo(order).email">{{ getUserInfo(order).email }}</small>
+                      <small v-if="getUserInfo(order).phone">{{ getUserInfo(order).phone }}</small>
+                    </div>
                   </div>
                 </td>
                 <td>
@@ -168,7 +170,7 @@
                     <button @click="toggleItems(order.id)" class="btn-action-circle" :class="{ 'active': expandedOrder === order.id }">
                       {{ expandedOrder === order.id ? '✕' : '👁️' }}
                     </button>
-                    <button @click="deleteOrder(order.id)" class="btn-delete-small">🗑️</button>
+                    <button @click="deleteOrder(order.id)" class="btn btn-danger btn-sm">🗑️</button>
                   </div>
                 </td>
               </tr>
@@ -202,10 +204,9 @@
                         <div class="ipro-info">
                           <div class="ipro-name">{{ getProductData(item.product_id).name }}</div>
                           <div class="ipro-meta">
-                            <span class="qty-badge">{{ item.quantity }} шт.</span>
+                            <span class="badge">{{ item.quantity }} шт.</span>
                             <span class="price-tag">× {{ item.unit_price }} ₽</span>
                           </div>
-                          <!-- Информация о складе-отправителе -->
                           <div class="ipro-warehouse" v-if="item.warehouse_id">
                             📦 Отправлен со склада: <b>{{ getWarehouseAddress(item.warehouse_id) }}</b>
                           </div>
@@ -219,6 +220,15 @@
             </template>
           </tbody>
         </table>
+      </div>
+
+      <!-- ПАГИНАЦИЯ -->
+      <div v-if="totalPages > 1" class="pagination mt-3">
+        <button @click="currentPage--" :disabled="currentPage === 1">←</button>
+        <div class="pagination-pages">
+          <button v-for="p in totalPages" :key="p" @click="currentPage = p" :class="{ active: currentPage === p }">{{ p }}</button>
+        </div>
+        <button @click="currentPage++" :disabled="currentPage === totalPages">→</button>
       </div>
     </div>
   </div>
@@ -244,7 +254,7 @@ const productStocks = ref([]);
 
 const expandedOrder = ref(null);
 const currentPage = ref(1);
-const itemsPerPage = 15;
+const itemsPerPage = 20;
 
 const filters = reactive({ query: '', deliveryStatus: 'all', paymentStatus: 'all', sort: 'new' });
 const selectedProducts = ref([]);
@@ -252,59 +262,54 @@ const newOrder = reactive({ user_id: null, warehouse_id: null, delivery_address:
 
 const handleWarehouseChange = () => {
   updateAddressFromWarehouse();
-  autoCalcShipping(); 
+  autoCalcShipping();
 };
 
 const addProductToNewOrder = () => selectedProducts.value.push({ product_id: null, quantity: 1, price: 0, weight: 0, isLocal: true, distance: 0 });
 const removeProductFromNewOrder = (index) => { selectedProducts.value.splice(index, 1); autoCalcShipping(); };
 
 const updateItemData = (index) => {
-    const item = selectedProducts.value[index];
-    const prod = products.value.find(p => p.id === item.product_id);
-    if (prod) {
-        item.price = prod.discount_price || prod.price;
-        item.weight = Number(prod.weight_kg) || 0;
-    }
-    autoCalcShipping();
+  const item = selectedProducts.value[index];
+  const prod = products.value.find(p => p.id === item.product_id);
+  if (prod) {
+    item.price = prod.discount_price || prod.price;
+    item.weight = Number(prod.weight_kg) || 0;
+  }
+  autoCalcShipping();
 };
 
-// Расчет доставки через серверный эндпоинт
 const autoCalcShipping = async () => {
-    if (!newOrder.warehouse_id || selectedProducts.value.length === 0) {
-        newOrder.shipping_cost = 0;
-        return;
-    }
-
-    const itemsForRpc = selectedProducts.value
-        .filter(item => item.product_id)
-        .map(item => ({ product_id: item.product_id, quantity: item.quantity }));
-
-    if (itemsForRpc.length === 0) {
-        newOrder.shipping_cost = 0;
-        return;
-    }
-
-    try {
-        const res = await axios.post(`${API_URL}/api/calculate-shipping`, {
-            warehouse_id: newOrder.warehouse_id,
-            items: itemsForRpc
-        }, config);
-        const result = res.data;
-        newOrder.shipping_cost = result.total;
-
-        let idx = 0;
-        selectedProducts.value.forEach(item => {
-            if (!item.product_id) return;
-            const det = result.details[idx++];
-            if (det) {
-                item.distance = det.distance_km || 0;
-                item.isLocal = item.distance === 0;
-            }
-        });
-    } catch (e) {
-        console.error('Ошибка расчёта доставки:', e);
-        newOrder.shipping_cost = 0;
-    }
+  if (!newOrder.warehouse_id || selectedProducts.value.length === 0) {
+    newOrder.shipping_cost = 0;
+    return;
+  }
+  const itemsForRpc = selectedProducts.value
+    .filter(item => item.product_id)
+    .map(item => ({ product_id: item.product_id, quantity: item.quantity }));
+  if (itemsForRpc.length === 0) {
+    newOrder.shipping_cost = 0;
+    return;
+  }
+  try {
+    const res = await axios.post(`${API_URL}/api/calculate-shipping`, {
+      warehouse_id: newOrder.warehouse_id,
+      items: itemsForRpc
+    }, config);
+    const result = res.data;
+    newOrder.shipping_cost = result.total;
+    let idx = 0;
+    selectedProducts.value.forEach(item => {
+      if (!item.product_id) return;
+      const det = result.details[idx++];
+      if (det) {
+        item.distance = det.distance_km || 0;
+        item.isLocal = item.distance === 0;
+      }
+    });
+  } catch (e) {
+    console.error('Ошибка расчёта доставки:', e);
+    newOrder.shipping_cost = 0;
+  }
 };
 
 const updateAddressFromWarehouse = () => {
@@ -313,12 +318,12 @@ const updateAddressFromWarehouse = () => {
 };
 
 const totals = computed(() => {
-    let itemsPrice = 0; let weight = 0;
-    selectedProducts.value.forEach(item => {
-        itemsPrice += item.price * item.quantity;
-        weight += item.weight * item.quantity;
-    });
-    return { itemsPrice, weight };
+  let itemsPrice = 0; let weight = 0;
+  selectedProducts.value.forEach(item => {
+    itemsPrice += item.price * item.quantity;
+    weight += item.weight * item.quantity;
+  });
+  return { itemsPrice, weight };
 });
 
 const loadData = async () => {
@@ -337,12 +342,31 @@ const loadData = async () => {
     orderItems.value = iRes.data;
     warehouses.value = wRes.data;
     productStocks.value = sRes.data;
-  } catch (e) { console.error("Ошибка загрузки данных"); }
+  } catch (e) {
+    console.error("Ошибка загрузки данных");
+  }
+};
+
+// Новая функция для извлечения полного имени и контактов
+const getUserInfo = (order) => {
+  const u = users.value.find(user => user.id === order.user_id);
+  if (u) {
+    return {
+      fullName: [u.last_name, u.first_name].filter(Boolean).join(' ') || 'Без имени',
+      email: u.email || null,
+      phone: u.phone_number || null
+    };
+  }
+  return {
+    fullName: order.customer_name || 'Гость',
+    email: order.customer_email || null,
+    phone: order.customer_phone || null
+  };
 };
 
 const getUserFullName = (order) => {
-    const u = users.value.find(user => user.id === order.user_id);
-    return u ? `${u.last_name || ''} ${u.first_name || ''}`.trim() : (order.customer_name || 'Гость');
+  const u = users.value.find(user => user.id === order.user_id);
+  return u ? `${u.last_name || ''} ${u.first_name || ''}`.trim() : (order.customer_name || 'Гость');
 };
 
 const getProductData = (id) => products.value.find(p => p.id === id) || {};
@@ -350,50 +374,54 @@ const getProductData = (id) => products.value.find(p => p.id === id) || {};
 const getOrderItems = (orderId) => orderItems.value.filter(item => item.order_id === orderId);
 
 const getWarehouseAddress = (whId) => {
-    const wh = warehouses.value.find(w => w.id === whId);
-    return wh ? `${wh.cities?.name || wh.city_name}, ${wh.address}` : `Склад #${whId}`;
+  const wh = warehouses.value.find(w => w.id === whId);
+  return wh ? `${wh.cities?.name || wh.city_name}, ${wh.address}` : `Склад #${whId}`;
 };
 
 const createOrder = async () => {
   try {
     const user = users.value.find(u => u.id === newOrder.user_id) || {};
     const itemsForServer = selectedProducts.value.map(item => ({
-        product_id: item.product_id,
-        quantity: item.quantity
+      product_id: item.product_id,
+      quantity: item.quantity
     }));
     const payload = {
-        ...newOrder,
-        customer_name: `${user.last_name || ''} ${user.first_name || 'Гость'}`.trim(),
-        customer_phone: user.phone_number || 'не указан',
-        customer_email: user.email || '',
-        customer_city: appStore.city,
-        items: itemsForServer,
-        total_price: totals.value.itemsPrice + newOrder.shipping_cost
+      ...newOrder,
+      customer_name: `${user.last_name || ''} ${user.first_name || 'Гость'}`.trim(),
+      customer_phone: user.phone_number || 'не указан',
+      customer_email: user.email || '',
+      customer_city: appStore.city,
+      items: itemsForServer,
+      total_price: totals.value.itemsPrice + newOrder.shipping_cost
     };
     const res = await axios.post(`/api/orders`, payload, config);
     alert(`Заказ №${res.data.orderId} создан!`);
     selectedProducts.value = [];
     await loadData();
-  } catch (e) { alert('Ошибка: ' + (e.response?.data?.error || e.message)); }
+  } catch (e) {
+    alert('Ошибка: ' + (e.response?.data?.error || e.message));
+  }
 };
 
 const updateOrderStatus = async (order) => {
-    try {
-        await axios.patch(`/api/admin/orders/${order.id}/status`, {
-            delivery_status: order.delivery_status,
-            payment_status: order.payment_status
-        }, config);
-    } catch (e) { alert("Ошибка обновления"); }
+  try {
+    await axios.patch(`/api/admin/orders/${order.id}/status`, {
+      delivery_status: order.delivery_status,
+      payment_status: order.payment_status
+    }, config);
+  } catch (e) {
+    alert("Ошибка обновления");
+  }
 };
 
 const deleteOrder = async (id) => {
   if (confirm('Удалить заказ? Остатки вернутся на склады.')) {
     try {
-        await axios.delete(`/api/admin/orders/${id}`, config);
-        orders.value = orders.value.filter(o => o.id !== id);
-        alert('Заказ удалён, остатки возвращены.');
+      await axios.delete(`/api/admin/orders/${id}`, config);
+      orders.value = orders.value.filter(o => o.id !== id);
+      alert('Заказ удалён, остатки возвращены.');
     } catch (e) {
-        alert('Ошибка при удалении: ' + (e.response?.data?.error || e.message));
+      alert('Ошибка при удалении: ' + (e.response?.data?.error || e.message));
     }
   }
 };
@@ -402,15 +430,15 @@ const formatDate = (d) => new Date(d).toLocaleDateString('ru-RU', { day: '2-digi
 const toggleItems = (id) => expandedOrder.value = expandedOrder.value === id ? null : id;
 
 const filteredOrders = computed(() => {
-    let res = [...orders.value];
-    if (filters.query) {
-        const q = filters.query.toLowerCase();
-        res = res.filter(o => o.id.toString() === q || (o.customer_name && o.customer_name.toLowerCase().includes(q)));
-    }
-    if (filters.deliveryStatus !== 'all') res = res.filter(o => o.delivery_status === filters.deliveryStatus);
-    if (filters.paymentStatus !== 'all') res = res.filter(o => o.payment_status === filters.paymentStatus);
-    if (filters.sort === 'new') res.sort((a, b) => b.id - a.id);
-    return res;
+  let res = [...orders.value];
+  if (filters.query) {
+    const q = filters.query.toLowerCase();
+    res = res.filter(o => o.id.toString() === q || (o.customer_name && o.customer_name.toLowerCase().includes(q)));
+  }
+  if (filters.deliveryStatus !== 'all') res = res.filter(o => o.delivery_status === filters.deliveryStatus);
+  if (filters.paymentStatus !== 'all') res = res.filter(o => o.payment_status === filters.paymentStatus);
+  if (filters.sort === 'new') res.sort((a, b) => b.id - a.id);
+  return res;
 });
 
 const totalPages = computed(() => Math.ceil(filteredOrders.value.length / itemsPerPage));
@@ -420,64 +448,289 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+/* ==========================================================================
+   УНИКАЛЬНЫЕ СТИЛИ СТРАНИЦЫ ЗАКАЗОВ (глобальный CSS используется)
+   ========================================================================== */
 
-.admin-orders { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-orders { color: #f8fafc; }
+.admin-orders {
+  padding: 40px 24px;
+}
 
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
-.header-left h1 { font-size: 2.2rem; font-weight: 900; background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
+.header-left h1 {
+  font-size: 2.2rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
 
-.glass-card { background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); backdrop-filter: blur(8px); }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; }
+.stats-badge {
+  padding: 10px 20px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-.admin-card { padding: 28px; margin-bottom: 32px; }
-.input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 28px; }
-.input-group label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); margin-bottom: 8px; display: block; }
+.admin-card {
+  padding: 28px;
+  margin-bottom: 32px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.card-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  margin: 0;
+}
+.card-decoration {
+  width: 50px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 4px;
+}
 
-.form-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color, #cbd5e1); background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); transition: all 0.3s; box-sizing: border-box; }
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+  margin-bottom: 28px;
+}
 
-.products-selector-section { background: rgba(0,0,0,0.02); padding: 20px; border-radius: 12px; margin-bottom: 24px; }
-.selector-row-advanced { display: flex; gap: 15px; align-items: center; padding: 15px; background: var(--bg-card, #fff); margin-bottom: 12px; }
-.item-sub-info { font-size: 11px; color: var(--text-muted, #94a3b8); display: flex; gap: 15px; margin-top: 5px; }
-.status-local { color: var(--success, #10b981); font-weight: 700; }
-.status-intercity { color: var(--warning, #f59e0b); font-weight: 700; }
+.products-selector-section {
+  background: rgba(0,0,0,0.02);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+.selector-row-advanced {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  padding: 15px;
+  background: var(--bg-card);
+  margin-bottom: 12px;
+  border-radius: 12px;
+}
+.item-sub-info {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: 15px;
+  margin-top: 5px;
+}
+.status-local { color: var(--success); font-weight: 700; }
+.status-intercity { color: var(--warning); font-weight: 700; }
 
-.constructor-footer { display: grid; grid-template-columns: 1fr 1.5fr 1fr auto; gap: 30px; align-items: center; padding: 25px; background: rgba(0,0,0,0.02); }
-.pill { padding: 8px 12px; background: var(--bg-card, #fff); border-radius: 8px; font-size: 13px; font-weight: 700; border: 1px solid var(--border-color); }
-.total-val { font-size: 2rem; font-weight: 900; color: var(--primary, #2563eb); }
+.qty-input {
+  width: 80px;
+}
+.btn-remove-char {
+  background: var(--danger-light);
+  color: var(--danger);
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.btn-remove-char:hover {
+  background: var(--danger);
+  color: white;
+}
 
+.constructor-footer {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr auto;
+  gap: 30px;
+  align-items: center;
+  padding: 25px;
+  background: rgba(0,0,0,0.02);
+}
+.pill {
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid var(--border-color);
+}
+.total-val {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--primary);
+}
+
+.table-container { margin-top: 20px; }
+.table-meta { font-size: 0.85rem; font-weight: 600; }
 .admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 1100px; }
-.admin-table th { padding: 16px 20px; text-align: left; font-size: 0.75rem; font-weight: 800; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
-.admin-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; }
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1100px;
+}
+.admin-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+}
+.admin-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
 
-.order-detail-view { padding: 25px; border-top: 4px solid var(--primary, #2563eb); margin: 15px 25px 30px; }
-.detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
-.detail-title { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: var(--primary, #2563eb); margin-bottom: 15px; }
-.detail-column p { font-size: 0.9rem; margin-bottom: 8px; }
+.user-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.user-name-row strong {
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+.user-contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.user-contacts small {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
 
-.item-row-pro { display: flex; align-items: center; gap: 20px; padding: 15px; margin-bottom: 10px; background: rgba(0,0,0,0.02); }
-.ipro-img { width: 50px; height: 50px; object-fit: contain; background: #fff; border-radius: 8px; padding: 4px; }
+.order-detail-view {
+  padding: 25px;
+  border-top: 4px solid var(--primary);
+  margin: 15px 25px 30px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+}
+.detail-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 15px;
+}
+.detail-column p {
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.item-row-pro {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 15px;
+  margin-bottom: 10px;
+  background: rgba(0,0,0,0.02);
+  border-radius: 12px;
+}
+.ipro-img {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px;
+}
 .ipro-name { font-weight: 800; font-size: 0.95rem; }
-.ipro-meta { display: flex; gap: 15px; font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; }
+.ipro-meta { display: flex; gap: 15px; font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; align-items: center; }
 .ipro-sum { font-weight: 900; font-size: 1.1rem; color: var(--primary); }
 
-.status-select { padding: 8px 14px; border-radius: 30px; font-weight: 800; font-size: 0.7rem; border: none; cursor: pointer; }
+.status-select {
+  padding: 8px 14px;
+  border-radius: 30px;
+  font-weight: 800;
+  font-size: 0.7rem;
+  border: none;
+  cursor: pointer;
+  background: var(--bg-input);
+  color: var(--text-main);
+}
 .status-select.processing { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
 .status-select.shipping { background: rgba(245, 158, 11, 0.1); color: #d97706; }
 .status-select.delivered { background: rgba(16, 185, 129, 0.1); color: #059669; }
+.status-select.ready_for_pickup { background: rgba(16, 185, 129, 0.1); color: #059669; }
 
-.btn-primary-lg { background: var(--primary); color: white; border: none; padding: 16px 32px; border-radius: 8px; font-weight: 800; cursor: pointer; }
-.btn-action-circle { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-color); background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.btn-delete-small { color: var(--danger); background: none; border: none; font-size: 1.2rem; cursor: pointer; }
+.btn-action-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+.btn-group-row { display: flex; gap: 8px; align-items: center; }
 
-@media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } .constructor-footer { grid-template-columns: 1fr; } }
+/* Пагинация */
+.pagination-pages {
+  display: flex;
+  gap: 8px;
+}
+.pagination-pages button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pagination-pages button:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.pagination-pages button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
 
-.status-select.ready_for_pickup {
-    background: rgba(16, 185, 129, 0.1);
-    color: #059669;
+.text-right { text-align: right; }
+
+@media (max-width: 900px) {
+  .detail-grid { grid-template-columns: 1fr; }
+  .constructor-footer { grid-template-columns: 1fr; }
 }
 </style>
