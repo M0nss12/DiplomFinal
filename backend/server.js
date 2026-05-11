@@ -1044,6 +1044,64 @@ app.put('/api/admin/return_requests/:id', verifyAdmin, async (req, res) => {
     }
 });
 
+
+// Оформление возврата пользователем
+app.post('/api/orders/:id/return', async (req, res) => {
+    const orderId = req.params.id;
+    const userId = req.headers['x-user-id'];
+    const { reason } = req.body;
+
+    if (!userId) return res.status(401).json({ error: 'Авторизуйтесь' });
+    if (!reason || reason.length < 5) return res.status(400).json({ error: 'Укажите причину возврата (минимум 5 символов)' });
+
+    try {
+        // 1. Проверяем заказ: должен быть выдан, оплачен и принадлежать юзеру
+        const { data: order, error: orderErr } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', orderId)
+            .eq('user_id', userId)
+            .single();
+
+        if (orderErr || !order) return res.status(404).json({ error: 'Заказ не найден' });
+        
+        if (order.delivery_status !== 'delivered' || order.payment_status !== 'paid') {
+            return res.status(400).json({ error: 'Возврат возможен только для оплаченных и полученных заказов' });
+        }
+
+        // 2. Проверяем, нет ли уже активной заявки
+        const { data: existing } = await supabase
+            .from('return_requests')
+            .select('id')
+            .eq('order_id', orderId)
+            .in('status', ['pending', 'approved'])
+            .maybeSingle();
+
+        if (existing) return res.status(400).json({ error: 'Заявка на возврат уже подана' });
+
+        // 3. Создаем заявку на возврат
+        const { data: returnReq, error: returnErr } = await supabase
+            .from('return_requests')
+            .insert([{ order_id: orderId, user_id: userId, reason, status: 'pending' }])
+            .select()
+            .single();
+
+        if (returnErr) throw returnErr;
+
+        // 4. Создаем уведомление для пользователя в БД
+        await supabase.from('notifications').insert([{
+            user_id: userId,
+            type: 'system',
+            title: 'Заявка на возврат создана',
+            message: `Ваша заявка по заказу №${orderId} принята на рассмотрение.`
+        }]);
+
+        res.json({ success: true, message: 'Заявка создана' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // =====================================================================
 // API: УПРАВЛЕНИЕ ФАЙЛАМИ
 // =====================================================================
