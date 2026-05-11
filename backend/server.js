@@ -589,51 +589,10 @@ app.get('/api/users/profile/:id', async (req, res) => {
 });
 
 app.put('/api/users/profile/:id', async (req, res) => {
-    // Извлекаем спец. поля, чтобы контролировать их запись
-    const { city, city_id, role, password_hash, ...updateData } = req.body;
-    const isAdmin = req.headers['x-admin-key'] === process.env.ADMIN_SECRET;
-
-    try {
-        // 1. Логика города: приоритет у ID, если нет — ищем/создаем по названию
-        if (city_id) {
-            updateData.saved_city_id = city_id;
-        } else if (city) {
-            updateData.saved_city_id = await getOrCreateCity(city);
-        }
-
-        // 2. Безопасность РОЛИ: менять роль может ТОЛЬКО админ с ключом
-        if (role) {
-            if (isAdmin) {
-                updateData.role = role;
-            } else {
-                // Если не админ пытается сменить роль — игнорируем или выдаем ошибку
-                console.warn(`Попытка несанкционированной смены роли для ID: ${req.params.id}`);
-            }
-        }
-        
-        // 3. Безопасность ПАРОЛЯ: если пришел пароль, бэкенд его обновит 
-        // (триггер в БД сам захеширует его, если он не захеширован)
-        if (password_hash) {
-            updateData.password_hash = password_hash;
-        }
-
-        // 4. Обновление в БД
-        const { data, error } = await supabase
-            .from('users')
-            .update(updateData)
-            .eq('id', req.params.id)
-            .select('*, cities(name)') // Сразу возвращаем с названием города
-            .single();
-
-        if (error) throw error;
-        
-        if (!data) return res.status(404).json({ error: 'Пользователь не найден' });
-
-        res.json(data);
-    } catch (e) {
-        console.error('Ошибка при обновлении профиля:', e.message);
-        res.status(500).json({ error: 'Ошибка сервера при обновлении профиля' });
-    }
+    const { city, ...updateData } = req.body;
+    if (city) updateData.saved_city_id = await getOrCreateCity(city);
+    const { data } = await supabase.from('users').update(updateData).eq('id', req.params.id).select();
+    res.json(data[0]);
 });
 
 // =====================================================================
@@ -1250,27 +1209,18 @@ app.get('/api/admin/wishlists', verifyAdmin, async (req, res) => {
 
 app.get('/api/admin/:table', verifyAdmin, async (req, res) => {
     try {
-        let query;
-        
-        // Специфические джоины для админки
-        if (req.params.table === 'users') {
-            query = supabase.from('users').select('*, cities(name)');
-        } else if (req.params.table === 'warehouses') {
-            query = supabase.from('warehouses').select('*, cities(name)');
-        } else if (req.params.table === 'notifications') {
-            query = supabase.from('notifications').select('*, users(first_name, last_name)');
-        } else if (req.params.table === 'product_stocks') {
-            query = supabase.from('product_stocks').select('*, products(name, sku), warehouses(*, cities(name))');
-        } else {
-            query = supabase.from(req.params.table).select('*');
-        }
-
-        const { data, error } = await query.order('created_at', { ascending: false });
+        let query = supabase.from(req.params.table).select('*');
+        if (req.params.table === 'warehouses') query = supabase.from('warehouses').select('*, cities(name)');
+        if (req.params.table === 'notifications') query = supabase.from('notifications').select('*, users(first_name, last_name)');
+        if (req.params.table === 'product_stocks') query = supabase.from('product_stocks').select('*, products(name, sku), warehouses(*, cities(name))');
+        if (req.params.table === 'user_vehicles') query = supabase.from('user_vehicles').select('*, users(first_name, last_name)');
+        if (req.params.table === 'return_requests') query = supabase.from('return_requests').select('*, users(first_name, last_name)');
+        if (req.params.table === 'order_items') 
+  query = supabase.from('order_items').select('*, products(name, sku, images)');
+        const { data, error } = await query.order('id', { ascending: false });
         if (error) throw error;
         res.json(data || []);
-    } catch (e) { 
-        res.status(500).json({ error: e.message }); 
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/:table', verifyAdmin, async (req, res) => {
