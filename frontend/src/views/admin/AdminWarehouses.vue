@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-warehouses">
+  <div class="admin-warehouses animate-fade-in">
     <!-- ЗАГОЛОВОК -->
     <div class="header-row">
       <div class="header-left">
@@ -20,39 +20,32 @@
       </div>
       <form @submit.prevent="createWarehouse" class="admin-form">
         <div class="input-grid">
-          <div class="input-group">
+          <div class="form-group">
             <label>🏙️ Город</label>
-            <select v-model="newWarehouse.city_id" required class="form-input">
+            <select v-model="newWarehouse.city_id" required>
               <option :value="null" disabled>-- Выберите город --</option>
               <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>🏠 Точный адрес</label>
-            <input
-              v-model="newWarehouse.address"
-              placeholder="ул. ..., д. ..."
-              required
-              class="form-input"
-            />
+            <input v-model="newWarehouse.address" placeholder="ул. ..., д. ..." required />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>📞 Телефон</label>
             <input
               v-model="newWarehouse.phone"
               type="tel"
               placeholder="+7-___-___-__-__"
-              class="form-input"
               @input="formatPhone($event, 'new')"
             />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>🕒 Часы работы</label>
             <input
               v-model="newWarehouse.working_hours"
               type="text"
               placeholder="09:00-21:00"
-              class="form-input"
               @input="formatHours($event, 'new')"
             />
           </div>
@@ -64,8 +57,8 @@
             <span class="checkmark"></span>
             <span>⭐ Разрешить выдачу заказов (ПВЗ)</span>
           </label>
-          <button type="submit" class="btn-primary" :disabled="loading">
-            <span v-if="loading" class="spinner-small"></span>
+          <button type="submit" class="btn btn-primary create-btn" :disabled="loading">
+            <span v-if="loading" class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></span>
             <span v-else>➕ Добавить в базу</span>
           </button>
         </div>
@@ -80,23 +73,23 @@
       </div>
 
       <div class="filter-grid">
-        <div class="input-group search-group">
+        <div class="form-group">
           <label>🔎 Поиск (Город, Адрес, ID)</label>
-          <input v-model="filters.search" placeholder="Название или ID..." class="form-input" />
+          <input v-model="filters.search" placeholder="Название или ID..." />
         </div>
 
-        <div class="input-group">
+        <div class="form-group">
           <label>🏢 Тип объекта</label>
-          <select v-model="filters.type" class="form-input">
+          <select v-model="filters.type">
             <option value="all">Все объекты</option>
             <option value="pickup">Только ПВЗ</option>
             <option value="warehouse">Только Склады</option>
           </select>
         </div>
 
-        <div class="input-group">
+        <div class="form-group">
           <label>📊 Сортировка</label>
-          <select v-model="filters.sort" class="form-input">
+          <select v-model="filters.sort">
             <option value="id-desc">Сначала новые</option>
             <option value="city">По алфавиту (Город)</option>
           </select>
@@ -106,8 +99,7 @@
 
     <!-- 3. ТАБЛИЦА -->
     <div class="table-container">
-      <div class="table-meta">
-        <span class="meta-icon">📄</span>
+      <div class="table-meta text-muted mb-2">
         Найдено: <b>{{ filteredWarehouses.length }}</b> из {{ warehouses.length }}
       </div>
 
@@ -130,11 +122,10 @@
               </td>
 
               <td style="width: 180px;">
-                <!-- Выбор города -->
                 <select
                   v-model="w.city_id"
                   @change="updateWarehouse(w)"
-                  class="inline-edit bold-city form-input"
+                  class="inline-edit bold-city"
                 >
                   <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
@@ -191,7 +182,7 @@
               </td>
 
               <td class="text-right">
-                <button @click="deleteWarehouse(w.id)" class="btn-delete-small">🗑️ Удалить</button>
+                <button @click="deleteWarehouse(w.id)" class="btn btn-danger btn-sm">🗑️ Удалить</button>
               </td>
             </tr>
           </tbody>
@@ -199,7 +190,7 @@
       </div>
 
       <div v-if="filteredWarehouses.length === 0" class="empty-state glass-card">
-        <div class="empty-icon">🏜️</div>
+        <div class="empty-state-icon">🏜️</div>
         <h3>Ничего не найдено</h3>
         <p>Попробуйте изменить параметры поиска или фильтры.</p>
       </div>
@@ -378,103 +369,317 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Все стили остаются как у вас, плюс добавил пару уточнений */
-.bold-city { font-weight: 800; color: var(--primary, #2563eb); }
-.inline-edit { background: transparent; border: 1px solid transparent; padding: 6px 10px; border-radius: 6px; color: var(--text-main, #0f172a); width: 100%; font-weight: 500; transition: 0.2s; }
-:global(.dark) .inline-edit { color: #f8fafc; }
-.inline-edit:hover { background: rgba(0,0,0,0.03); border-color: var(--border-color, #cbd5e1); }
-.inline-edit:focus { border-color: var(--primary, #2563eb); background: var(--bg-card, #fff); outline: none; }
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes spin { to { transform: rotate(360deg); } }
+/* ==========================================================================
+   УНИКАЛЬНЫЕ СТИЛИ АДМИНКИ СКЛАДОВ (глобальные классы уже применены)
+   ========================================================================== */
 
-.admin-warehouses { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-warehouses { color: #f8fafc; }
+.admin-warehouses {
+  padding: 40px 24px;
+}
 
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
 .header-left h1 {
-  font-size: 2.2rem; font-weight: 900; margin: 0;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; font-weight: 500; }
-
-.stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
-
-/* КАРТОЧКИ */
-.glass-card {
-  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px); transition: all 0.3s ease;
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
 }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
 
-.admin-card { padding: 28px; margin-bottom: 32px; }
-.card-title { font-size: 1.35rem; font-weight: 900; margin: 0; }
-.card-decoration { width: 50px; height: 4px; background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); border-radius: 4px; margin-top: 5px; }
-
-/* ФОРМА */
-.input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 28px; }
-.input-group { display: flex; flex-direction: column; gap: 8px; }
-.input-group label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); }
-
-.form-input {
-  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s;
+.stats-badge {
+  padding: 10px 20px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
 }
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
-.form-input:focus { border-color: var(--primary, #2563eb); background: transparent; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); outline: none; }
 
-.form-footer { margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--border-color, #e2e8f0); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); color: white; border: none;
-  padding: 12px 30px; border-radius: var(--radius-md, 8px); font-weight: 800; cursor: pointer; transition: 0.3s;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); display: flex; align-items: center; gap: 10px;
+.admin-card {
+  padding: 28px;
+  margin-bottom: 32px;
 }
-.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.card-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  margin: 0;
+}
+.card-decoration {
+  width: 50px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 4px;
+}
 
-/* ТАБЛИЦА */
-.table-container { margin-top: 20px; }
-.table-meta { margin-bottom: 16px; font-size: 0.85rem; color: var(--text-muted, #64748b); font-weight: 600; }
+/* Форма */
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.form-group label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 
-.admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 900px; }
-.admin-table th { padding: 16px 20px; text-align: left; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
-:global(.dark) .admin-table th { border-color: #334155; }
-.admin-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; }
-:global(.dark) .admin-table td { border-color: #334155; }
+.form-footer {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
 
-.col-id { width: 80px; font-weight: 800; color: var(--primary, #2563eb); }
-.inline-edit { background: transparent; border: 1px solid transparent; padding: 6px 10px; border-radius: 6px; color: var(--text-main, #0f172a); width: 100%; font-weight: 500; transition: 0.2s; }
-:global(.dark) .inline-edit { color: #f8fafc; }
-.inline-edit:hover { background: rgba(0,0,0,0.03); border-color: var(--border-color, #cbd5e1); }
-.inline-edit:focus { border-color: var(--primary, #2563eb); background: var(--bg-card, #fff); outline: none; }
-.bold-city { font-weight: 800; color: var(--primary, #2563eb); }
+/* Кнопка создания (глобальный btn btn-primary + градиент) */
+.create-btn {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border: none;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.create-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+}
 
-.sub-input-row { display: flex; align-items: center; gap: 5px; margin-top: 4px; padding-left: 10px; }
-.inline-edit-sub { background: transparent; border: none; font-size: 0.75rem; color: var(--text-muted, #64748b); width: 100%; }
+/* Фильтры */
+.filter-section {
+  background: rgba(0,0,0,0.01);
+  border-style: dashed;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 20px;
+  align-items: flex-end;
+}
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+}
 
-/* Статусы и Тогглы */
-.status-cell { display: flex; align-items: center; gap: 12px; }
-.toggle-switch { position: relative; display: inline-block; width: 40px; height: 20px; }
-.toggle-switch input { opacity: 0; width: 0; height: 0; }
-.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e1; transition: .4s; border-radius: 20px; }
-.toggle-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background: white; transition: .4s; border-radius: 50%; }
-input:checked + .toggle-slider { background: var(--success, #10b981); }
-input:checked + .toggle-slider:before { transform: translateX(20px); }
+/* Таблица */
+.table-container {
+  margin-top: 20px;
+}
+.table-meta {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 
-.status-tag { padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.5px; }
-.tag-pickup { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.tag-storage { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+.admin-table-wrapper {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+.admin-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+}
+.admin-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
 
-.btn-delete-small { background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); padding: 8px 16px; border-radius: 30px; font-weight: 800; font-size: 0.8rem; color: var(--danger, #ef4444); cursor: pointer; transition: 0.2s; }
-.btn-delete-small:hover { background: var(--danger, #ef4444); color: white; }
+.col-id {
+  width: 80px;
+  font-weight: 800;
+  color: var(--primary);
+}
 
-.empty-state { text-align: center; padding: 60px; color: var(--text-muted, #64748b); font-weight: 600; }
-.empty-icon { font-size: 3rem; margin-bottom: 10px; opacity: 0.5; }
+.inline-edit {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--text-main);
+  width: 100%;
+  font-weight: 500;
+  transition: 0.2s;
+}
+.inline-edit:hover {
+  background: rgba(0,0,0,0.03);
+  border-color: var(--border-color);
+}
+.inline-edit:focus {
+  border-color: var(--primary);
+  background: var(--bg-card);
+  outline: none;
+}
+.bold-city {
+  font-weight: 800;
+  color: var(--primary);
+}
 
-/* АДАПТИВНОСТЬ */
-@media (max-width: 900px) { .filter-grid { grid-template-columns: 1fr; } .input-grid { grid-template-columns: 1fr; } }
+.sub-input-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding-left: 10px;
+}
+.inline-edit-sub {
+  background: transparent;
+  border: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  width: 100%;
+}
+
+/* Статусы и тогглы */
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #cbd5e1;
+  transition: .4s;
+  border-radius: 20px;
+}
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+input:checked + .toggle-slider {
+  background: var(--success);
+}
+input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+.status-tag {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.tag-pickup {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+.tag-storage {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+
+/* Чекбокс (локальный) */
+.custom-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.85rem;
+  user-select: none;
+}
+.custom-checkbox input {
+  display: none;
+}
+.checkmark {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  position: relative;
+  transition: all 0.2s;
+}
+:global(.dark) .checkmark {
+  border-color: #475569;
+}
+.custom-checkbox input:checked + .checkmark {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.custom-checkbox input:checked + .checkmark::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+@media (max-width: 900px) {
+  .filter-grid { grid-template-columns: 1fr; }
+  .input-grid { grid-template-columns: 1fr; }
+}
 @media (max-width: 768px) {
   .admin-warehouses { padding: 24px 16px; }
   .header-row { flex-direction: column; align-items: flex-start; }

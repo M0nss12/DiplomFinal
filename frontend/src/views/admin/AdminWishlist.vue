@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-wishlist">
+  <div class="admin-wishlist animate-fade-in">
     <!-- ЗАГОЛОВОК -->
     <div class="header-row">
       <div class="header-left">
@@ -19,13 +19,13 @@
         <button @click="resetFilters" class="btn-text-link">Сбросить всё</button>
       </div>
       <div class="filter-grid">
-        <div class="input-group search-group">
+        <div class="form-group">
           <label>🔎 Поиск (Товар, Артикул, Пользователь)</label>
-          <input v-model="searchQuery" placeholder="Введите название детали или имя клиента..." class="form-input" />
+          <input v-model="searchQuery" placeholder="Введите название детали или имя клиента..." />
         </div>
-        <div class="input-group">
+        <div class="form-group">
           <label>📅 Период добавления</label>
-          <select v-model="timeFilter" class="form-input">
+          <select v-model="timeFilter">
             <option value="all">За всё время</option>
             <option value="today">За сегодня</option>
             <option value="week">За неделю</option>
@@ -37,9 +37,8 @@
 
     <!-- ТАБЛИЦА -->
     <div class="table-container">
-      <div class="table-meta">
-        <span class="meta-icon">📄</span>
-        Страница {{ currentPage }} из {{ totalPages || 1 }}
+      <div class="table-meta text-muted mb-2">
+        Страница {{ currentPage }} из {{ totalPages || 1 }} (показано {{ paginatedWishlist.length }} из {{ filteredWishlist.length }})
       </div>
 
       <div class="admin-table-wrapper glass-card">
@@ -83,7 +82,7 @@
               </td>
 
               <td class="text-right">
-                <button @click="removeFromWishlist(item.id)" class="btn-delete-small">🗑️</button>
+                <button @click="removeFromWishlist(item.id)" class="btn btn-danger btn-sm">🗑️</button>
               </td>
             </tr>
           </tbody>
@@ -92,18 +91,18 @@
 
       <!-- ПУСТОЕ СОСТОЯНИЕ -->
       <div v-if="filteredWishlist.length === 0" class="empty-state glass-card">
-        <div class="empty-icon">💔</div>
+        <div class="empty-state-icon">💔</div>
         <h3>Записей не найдено</h3>
         <p>Пользователи пока не добавили товары в избранное или фильтры слишком строгие.</p>
       </div>
 
       <!-- ПАГИНАЦИЯ -->
-      <div v-if="totalPages > 1" class="pagination-wrapper">
-        <button @click="currentPage--" :disabled="currentPage === 1" class="p-btn glass-card">←</button>
-        <div class="p-numbers">
-          <button v-for="p in totalPages" :key="p" @click="currentPage = p" class="glass-card" :class="{ active: currentPage === p }">{{ p }}</button>
+      <div v-if="totalPages > 1" class="pagination mt-3">
+        <button @click="currentPage--" :disabled="currentPage === 1">←</button>
+        <div class="pagination-pages">
+          <button v-for="p in totalPages" :key="p" @click="currentPage = p" :class="{ active: currentPage === p }">{{ p }}</button>
         </div>
-        <button @click="currentPage++" :disabled="currentPage === totalPages" class="p-btn glass-card">→</button>
+        <button @click="currentPage++" :disabled="currentPage === totalPages">→</button>
       </div>
     </div>
   </div>
@@ -184,85 +183,195 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-/* (все стили без изменений, только убраны дубликаты) */
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+/* ==========================================================================
+   УНИКАЛЬНЫЕ СТИЛИ АДМИНКИ ИЗБРАННОГО (глобальные классы уже применены)
+   ========================================================================== */
 
-.admin-wishlist { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-wishlist { color: #f8fafc; }
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+.admin-wishlist {
+  padding: 40px 24px;
+}
 
-.admin-wishlist { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-wishlist { color: #f8fafc; }
-
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
 .header-left h1 {
-  font-size: 2.2rem; font-weight: 900; margin: 0;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; }
-
-.stats-badge { padding: 12px 24px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
-
-.glass-card {
-  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px); transition: all 0.3s ease;
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
 }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
 
-.admin-card { padding: 25px; margin-bottom: 30px; }
-.filter-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; align-items: flex-end; }
-
-.form-input {
-  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s;
+.stats-badge {
+  padding: 12px 24px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
 }
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
-.input-group label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); margin-bottom: 8px; }
 
-.table-container { margin-top: 20px; }
-.table-meta { margin-bottom: 16px; font-size: 0.85rem; color: var(--text-muted, #64748b); font-weight: 600; }
+.admin-card {
+  padding: 25px;
+  margin-bottom: 30px;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 25px;
+  align-items: flex-end;
+}
 
-.admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
-.admin-table th { padding: 16px 20px; text-align: left; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
-:global(.dark) .admin-table th { border-color: #334155; }
-.admin-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; }
-:global(.dark) .admin-table td { border-color: #334155; }
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+}
 
-.wish-row:hover td { background: rgba(37, 99, 235, 0.02); }
+.table-container {
+  margin-top: 20px;
+}
+.table-meta {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 
-.col-id { width: 70px; font-weight: 800; color: var(--primary, #2563eb); font-family: monospace; }
+.admin-table-wrapper {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+}
+.admin-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+}
+.admin-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+.wish-row:hover td {
+  background: rgba(37, 99, 235, 0.02);
+}
 
-.user-cell { display: flex; align-items: center; gap: 12px; }
-.mini-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
-.u-info strong { display: block; font-size: 0.9rem; color: var(--text-main, #0f172a); }
-:global(.dark) .u-info strong { color: #f8fafc; }
-.u-info small { color: var(--text-muted, #94a3b8); font-size: 0.75rem; font-weight: 600; }
+.col-id {
+  width: 70px;
+  font-weight: 800;
+  color: var(--primary);
+  font-family: monospace;
+}
 
-.product-link { color: var(--primary, #2563eb); font-weight: 700; text-decoration: none; font-size: 0.95rem; }
-.product-link:hover { text-decoration: underline; }
-.sku-tag { background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 0.8rem; font-weight: 700; color: var(--text-muted, #64748b); }
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mini-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.u-info strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+.u-info small {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
 
-.date-text { font-size: 0.85rem; color: var(--text-muted, #64748b); font-weight: 600; }
+.product-link {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+.product-link:hover {
+  text-decoration: underline;
+}
+.sku-tag {
+  background: rgba(0,0,0,0.05);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
 
-.btn-delete-small { background: rgba(239, 68, 68, 0.05); border: none; width: 36px; height: 36px; border-radius: 50%; color: var(--danger, #ef4444); cursor: pointer; transition: 0.2s; font-size: 1.1rem; }
-.btn-delete-small:hover { background: var(--danger, #ef4444); color: white; transform: scale(1.1); }
+.date-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
 
-.pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 40px; }
-.p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-size: 1.2rem; font-weight: 900; border: 1px solid var(--border-color, #e2e8f0); color: var(--text-main, #0f172a); }
-:global(.dark) .p-btn { color: #f8fafc; }
-.p-numbers button { width: 44px; height: 44px; border-radius: 12px; font-weight: 800; cursor: pointer; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-card, #fff); color: var(--text-muted, #64748b); }
-.p-numbers button.active { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+.text-right { text-align: right; }
 
-.empty-state { text-align: center; padding: 60px; color: var(--text-muted, #64748b); font-weight: 600; }
-.empty-icon { font-size: 4rem; margin-bottom: 15px; opacity: 0.5; }
-.btn-text-link { background: none; border: none; color: var(--primary, #2563eb); font-weight: 800; cursor: pointer; text-decoration: underline; }
+/* Пагинация */
+.pagination-pages {
+  display: flex;
+  gap: 8px;
+}
+.pagination-pages button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pagination-pages button:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.pagination-pages button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
 
 @media (max-width: 768px) {
-  .header-row { flex-direction: column; align-items: flex-start; }
-  .filter-grid { grid-template-columns: 1fr; }
-  .p-numbers { display: none; }
+  .header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+  .pagination-pages {
+    display: none;
+  }
 }
 </style>

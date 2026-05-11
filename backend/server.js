@@ -45,6 +45,30 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+app.use((req, res, next) => {
+    // Логируем только методы, изменяющие данные
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+        // Перехватываем завершение запроса, чтобы знать, был ли он успешен
+        res.on('finish', () => {
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+                writeLog(ACTIONS_LOG, {
+                    action: req.method,
+                    url: req.originalUrl,
+                    message: `Успешный запрос: ${req.method} ${req.originalUrl}`,
+                    user: {
+                        id: req.headers['x-user-id'] || 'guest',
+                        name: req.headers['x-user-name'] || 'Anonymous'
+                    },
+                    ip: req.ip,
+                    status: res.statusCode
+                });
+            }
+        });
+    }
+    next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const DEFAULT_AVATARS = [
@@ -83,7 +107,20 @@ const writeLog = (filePath, data) => {
         timestamp: new Date().toLocaleString('ru-RU'),
         ...data
     }) + '\n';
+    // Используем appendFileSync для надежности или убедимся, что поток не блокируется
     fs.appendFile(filePath, entry, (err) => { if (err) console.error('Ошибка записи лога:', err); });
+};
+
+const logError = (err, req = null) => {
+    writeLog(ERROR_LOG, {
+        type: 'ERROR', 
+        message: err.message,
+        stack: err.stack, // Добавляем стек для анализа в модалке
+        url: req ? req.originalUrl : 'SYSTEM',
+        method: req ? req.method : 'N/A',
+        user: req ? (req.headers['x-user-id'] || 'guest') : 'system',
+        ip: req ? req.ip : '127.0.0.1'
+    });
 };
 
 // --- Уведомления и email (Unisender Go REST API) ---
@@ -1441,6 +1478,13 @@ app.get(/^(?!\/api).+/, (req, res) => {
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Глобальный обработчик ошибок (ставится ПОСЛЕ всех роутов)
+app.use((err, req, res, next) => {
+    logError(err, req); // Записываем в файл
+    console.error('🔴 System Error:', err.message);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера. Информация сохранена в журнале.' });
 });
 
 app.listen(PORT, () => console.log(`🚀 ApexDrive Server Active: http://localhost:${PORT}`));
