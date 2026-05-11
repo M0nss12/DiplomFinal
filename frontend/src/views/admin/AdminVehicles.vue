@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-vehicles">
+  <div class="admin-vehicles animate-fade-in">
     <!-- ЗАГОЛОВОК -->
     <div class="header-row">
       <div class="header-left">
@@ -20,9 +20,9 @@
       </div>
       <form @submit.prevent="createVehicle" class="admin-form">
         <div class="input-grid">
-          <div class="input-group">
+          <div class="form-group">
             <label>👤 Владелец (Пользователь)</label>
-            <select v-model="newVehicle.user_id" required class="form-input">
+            <select v-model="newVehicle.user_id" required>
               <option :value="null" disabled>-- Выберите владельца --</option>
               <option v-for="u in users" :key="u.id" :value="u.id">
                 {{ u.last_name || '' }} {{ u.first_name }} ({{ u.email || u.phone_number }})
@@ -30,34 +30,33 @@
             </select>
           </div>
 
-          <div class="input-group">
+          <div class="form-group">
             <label>🏎️ Марка</label>
-            <input v-model="newVehicle.brand" placeholder="Toyota" required class="form-input" />
+            <input v-model="newVehicle.brand" placeholder="Toyota" required />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>🚘 Модель</label>
-            <input v-model="newVehicle.model" placeholder="Camry" required class="form-input" />
+            <input v-model="newVehicle.model" placeholder="Camry" required />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>📅 Год выпуска</label>
             <input
               v-model.number="newVehicle.year"
               type="number"
               placeholder="2024"
-              class="form-input"
               :class="{ 'year-warn': isYearInvalid(newVehicle.year) }"
             />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>🆔 VIN-номер (17 знаков)</label>
             <input
               v-model="newVehicle.vin"
               maxlength="17"
-              class="form-input vin-input"
+              class="vin-input"
               @input="formatVin($event)"
             />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>🧪 Объем двигателя (л)</label>
             <input
               v-model.number="newVehicle.engine_volume"
@@ -65,7 +64,6 @@
               step="0.1"
               min="0.1"
               placeholder="2.0"
-              class="form-input"
             />
           </div>
         </div>
@@ -75,8 +73,8 @@
             <span class="checkmark"></span>
             <span>⭐ Сделать основным авто</span>
           </label>
-          <button type="submit" class="btn-primary" :disabled="loadingAction">
-            <span v-if="loadingAction" class="spinner-small"></span>
+          <button type="submit" class="btn btn-primary create-btn" :disabled="loadingAction">
+            <span v-if="loadingAction" class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></span>
             <span v-else>➕ Добавить в гараж</span>
           </button>
         </div>
@@ -90,13 +88,13 @@
         <button @click="resetFilters" class="btn-text-link">Сбросить всё</button>
       </div>
       <div class="filter-grid">
-        <div class="input-group search-group">
+        <div class="form-group">
           <label>🔎 Поиск (Марка, Модель, VIN или владелец)</label>
-          <input v-model="searchQuery" placeholder="Введите данные для поиска..." class="form-input" />
+          <input v-model="searchQuery" placeholder="Введите данные для поиска..." />
         </div>
-        <div class="input-group">
+        <div class="form-group">
           <label>🏎️ Фильтр по марке</label>
-          <select v-model="brandFilter" class="form-input">
+          <select v-model="brandFilter">
             <option value="all">Все марки</option>
             <option v-for="b in uniqueBrands" :key="b" :value="b">{{ b }}</option>
           </select>
@@ -106,6 +104,10 @@
 
     <!-- 3. ТАБЛИЦА -->
     <div class="table-container">
+      <div class="table-meta text-muted mb-2">
+        Показано {{ paginatedVehicles.length }} из {{ filteredVehicles.length }} автомобилей (страница {{ currentPage }} из {{ totalPages }})
+      </div>
+
       <div class="admin-table-wrapper glass-card">
         <table class="admin-table">
           <thead>
@@ -163,7 +165,7 @@
               </td>
 
               <td class="text-right">
-                <button @click="deleteVehicle(v.id)" class="btn-delete-small">🗑️ Удалить</button>
+                <button @click="deleteVehicle(v.id)" class="btn btn-danger btn-sm">🗑️ Удалить</button>
               </td>
             </tr>
           </tbody>
@@ -171,12 +173,12 @@
       </div>
 
       <!-- ПАГИНАЦИЯ -->
-      <div v-if="totalPages > 1" class="pagination-wrapper">
-        <button @click="currentPage--" :disabled="currentPage === 1" class="p-btn glass-card">←</button>
-        <div class="p-numbers">
-          <button v-for="p in totalPages" :key="p" @click="currentPage = p" class="glass-card" :class="{ active: currentPage === p }">{{ p }}</button>
+      <div v-if="totalPages > 1" class="pagination mt-3">
+        <button @click="currentPage--" :disabled="currentPage === 1">←</button>
+        <div class="pagination-pages">
+          <button v-for="p in totalPages" :key="p" @click="currentPage = p" :class="{ active: currentPage === p }">{{ p }}</button>
         </div>
-        <button @click="currentPage++" :disabled="currentPage === totalPages" class="p-btn glass-card">→</button>
+        <button @click="currentPage++" :disabled="currentPage === totalPages">→</button>
       </div>
     </div>
   </div>
@@ -196,7 +198,7 @@ const loadingAction = ref(false);
 const searchQuery = ref('');
 const brandFilter = ref('all');
 const currentPage = ref(1);
-const itemsPerPage = 15;
+const itemsPerPage = 20;
 
 const updatedRow = ref(null);
 const errorRow = ref(null);
@@ -240,7 +242,6 @@ const isYearInvalid = (year) => {
   return year && (year < 1886 || year > currentYear + 1);
 };
 
-// CRUD
 const createVehicle = async () => {
   if (!newVehicle.user_id) return alert('Выберите владельца');
   loadingAction.value = true;
@@ -260,10 +261,8 @@ const createVehicle = async () => {
   finally { loadingAction.value = false; }
 };
 
-// ** Исправляем обновление: убираем лишние поля **
 const updateVehicle = async (v) => {
   try {
-    // Отправляем только нужные поля
     const payload = {
       user_id: v.user_id,
       brand: v.brand,
@@ -291,7 +290,6 @@ const deleteVehicle = async (id) => {
   } catch (e) { alert('Ошибка при удалении'); }
 };
 
-// Фильтры
 const uniqueBrands = computed(() => {
   const brands = vehicles.value.map(v => v.brand).filter(Boolean);
   return Array.from(new Set(brands)).sort();
@@ -324,113 +322,331 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+/* ==========================================================================
+   УНИКАЛЬНЫЕ СТИЛИ АДМИНКИ ГАРАЖА (глобальные классы уже применены)
+   ========================================================================== */
 
-.admin-vehicles { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-vehicles { color: #f8fafc; }
+.admin-vehicles {
+  padding: 40px 24px;
+}
 
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
 .header-left h1 {
-  font-size: 2.2rem; font-weight: 900; margin: 0;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; font-weight: 500; }
-
-.stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
-
-.glass-card {
-  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px); transition: all 0.3s ease;
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
 }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
 
-.admin-card { padding: 28px; margin-bottom: 32px; }
-.card-title { font-size: 1.35rem; font-weight: 900; margin: 0; }
-.card-decoration { width: 50px; height: 4px; background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); border-radius: 4px; margin-top: 5px; }
-
-.input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 28px; }
-.input-group label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted, #64748b); display: block; margin-bottom: 8px; }
-
-.form-input {
-  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s;
+.stats-badge {
+  padding: 10px 20px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
 }
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
-.form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; }
 
-.vin-input { font-family: monospace; text-transform: uppercase; letter-spacing: 1px; }
-.year-warn { background: rgba(255, 193, 7, 0.15) !important; border-color: #ffc107 !important; }
+.admin-card {
+  padding: 28px;
+  margin-bottom: 32px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.card-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  margin: 0;
+}
+.card-decoration {
+  width: 50px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 4px;
+}
 
-.form-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-top: 20px; border-top: 1px dashed var(--border-color, #e2e8f0); padding-top: 20px; }
+/* Форма */
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.form-group label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
 
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); color: white; border: none;
-  padding: 12px 30px; border-radius: var(--radius-md, 8px); font-weight: 800; cursor: pointer; transition: 0.3s;
+.vin-input {
+  font-family: monospace;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.year-warn {
+  background: rgba(255, 193, 7, 0.15) !important;
+  border-color: #ffc107 !important;
+}
+
+.form-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 20px;
+  border-top: 1px dashed var(--border-color);
+  padding-top: 20px;
+}
+
+/* Кнопка создания (глобальный btn btn-primary + градиент) */
+.create-btn {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border: none;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
 }
-.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
+.create-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+}
 
-.filter-section { background: rgba(0,0,0,0.01); border-style: dashed; }
-.filter-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; align-items: flex-end; }
-.btn-text-link { background: none; border: none; color: var(--primary, #2563eb); font-weight: 800; cursor: pointer; text-decoration: underline; }
+/* Фильтры */
+.filter-section {
+  background: rgba(0,0,0,0.01);
+  border-style: dashed;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  align-items: flex-end;
+}
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+}
 
-.table-container { margin-top: 20px; }
-.admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 1100px; }
-.admin-table th { padding: 16px 20px; text-align: left; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
-:global(.dark) .admin-table th { border-color: #334155; }
-.admin-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; }
-:global(.dark) .admin-table td { border-color: #334155; }
+/* Таблица */
+.table-container {
+  margin-top: 20px;
+}
+.table-meta {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 
-.vehicle-row:hover td { background: rgba(37, 99, 235, 0.02); }
-.row-updated td { background: rgba(16, 185, 129, 0.15) !important; }
-.row-error td { background: rgba(239, 68, 68, 0.15) !important; }
+.admin-table-wrapper {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1100px;
+}
+.admin-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+}
+.admin-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+.vehicle-row:hover td {
+  background: rgba(37, 99, 235, 0.02);
+}
+.row-updated td {
+  background: rgba(16, 185, 129, 0.15) !important;
+}
+.row-error td {
+  background: rgba(239, 68, 68, 0.15) !important;
+}
 
-.col-id { width: 70px; font-weight: 800; color: var(--primary, #2563eb); font-family: monospace; }
+.col-id {
+  width: 70px;
+  font-weight: 800;
+  color: var(--primary);
+  font-family: monospace;
+}
 
-.owner-info strong { display: block; font-size: 0.95rem; color: var(--text-main, #0f172a); }
-:global(.dark) .owner-info strong { color: #f8fafc; }
-.owner-info small { color: var(--text-muted, #94a3b8); font-size: 0.8rem; }
+.owner-info strong {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+.owner-info small {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
 
-/* Увеличенные столбцы */
 .col-auto { min-width: 200px; }
 .col-vin { min-width: 160px; }
 .col-specs { min-width: 140px; text-align: center; }
 
-.car-info-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.auto-input { flex: 1 1 100px; }
+.car-info-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.auto-input {
+  flex: 1 1 100px;
+}
+.specs-inline {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  justify-content: center;
+}
 
-.specs-inline { display: flex; align-items: center; gap: 5px; justify-content: center; }
-
-.inline-edit { background: transparent; border: 1px solid transparent; padding: 6px; border-radius: 6px; color: var(--text-main, #0f172a); width: 100%; font-weight: 500; transition: 0.2s; }
-:global(.dark) .inline-edit { color: #f8fafc; }
-.inline-edit:hover { background: rgba(0,0,0,0.03); border-color: var(--border-color, #cbd5e1); }
-.inline-edit:focus { border-color: var(--primary, #2563eb); background: var(--bg-card, #fff); outline: none; }
+.inline-edit {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--text-main);
+  width: 100%;
+  font-weight: 500;
+  transition: 0.2s;
+}
+.inline-edit:hover {
+  background: rgba(0,0,0,0.03);
+  border-color: var(--border-color);
+}
+.inline-edit:focus {
+  border-color: var(--primary);
+  background: var(--bg-card);
+  outline: none;
+}
 .bold { font-weight: 800; }
-.vin-code { font-family: monospace; text-transform: uppercase; color: var(--primary, #2563eb); font-weight: 700; width: 100%; min-width: 140px; }
+.vin-code {
+  font-family: monospace;
+  text-transform: uppercase;
+  color: var(--primary);
+  font-weight: 700;
+  width: 100%;
+  min-width: 140px;
+}
 .inline-edit.mini { width: 70px; text-align: center; }
 
-.btn-delete-small { background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); padding: 8px 16px; border-radius: 30px; font-weight: 800; font-size: 0.8rem; color: var(--danger, #ef4444); cursor: pointer; transition: 0.2s; }
-.btn-delete-small:hover { background: var(--danger, #ef4444); color: white; transform: translateY(-2px); }
+/* Чекбокс */
+.custom-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.custom-checkbox input {
+  display: none;
+}
+.checkmark {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  position: relative;
+  transition: all 0.2s;
+}
+:global(.dark) .checkmark {
+  border-color: #475569;
+}
+.custom-checkbox input:checked + .checkmark {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.custom-checkbox input:checked + .checkmark::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
 
-.custom-checkbox { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-weight: 700; font-size: 0.85rem; }
-.custom-checkbox input { display: none; }
-.checkmark { width: 20px; height: 20px; background: transparent; border: 2px solid var(--border-color, #cbd5e1); border-radius: 6px; position: relative; transition: all 0.2s; }
-:global(.dark) .checkmark { border-color: #475569; }
-.custom-checkbox input:checked + .checkmark { background: var(--primary, #2563eb); border-color: var(--primary, #2563eb); }
-.custom-checkbox input:checked + .checkmark::after { content: '✓'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 12px; font-weight: bold; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
 
-.pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 40px; }
-.p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-size: 1.2rem; font-weight: 900; border: 1px solid var(--border-color, #e2e8f0); color: var(--text-main, #0f172a); }
-:global(.dark) .p-btn { color: #f8fafc; }
-.p-numbers button { width: 44px; height: 44px; border-radius: 12px; font-weight: 800; cursor: pointer; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-card, #fff); color: var(--text-muted, #64748b); }
-.p-numbers button.active { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
+/* Пагинация */
+.pagination-pages {
+  display: flex;
+  gap: 8px;
+}
+.pagination-pages button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pagination-pages button:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.pagination-pages button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
 
 @media (max-width: 768px) {
-  .header-row { flex-direction: column; align-items: flex-start; }
-  .input-grid { grid-template-columns: 1fr; }
-  .filter-grid { grid-template-columns: 1fr; }
+  .header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .input-grid {
+    grid-template-columns: 1fr;
+  }
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
