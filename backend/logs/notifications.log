@@ -23,3 +23,5 @@
 {"id":"31cdd860","timestamp":"09.05.2026, 19:27:27","userId":"68cff161-6f8c-466b-a3fa-0b7103f59ca1","type":"system","title":"Подтверждение регистрации","message":"Добро пожаловать в ApexDrive! Подтвердите вашу почту.","emailSentTo":"school7343173@gmail.com"}
 {"id":"a8a6d264","timestamp":"10.05.2026, 16:47:27","userId":"111","type":"order","title":"Заказ №62 готов к выдаче!","message":"Ваш заказ ожидает вас по адресу: Москва, ул. Складская, д. 1.","emailSentTo":"monsschogath@gmail.com"}
 {"id":"e58d648e","timestamp":"11.05.2026, 11:36:24","userId":"111","type":"order","title":"Заказ №65 выдан","message":"Ваш заказ был выдан.","emailSentTo":"monsschogath@gmail.com"}
+{"id":"3e747aeb","timestamp":"11.05.2026, 11:43:33","userId":"111","type":"order","title":"Заказ №66 выдан","message":"Ваш заказ был выдан.","emailSentTo":"monsschogath@gmail.com"}
+{"id":"27f3c703","timestamp":"11.05.2026, 11:44:41","userId":"111","type":"system","title":"✅ Возврат одобрен","message":"Ваша заявка на возврат по заказу №66 одобрена. Товар принят обратно.","emailSentTo":"monsschogath@gmail.com"}

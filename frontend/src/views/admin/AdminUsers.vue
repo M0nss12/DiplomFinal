@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-users">
+  <div class="admin-users animate-fade-in">
     <!-- ЗАГОЛОВОК -->
     <div class="header-row">
       <div class="header-left">
@@ -20,52 +20,50 @@
       </div>
       <form @submit.prevent="createUser" class="admin-form">
         <div class="input-grid">
-          <div class="input-group">
+          <div class="form-group">
             <label>📛 Фамилия</label>
-            <input v-model="newUser.last_name" placeholder="Иванов" class="form-input" />
+            <input v-model="newUser.last_name" placeholder="Иванов" />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>📛 Имя *</label>
-            <input v-model="newUser.first_name" placeholder="Иван" required class="form-input" />
+            <input v-model="newUser.first_name" placeholder="Иван" required />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>📛 Отчество</label>
-            <input v-model="newUser.otchestvo" placeholder="Иванович" class="form-input" />
+            <input v-model="newUser.otchestvo" placeholder="Иванович" />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>📧 Email</label>
-            <input v-model="newUser.email" type="email" placeholder="mail@example.com" class="form-input" />
+            <input v-model="newUser.email" type="email" placeholder="mail@example.com" />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>📞 Телефон</label>
             <input
               v-model="newUser.phone_number"
               type="tel"
               placeholder="+7-___-___-__-__"
-              class="form-input"
               @input="formatPhone($event, 'new')"
             />
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>👑 Роль</label>
-            <select v-model="newUser.role" class="form-input">
+            <select v-model="newUser.role">
               <option value="guest">Гость</option>
               <option value="user">Пользователь</option>
               <option value="admin">Администратор</option>
             </select>
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>🔒 Пароль</label>
-            <input v-model="newUser.password" type="password" placeholder="Задайте пароль..." class="form-input" />
+            <input v-model="newUser.password" type="password" placeholder="Задайте пароль..." />
           </div>
           <!-- Город с автодополнением -->
-          <div class="input-group autocomplete-wrapper">
+          <div class="form-group autocomplete-wrapper">
             <label>📍 Город</label>
             <input
               v-model="citySearch"
               type="text"
               placeholder="Начните вводить..."
-              class="form-input"
               @input="filterCities"
               @focus="showCitySuggestions = true"
               @blur="hideCitySuggestions"
@@ -82,8 +80,8 @@
           </div>
         </div>
         <div class="form-footer">
-          <button type="submit" class="btn-primary" :disabled="loadingAction">
-            <span v-if="loadingAction" class="spinner-small"></span>
+          <button type="submit" class="btn btn-primary create-btn" :disabled="loadingAction">
+            <span v-if="loadingAction" class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></span>
             <span v-else>✨ Создать аккаунт</span>
           </button>
         </div>
@@ -97,22 +95,22 @@
         <button @click="resetFilters" class="btn-text-link">Сбросить всё</button>
       </div>
       <div class="filter-grid">
-        <div class="input-group search-group">
+        <div class="form-group">
           <label>🔎 Умный поиск</label>
-          <input v-model="searchQuery" placeholder="ФИО, Email, Телефон, ID..." class="form-input" />
+          <input v-model="searchQuery" placeholder="ФИО, Email, Телефон, ID..." />
         </div>
-        <div class="input-group">
+        <div class="form-group">
           <label>👑 Роль</label>
-          <select v-model="roleFilter" class="form-input">
+          <select v-model="roleFilter">
             <option value="all">Все роли</option>
             <option value="admin">Администраторы</option>
             <option value="user">Пользователи</option>
             <option value="guest">Гости</option>
           </select>
         </div>
-        <div class="input-group">
+        <div class="form-group">
           <label>📊 Сортировка</label>
-          <select v-model="sortOrder" class="form-input">
+          <select v-model="sortOrder">
             <option value="new">Сначала новые</option>
             <option value="old">Сначала старые</option>
             <option value="name">По имени (А→Я)</option>
@@ -123,9 +121,8 @@
 
     <!-- 3. ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ -->
     <div class="table-container">
-      <div class="table-meta">
-        <span class="meta-icon">📄</span>
-        Страница {{ currentPage }} из {{ totalPages || 1 }}
+      <div class="table-meta text-muted mb-2">
+        Показано {{ paginatedUsers.length }} из {{ filteredUsers.length }} пользователей (страница {{ currentPage }} из {{ totalPages }})
       </div>
 
       <div class="admin-table-wrapper glass-card">
@@ -194,20 +191,23 @@
               </td>
 
               <!-- Город через select -->
-              <td>
-                <select
-                  v-model="u.city_id"
-                  @change="onCitySelect(u)"
-                  class="inline-edit table-select"
-                >
-                  <option :value="null">-- Не выбран --</option>
-                  <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
-                </select>
-              </td>
+<!-- Внутри <tbody> в колонке Город -->
+<td>
+  <select
+    v-model="u.city_id"
+    @change="onCitySelect(u)"
+    class="inline-edit table-select"
+  >
+    <option :value="null">-- Не выбран --</option>
+    <option v-for="c in cities" :key="c.id" :value="c.id">
+      {{ c.name }}
+    </option>
+  </select>
+</td>
 
               <td class="text-right action-buttons">
-                <button @click="resetUserPassword(u)" class="btn-secondary-small">🔑 Пароль</button>
-                <button @click="deleteUser(u)" class="btn-delete-small">🗑️</button>
+                <button @click="resetUserPassword(u)" class="btn btn-outline btn-sm">🔑 Пароль</button>
+                <button @click="deleteUser(u)" class="btn btn-danger btn-sm">🗑️</button>
               </td>
             </tr>
           </tbody>
@@ -215,12 +215,12 @@
       </div>
 
       <!-- ПАГИНАЦИЯ -->
-      <div v-if="totalPages > 1" class="pagination-wrapper">
-        <button @click="currentPage--" :disabled="currentPage === 1" class="p-btn glass-card">←</button>
-        <div class="p-numbers">
-          <button v-for="p in totalPages" :key="p" @click="currentPage = p" class="glass-card" :class="{ active: currentPage === p }">{{ p }}</button>
+      <div v-if="totalPages > 1" class="pagination mt-3">
+        <button @click="currentPage--" :disabled="currentPage === 1">←</button>
+        <div class="pagination-pages">
+          <button v-for="p in totalPages" :key="p" @click="currentPage = p" :class="{ active: currentPage === p }">{{ p }}</button>
         </div>
-        <button @click="currentPage++" :disabled="currentPage === totalPages" class="p-btn glass-card">→</button>
+        <button @click="currentPage++" :disabled="currentPage === totalPages">→</button>
       </div>
     </div>
 
@@ -330,12 +330,18 @@ const loadData = async () => {
   try {
     const [userRes, cityRes] = await Promise.all([
       axios.get(`/api/admin/users`, config),
-      axios.get(`/api/cities`)          // публичный эндпоинт городов
+      axios.get(`/api/cities`)
     ]);
+    
+    // Приводим данные к удобному виду
     users.value = userRes.data.map(u => ({
       ...u,
+      // Сопоставляем id города для селекта
+      city_id: u.saved_city_id, 
+      // Сохраняем имя для отображения (если нужно)
       cityName: u.cities?.name || ''
     }));
+    
     cities.value = cityRes.data || [];
   } catch (e) { 
     console.error('Ошибка загрузки данных'); 
@@ -469,146 +475,416 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-/* Полный CSS из предыдущей версии + новые стили для autocomplete */
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes spin { to { transform: rotate(360deg); } }
+/* ==========================================================================
+   УНИКАЛЬНЫЕ СТИЛИ АДМИНКИ ПОЛЬЗОВАТЕЛЕЙ (глобальные классы уже применены)
+   ========================================================================== */
 
-.admin-users { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-users { color: #f8fafc; }
+.admin-users {
+  padding: 40px 24px;
+}
 
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
 .header-left h1 {
-  font-size: 2.2rem; font-weight: 900; margin: 0 0 6px 0;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0 0 6px 0;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; font-weight: 500; }
-
-.stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
-
-/* КАРТОЧКИ */
-.glass-card {
-  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px); transition: all 0.3s ease;
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
 }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; }
 
-.admin-card { padding: 28px; margin-bottom: 32px; }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.card-title { font-size: 1.35rem; font-weight: 900; margin: 0; }
-.card-decoration { width: 50px; height: 4px; background: linear-gradient(90deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); border-radius: 4px; }
-
-/* ФОРМА */
-.input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin-bottom: 28px; }
-.input-group { display: flex; flex-direction: column; gap: 8px; }
-.input-group label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); }
-
-.form-input {
-  width: 100%; padding: 10px 14px; border-radius: 8px; border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.9rem; transition: all 0.3s; box-sizing: border-box;
+.stats-badge {
+  padding: 10px 20px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
 }
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
-.form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
 
-/* autocomplete */
-.autocomplete-wrapper { position: relative; }
+.admin-card {
+  padding: 28px;
+  margin-bottom: 32px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.card-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  margin: 0;
+}
+.card-decoration {
+  width: 50px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 4px;
+}
+
+/* Форма */
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.form-group label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Автодополнение города */
+.autocomplete-wrapper {
+  position: relative;
+}
 .suggestions {
-  position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
-  max-height: 200px; overflow-y: auto; list-style: none; padding: 0; margin-top: 4px;
-  border-radius: 8px; background: var(--bg-card, #fff); border: 1px solid var(--border-color, #e2e8f0);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  max-height: 200px;
+  overflow-y: auto;
+  list-style: none;
+  padding: 0;
+  margin-top: 4px;
+  border-radius: 8px;
 }
-:global(.dark) .suggestions { background: #1e293b; border-color: #334155; }
 .suggestions li {
-  padding: 10px 16px; cursor: pointer; font-size: 0.9rem; color: var(--text-main, #0f172a);
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border-color);
 }
-:global(.dark) .suggestions li { color: #f8fafc; }
-.suggestions li:hover { background: rgba(37, 99, 235, 0.1); }
-
-.form-footer { display: flex; justify-content: flex-end; }
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9)); color: white; border: none;
-  padding: 12px 30px; border-radius: 8px; font-weight: 800; cursor: pointer; transition: 0.3s;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); display: flex; align-items: center; gap: 10px;
+.suggestions li:hover {
+  background: var(--primary-light);
 }
-.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
 
-/* ФИЛЬТРЫ */
-.filter-section { background: rgba(0,0,0,0.01); border-style: dashed; }
-.filter-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 20px; align-items: flex-end; }
-.btn-text-link { background: none; border: none; color: var(--primary, #2563eb); font-weight: 800; cursor: pointer; text-decoration: underline; }
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+}
 
-/* ТАБЛИЦА */
-.table-container { margin-top: 20px; }
-.table-meta { margin-bottom: 16px; font-size: 0.85rem; color: var(--text-muted, #64748b); font-weight: 600; }
+/* Кнопка создания (глобальный btn btn-primary + градиент) */
+.create-btn {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border: none;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.create-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+}
 
-.admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
-.admin-table th { padding: 16px 20px; text-align: left; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
-:global(.dark) .admin-table th { border-color: #334155; }
-.admin-table td { padding: 12px 16px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; transition: background 0.2s; }
-:global(.dark) .admin-table td { border-color: #334155; }
-.user-row:hover td { background: rgba(37, 99, 235, 0.03); }
+/* Фильтры */
+.filter-section {
+  background: rgba(0,0,0,0.01);
+  border-style: dashed;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 20px;
+  align-items: flex-end;
+}
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+}
 
-.col-avatar { width: 80px; text-align: center; }
-.table-avatar { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-color, #cbd5e1); cursor: pointer; transition: 0.2s; }
-.avatar-edit-box { position: relative; display: inline-block; }
-.btn-edit-avatar { position: absolute; bottom: 0; right: 0; background: var(--primary, #2563eb); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+/* Таблица */
+.table-container {
+  margin-top: 20px;
+}
+.table-meta {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 
-.client-id { font-size: 0.7rem; font-weight: 800; color: var(--primary, #2563eb); font-family: monospace; margin-bottom: 5px; }
-.name-edit-row { display: flex; flex-direction: column; gap: 4px; }
-.inline-edit { background: transparent; border: 1px solid transparent; padding: 4px 8px; border-radius: 6px; color: var(--text-main, #0f172a); width: 100%; transition: 0.2s; font-size: 0.9rem; }
-:global(.dark) .inline-edit { color: #f8fafc; }
-.inline-edit:hover { background: rgba(0,0,0,0.03); border-color: var(--border-color, #cbd5e1); }
-.inline-edit:focus { border-color: var(--primary, #2563eb); background: var(--bg-card, #fff); outline: none; }
-.bold { font-weight: 800; }
-.date-tag { font-size: 0.65rem; color: var(--text-muted, #94a3b8); margin-top: 5px; font-weight: 600;}
+.admin-table-wrapper {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+}
+.admin-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+}
+.admin-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+  transition: background 0.2s;
+}
+.user-row:hover td {
+  background: rgba(37, 99, 235, 0.03);
+}
 
-/* Селект города в таблице */
+.col-avatar {
+  width: 80px;
+  text-align: center;
+}
+.table-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  transition: 0.2s;
+}
+.avatar-edit-box {
+  position: relative;
+  display: inline-block;
+}
+.btn-edit-avatar {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.client-id {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--primary);
+  font-family: monospace;
+  margin-bottom: 5px;
+}
+.name-edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.inline-edit {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--text-main);
+  width: 100%;
+  transition: 0.2s;
+  font-size: 0.9rem;
+}
+.inline-edit:hover {
+  background: rgba(0,0,0,0.03);
+  border-color: var(--border-color);
+}
+.inline-edit:focus {
+  border-color: var(--primary);
+  background: var(--bg-card);
+  outline: none;
+}
+.bold {
+  font-weight: 800;
+}
+.date-tag {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 5px;
+  font-weight: 600;
+}
+
 .table-select {
-  background: transparent; border: 1px solid transparent; padding: 6px; border-radius: 6px;
-  width: 100%; font-weight: 500; cursor: pointer; color: var(--text-main, #0f172a);
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px;
+  border-radius: 6px;
+  width: 100%;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-main);
 }
-:global(.dark) .table-select { color: #f8fafc; }
 
 /* Роли */
-.role-select { padding: 6px 12px; border-radius: 40px; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; border: none; cursor: pointer; transition: 0.2s; background: rgba(0,0,0,0.05); }
-.role-select.admin { background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); }
-.role-select.user { background: rgba(37, 99, 235, 0.1); color: var(--primary, #2563eb); }
+.role-select {
+  padding: 6px 12px;
+  border-radius: 40px;
+  font-weight: 800;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s;
+  background: rgba(0,0,0,0.05);
+  color: var(--text-main);
+}
+.role-select.admin { background: var(--danger-light); color: var(--danger); }
+.role-select.user { background: var(--primary-light); color: var(--primary); }
 .role-select.guest { background: rgba(0,0,0,0.1); color: #64748b; }
 
-.consent-control { margin-top: 8px; }
-.custom-checkbox.small-check .checkmark { width: 16px; height: 16px; }
-.consent-text { font-size: 0.65rem; color: var(--text-muted, #94a3b8); font-weight: 700; }
+.consent-control {
+  margin-top: 8px;
+}
+.custom-checkbox.small-check .checkmark {
+  width: 16px;
+  height: 16px;
+}
+.consent-text {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
 
-.action-buttons { display: flex; flex-direction: column; gap: 6px; }
-.btn-secondary-small { background: rgba(0,0,0,0.05); border: 1px solid var(--border-color, #cbd5e1); padding: 6px 12px; border-radius: 30px; font-weight: 700; font-size: 0.75rem; color: var(--text-main, #0f172a); cursor: pointer; transition: 0.2s; }
-:global(.dark) .btn-secondary-small { color: #f8fafc; border-color: #475569; }
-.btn-delete-small { background: rgba(239, 68, 68, 0.1); border: none; padding: 6px 12px; border-radius: 30px; font-weight: 800; font-size: 0.75rem; color: var(--danger, #ef4444); cursor: pointer; }
-.btn-delete-small:hover { background: var(--danger, #ef4444); color: white; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
 
-/* ПАГИНАЦИЯ */
-.pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 40px; }
-.p-btn { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #fff); color: var(--text-main, #0f172a); font-weight: 800; cursor: pointer; }
-:global(.dark) .p-btn { background: #1e293b; border-color: #334155; color: #f8fafc; }
-.p-numbers button { width: 40px; height: 40px; border-radius: 12px; font-weight: 800; cursor: pointer; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-card, #fff); color: var(--text-muted, #64748b); }
-.p-numbers button.active { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
+/* Модалка аватаров */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.modal-content {
+  width: 90%;
+  max-width: 480px;
+  padding: 30px;
+  position: relative;
+}
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin: 20px 0;
+}
+.avatar-option {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+  border: 2px solid transparent;
+}
+.avatar-option:hover {
+  border-color: var(--primary);
+  transform: scale(1.05);
+}
+.file-upload-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background 0.2s;
+}
+.file-upload-label:hover {
+  background: var(--primary-light);
+}
 
-/* МОДАЛКА */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 10000; }
-.modal-content { width: 90%; max-width: 480px; padding: 30px; position: relative; }
-.avatar-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
-.avatar-option { width: 100%; aspect-ratio: 1; border-radius: 50%; object-fit: cover; cursor: pointer; transition: 0.2s; border: 2px solid transparent; }
-.avatar-option:hover { border-color: var(--primary, #2563eb); transform: scale(1.05); }
+/* Просмотр фото */
+.image-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  cursor: zoom-out;
+}
+.full-image {
+  max-width: 90%;
+  max-height: 90%;
+  border-radius: 20px;
+  border: 4px solid #fff;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
 
-/* ПРОСМОТР */
-.image-preview-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 10001; cursor: zoom-out; }
-.full-image { max-width: 90%; max-height: 90%; border-radius: 20px; border: 4px solid #fff; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+/* Пагинация */
+.pagination-pages {
+  display: flex;
+  gap: 8px;
+}
+.pagination-pages button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pagination-pages button:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.pagination-pages button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
 
-/* АДАПТИВНОСТЬ */
-@media (max-width: 900px) { .filter-grid { grid-template-columns: 1fr; } .input-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .filter-grid { grid-template-columns: 1fr; }
+  .input-grid { grid-template-columns: 1fr; }
+}
 @media (max-width: 768px) {
   .admin-users { padding: 24px 16px; }
   .header-row { flex-direction: column; align-items: flex-start; }

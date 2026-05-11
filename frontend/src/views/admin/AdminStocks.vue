@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-stocks">
+  <div class="admin-stocks animate-fade-in">
     <!-- ЗАГОЛОВОК -->
     <div class="header-row">
       <div class="header-left">
@@ -16,36 +16,36 @@
       <h3 class="card-title">📦 Приход товара на склад</h3>
       <form @submit.prevent="createStock" class="admin-form">
         <div class="input-grid">
-          <div class="input-group">
+          <div class="form-group">
             <label>Товар</label>
-            <select v-model="newStock.product_id" required class="form-input">
+            <select v-model="newStock.product_id" required>
               <option :value="null">-- Выберите товар --</option>
               <option v-for="p in products" :key="p.id" :value="p.id">
                 {{ p.name }} (арт: {{ p.sku }})
               </option>
             </select>
           </div>
-          <div class="input-group">
+          <div class="form-group">
             <label>Склад (ПВЗ)</label>
-            <select v-model="newStock.warehouse_id" required class="form-input">
+            <select v-model="newStock.warehouse_id" required>
               <option :value="null">-- Выберите склад --</option>
               <option v-for="w in warehouses" :key="w.id" :value="w.id">
                 {{ w.cities?.name || w.city_name }} — {{ w.address }}
               </option>
             </select>
           </div>
-          <div class="input-group mini">
+          <div class="form-group mini">
             <label>Кол-во</label>
-            <input v-model.number="newStock.quantity" type="number" required class="form-input" />
+            <input v-model.number="newStock.quantity" type="number" required />
           </div>
-          <div class="input-group mini">
+          <div class="form-group mini">
             <label>Место (полка)</label>
-            <input v-model="newStock.shelf_location" placeholder="Напр. A-1" class="form-input" />
+            <input v-model="newStock.shelf_location" placeholder="Напр. A-1" />
           </div>
         </div>
         <div class="form-footer">
-          <button type="submit" class="btn-admission" :disabled="loadingAction">
-            <span v-if="loadingAction" class="spinner-small"></span>
+          <button type="submit" class="btn btn-success admission-btn" :disabled="loadingAction">
+            <span v-if="loadingAction" class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></span>
             <span v-else>✅ Добавить на склад</span>
           </button>
         </div>
@@ -55,32 +55,29 @@
     <!-- 2. УМНАЯ ФИЛЬТРАЦИЯ -->
     <section class="admin-card filter-section glass-card">
       <div class="filter-grid">
-        <div class="input-group search-group">
+        <div class="form-group">
           <label>🔍 Поиск товара/SKU</label>
-          <input v-model="searchQuery" placeholder="Название или артикул..." class="form-input" />
+          <input v-model="searchQuery" placeholder="Название или артикул..." />
         </div>
-
-        <div class="input-group">
+        <div class="form-group">
           <label>Склад</label>
-          <select v-model="filters.warehouseId" class="form-input">
+          <select v-model="filters.warehouseId">
             <option value="all">Все склады</option>
             <option v-for="w in warehouses" :key="w.id" :value="w.id">
                 {{ w.cities?.name || w.city_name }} ({{ w.address }})
             </option>
           </select>
         </div>
-
-        <div class="input-group">
+        <div class="form-group">
           <label>Категория</label>
-          <select v-model="filters.categoryId" class="form-input">
+          <select v-model="filters.categoryId">
             <option value="all">Все категории</option>
             <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
-
-        <div class="input-group">
+        <div class="form-group">
           <label>Сортировка</label>
-          <select v-model="filters.sort" class="form-input">
+          <select v-model="filters.sort">
             <option value="product-name">По названию</option>
             <option value="qty-asc">Мало на складе ↑</option>
             <option value="qty-desc">Много на складе ↓</option>
@@ -100,9 +97,8 @@
 
     <!-- 3. ТАБЛИЦА -->
     <div class="table-container">
-      <div class="table-meta">
-        <span class="meta-icon">📄</span>
-        Страница {{ currentPage }} из {{ totalPages || 1 }}
+      <div class="table-meta text-muted mb-2">
+        Показано {{ paginatedStocks.length }} из {{ filteredStocks.length }} записей (страница {{ currentPage }} из {{ totalPages }})
       </div>
 
       <div class="admin-table-wrapper glass-card">
@@ -152,32 +148,21 @@
               </td>
 
               <td class="text-right">
-                <button @click="deleteStock(stock.id)" class="btn-delete-small">🗑️ Удалить</button>
+                <button @click="deleteStock(stock.id)" class="btn btn-danger btn-sm">🗑️ Удалить</button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div v-if="filteredStocks.length === 0" class="empty-state glass-card">
-        <div class="empty-icon">📦</div>
-        <h3>Остатки не найдены</h3>
-        <p>Попробуйте изменить параметры фильтрации.</p>
+      <!-- ПАГИНАЦИЯ -->
+      <div v-if="totalPages > 1" class="pagination mt-3">
+        <button @click="currentPage--" :disabled="currentPage === 1">←</button>
+        <div class="pagination-pages">
+          <button v-for="page in totalPages" :key="page" @click="currentPage = page" :class="{ active: currentPage === page }">{{ page }}</button>
+        </div>
+        <button @click="currentPage++" :disabled="currentPage === totalPages">→</button>
       </div>
-    </div>
-
-    <!-- 4. ПАГИНАЦИЯ -->
-    <div v-if="totalPages > 1" class="pagination-wrapper">
-      <button @click="currentPage--" :disabled="currentPage === 1" class="p-btn glass-card">←</button>
-      <div class="p-numbers">
-        <button v-for="page in totalPages" :key="page" 
-                @click="currentPage = page"
-                class="glass-card"
-                :class="{ active: currentPage === page }">
-          {{ page }}
-        </button>
-      </div>
-      <button @click="currentPage++" :disabled="currentPage === totalPages" class="p-btn glass-card">→</button>
     </div>
   </div>
 </template>
@@ -295,126 +280,309 @@ onMounted(loadData);
 
 <style scoped>
 /* ==========================================================================
-   АДМИНКА: СКЛАДСКОЙ УЧЕТ (GLASSMORPHISM & DARK MODE)
+   УНИКАЛЬНЫЕ СТИЛИ АДМИНКИ СКЛАДА (глобальный CSS используется)
    ========================================================================== */
 
-@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes spin { to { transform: rotate(360deg); } }
+.admin-stocks {
+  padding: 40px 24px;
+}
 
-.admin-stocks { padding: 40px 24px; animation: fadeSlideUp 0.5s ease-out; color: var(--text-main, #0f172a); }
-:global(.dark) .admin-stocks { color: #f8fafc; }
-
-.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 32px;
+}
 .header-left h1 {
-  font-size: 2.2rem; font-weight: 900; margin: 0;
-  background: linear-gradient(135deg, var(--primary, #2563eb), var(--accent, #0ea5e9));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.subtitle { color: var(--text-muted, #64748b); font-size: 0.95rem; font-weight: 500; }
-
-.stats-badge { padding: 10px 20px; border-radius: 60px; font-weight: 800; display: flex; align-items: center; gap: 10px; font-size: 0.9rem; }
-
-/* КАРТОЧКИ */
-.glass-card {
-  background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-lg, 16px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px); transition: all 0.3s ease;
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
 }
-:global(.dark) .glass-card { background: #1e293b; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
 
-.admin-card { padding: 28px; margin-bottom: 32px; }
-.admission-card { border-left: 5px solid var(--success, #10b981); background: rgba(16, 185, 129, 0.03); }
-:global(.dark) .admission-card { background: rgba(16, 185, 129, 0.05); }
-
-.card-title { font-size: 1.25rem; font-weight: 900; margin-top: 0; margin-bottom: 25px; color: var(--text-main, #0f172a); }
-:global(.dark) .card-title { color: #f8fafc; }
-
-/* ИНПУТЫ */
-.form-input {
-  width: 100%; padding: 12px 16px; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--border-color, #cbd5e1);
-  background: rgba(0,0,0,0.02); color: var(--text-main, #0f172a); font-size: 0.95rem; transition: all 0.3s; box-sizing: border-box;
+.stats-badge {
+  padding: 10px 20px;
+  border-radius: 60px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
 }
-:global(.dark) .form-input { background: rgba(255,255,255,0.02); border-color: #475569; color: #f8fafc; }
-.form-input:focus { border-color: var(--primary, #2563eb); background: transparent; outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
 
-.input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
-.input-group label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted, #64748b); margin-bottom: 8px; }
-
-/* КНОПКИ */
-.btn-admission {
-  background: var(--success, #10b981); color: white; border: none; padding: 14px 30px;
-  border-radius: var(--radius-md, 8px); font-weight: 800; cursor: pointer; transition: all 0.3s;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); display: flex; align-items: center; gap: 10px;
+.admin-card {
+  padding: 28px;
+  margin-bottom: 32px;
 }
-.btn-admission:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(16, 185, 129, 0.4); background: #059669; }
-.btn-admission:disabled { opacity: 0.6; cursor: not-allowed; }
+.admission-card {
+  border-left: 5px solid var(--success);
+  background: rgba(16, 185, 129, 0.03);
+}
+:global(.dark) .admission-card {
+  background: rgba(16, 185, 129, 0.05);
+}
 
-.btn-text-link { background: none; border: none; color: var(--primary, #2563eb); font-weight: 800; cursor: pointer; text-decoration: underline; font-size: 0.9rem; }
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  margin-top: 0;
+  margin-bottom: 25px;
+  color: var(--text-main);
+}
 
-.spinner-small { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.form-group label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+.mini {
+  max-width: 140px;
+}
 
-/* ФИЛЬТРЫ */
-.filter-section { background: rgba(0,0,0,0.01); border-style: dashed; }
-.filter-grid { display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr; gap: 20px; align-items: flex-end; }
-.filter-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 25px; }
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
 
-.danger-text { color: var(--danger, #ef4444); font-weight: 800; font-size: 0.85rem; }
+/* Кнопка приёмки (глобальный btn-success + небольшой градиент) */
+.admission-btn {
+  background: linear-gradient(135deg, var(--success), #059669);
+  border: none;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.admission-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(16, 185, 129, 0.4);
+}
 
-/* ТАБЛИЦА */
-.table-container { margin-top: 16px; }
-.table-meta { margin-bottom: 16px; font-size: 0.85rem; color: var(--text-muted, #64748b); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+/* Фильтры */
+.filter-section {
+  background: rgba(0,0,0,0.01);
+  border-style: dashed;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr;
+  gap: 20px;
+  align-items: flex-end;
+}
+.filter-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 25px;
+}
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.9rem;
+}
 
-.admin-table-wrapper { overflow-x: auto; }
-.admin-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
-.admin-table th { padding: 16px 20px; text-align: left; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted, #64748b); border-bottom: 2px solid var(--border-color, #e2e8f0); }
-:global(.dark) .admin-table th { border-color: #334155; }
-.admin-table td { padding: 12px 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); vertical-align: middle; transition: background 0.2s; }
-:global(.dark) .admin-table td { border-color: #334155; }
+/* Чекбокс "только нулевые" (локальный) */
+.custom-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.custom-checkbox input {
+  display: none;
+}
+.checkmark {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  position: relative;
+  transition: all 0.2s;
+}
+:global(.dark) .checkmark {
+  border-color: #475569;
+}
+.custom-checkbox input:checked + .checkmark {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+.custom-checkbox input:checked + .checkmark::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+.danger-text {
+  color: var(--danger);
+  font-weight: 800;
+  font-size: 0.85rem;
+}
 
-.stock-row:hover td { background: rgba(37, 99, 235, 0.02); }
-.row-zero { background: rgba(239, 68, 68, 0.03); }
-:global(.dark) .row-zero { background: rgba(239, 68, 68, 0.05); }
+/* Таблица */
+.table-container {
+  margin-top: 16px;
+}
+.table-meta {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.admin-table-wrapper {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+}
+.admin-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+}
+.admin-table td {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+  transition: background 0.2s;
+}
+.stock-row:hover td {
+  background: rgba(37, 99, 235, 0.02);
+}
+.row-zero {
+  background: rgba(239, 68, 68, 0.03);
+}
+:global(.dark) .row-zero {
+  background: rgba(239, 68, 68, 0.05);
+}
 
-.col-id { width: 70px; font-weight: 800; color: var(--primary, #2563eb); font-family: monospace; }
+.col-id {
+  width: 70px;
+  font-weight: 800;
+  color: var(--primary);
+  font-family: monospace;
+}
 
-/* РЕДАКТИРОВАНИЕ В ТАБЛИЦЕ */
-.inline-edit { background: transparent; border: 1px solid transparent; padding: 8px; border-radius: 8px; color: var(--text-main, #0f172a); width: 100%; transition: 0.2s; font-size: 0.9rem; }
-:global(.dark) .inline-edit { color: #f8fafc; }
-.inline-edit:hover { background: rgba(0,0,0,0.03); border-color: var(--border-color, #cbd5e1); }
-:global(.dark) .inline-edit:hover { background: rgba(255,255,255,0.03); border-color: #475569; }
-.inline-edit:focus { border-color: var(--primary, #2563eb); background: var(--bg-card, #fff); outline: none; }
+/* Инлайн-редактирование */
+.inline-edit {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 8px;
+  border-radius: 8px;
+  color: var(--text-main);
+  width: 100%;
+  transition: 0.2s;
+  font-size: 0.9rem;
+}
+.inline-edit:hover {
+  background: rgba(0,0,0,0.03);
+  border-color: var(--border-color);
+}
+:global(.dark) .inline-edit:hover {
+  background: rgba(255,255,255,0.03);
+  border-color: #475569;
+}
+.inline-edit:focus {
+  border-color: var(--primary);
+  background: var(--bg-card);
+  outline: none;
+}
+.table-select {
+  font-weight: 700;
+  cursor: pointer;
+}
+.table-select.muted {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.qty-input {
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: var(--primary);
+  width: 80px;
+}
+.warning-input {
+  color: var(--danger) !important;
+  font-weight: 900;
+}
+.text-center { text-align: center; }
+.text-right { text-align: right; }
 
-.table-select { font-weight: 700; cursor: pointer; }
-.table-select.muted { color: var(--text-muted, #64748b); font-size: 0.8rem; font-weight: 500; }
+/* Пагинация */
+.pagination-pages {
+  display: flex;
+  gap: 8px;
+}
+.pagination-pages button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pagination-pages button:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.pagination-pages button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
 
-.qty-input { font-weight: 900; font-size: 1.1rem; color: var(--primary, #2563eb); width: 80px; }
-.warning-input { color: var(--danger, #ef4444) !important; font-weight: 900; }
-
-.btn-delete-small { background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); padding: 6px 14px; border-radius: 30px; font-weight: 800; font-size: 0.8rem; color: var(--danger, #ef4444); cursor: pointer; transition: 0.2s; }
-.btn-delete-small:hover { background: var(--danger, #ef4444); color: white; transform: translateY(-2px); }
-
-/* ПАГИНАЦИЯ */
-.pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 40px; }
-.p-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-size: 1.2rem; font-weight: 900; border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #fff); color: var(--text-main, #0f172a); }
-:global(.dark) .p-btn { background: #1e293b; border-color: #334155; color: #f8fafc; }
-.p-btn:hover:not(:disabled) { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); background: rgba(37, 99, 235, 0.05); }
-
-.p-numbers button { width: 44px; height: 44px; border-radius: 12px; font-weight: 800; cursor: pointer; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-card, #fff); color: var(--text-muted, #64748b); }
-.p-numbers button.active { background: var(--primary, #2563eb); color: white; border-color: var(--primary, #2563eb); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
-
-/* ЧЕКБОКСЫ */
-.custom-checkbox { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-weight: 700; font-size: 0.85rem; }
-.custom-checkbox input { display: none; }
-.checkmark { width: 20px; height: 20px; background: transparent; border: 2px solid var(--border-color, #cbd5e1); border-radius: 6px; position: relative; transition: all 0.2s; }
-:global(.dark) .checkmark { border-color: #475569; }
-.custom-checkbox input:checked + .checkmark { background: var(--danger, #ef4444); border-color: var(--danger, #ef4444); }
-.custom-checkbox input:checked + .checkmark::after { content: '✓'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 12px; font-weight: bold; }
-
-/* ПУСТОЕ СОСТОЯНИЕ */
-.empty-state { text-align: center; padding: 60px; color: var(--text-muted, #64748b); font-weight: 600; }
-.empty-icon { font-size: 4rem; margin-bottom: 15px; opacity: 0.5; }
-
-/* АДАПТИВНОСТЬ */
-@media (max-width: 900px) { .filter-grid { grid-template-columns: 1fr; } .input-grid { grid-template-columns: 1fr; } }
-@media (max-width: 768px) { .admin-stocks { padding: 24px 16px; } .header-row { flex-direction: column; align-items: flex-start; } .p-numbers { display: none; } }
+@media (max-width: 900px) {
+  .filter-grid { grid-template-columns: 1fr; }
+  .input-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .admin-stocks { padding: 24px 16px; }
+  .header-row { flex-direction: column; align-items: flex-start; }
+  .pagination-pages { display: none; }
+}
 </style>
