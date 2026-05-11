@@ -333,15 +333,15 @@ const updateStatus = async (id, newStatus) => {
   if (!confirm(confirmMsg)) return;
 
   try {
+    // Этот запрос теперь триггерит уведомление на бэкенде
     const res = await axios.put(`/api/admin/return_requests/${id}`, { status: newStatus }, config);
     
-    // Находим и обновляем локально
     const idx = requests.value.findIndex(r => r.id === id);
     if (idx !== -1) {
       requests.value[idx] = res.data;
     }
     
-    alert(`Заявка ${newStatus === 'approved' ? 'одобрена, остатки возвращены' : 'отклонена'}`);
+    alert(`Заявка ${newStatus === 'approved' ? 'одобрена' : 'отклонена'}. Уведомление отправлено клиенту.`);
   } catch (e) {
     alert(e.response?.data?.error || 'Ошибка сохранения');
   }

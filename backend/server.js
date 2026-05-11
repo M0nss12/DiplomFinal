@@ -971,27 +971,23 @@ app.post('/api/admin/return_requests', verifyAdmin, async (req, res) => {
 });
 
 // --- Специализированный роут для обновления статуса возврата ---
+// Обновление статуса возврата админом (Одобрение/Отклонение)
 app.put('/api/admin/return_requests/:id', verifyAdmin, async (req, res) => {
     const { status } = req.body; // 'approved' или 'rejected'
     const requestId = req.params.id;
 
     try {
-        // 1. Получаем текущую заявку
-        const { data: request, error: reqErr } = await supabase
+        // 1. Получаем данные о заявке, чтобы знать кому отправлять уведомление
+        const { data: request, error: fetchErr } = await supabase
             .from('return_requests')
-            .select('*')
+            .select('*, users(email, first_name)')
             .eq('id', requestId)
             .single();
-        
-        if (reqErr || !request) return res.status(404).json({ error: 'Заявка не найдена' });
-        
-        // Если статус уже одобрен, ничего не делаем (защита от повторного возврата остатков)
-        if (request.status === 'approved' && status === 'approved') {
-            return res.json(request);
-        }
 
-        // 2. Если статус меняется на 'approved', возвращаем товар на склады
-        if (status === 'approved') {
+        if (fetchErr || !request) return res.status(404).json({ error: 'Заявка не найдена' });
+
+        // 2. Если статус 'approved', возвращаем товар на склад (как делали раньше)
+        if (status === 'approved' && request.status !== 'approved') {
             const { data: items } = await supabase
                 .from('order_items')
                 .select('product_id, quantity, warehouse_id')
@@ -1000,34 +996,25 @@ app.put('/api/admin/return_requests/:id', verifyAdmin, async (req, res) => {
             if (items) {
                 for (const item of items) {
                     if (item.warehouse_id) {
-                        // Получаем текущий остаток
                         const { data: stock } = await supabase
                             .from('product_stocks')
                             .select('quantity')
                             .eq('product_id', item.product_id)
                             .eq('warehouse_id', item.warehouse_id)
                             .maybeSingle();
-                        
                         if (stock) {
-                            // Прибавляем количество обратно
-                            await supabase
-                                .from('product_stocks')
-                                .update({ quantity: stock.quantity + item.quantity })
-                                .eq('product_id', item.product_id)
-                                .eq('warehouse_id', item.warehouse_id);
+                            await supabase.from('product_stocks').update({ 
+                                quantity: stock.quantity + item.quantity 
+                            }).eq('product_id', item.product_id).eq('warehouse_id', item.warehouse_id);
                         }
                     }
                 }
             }
-            
-            // Также логично обновить статус самого заказа
-            await supabase
-                .from('orders')
-                .update({ delivery_status: 'returned' })
-                .eq('id', request.order_id);
+            // Обновляем статус заказа
+            await supabase.from('orders').update({ delivery_status: 'returned' }).eq('id', request.order_id);
         }
 
-        // 3. Обновляем статус заявки
+        // 3. Обновляем статус самой заявки
         const { data: updated, error: updateErr } = await supabase
             .from('return_requests')
             .update({ status })
@@ -1036,10 +1023,26 @@ app.put('/api/admin/return_requests/:id', verifyAdmin, async (req, res) => {
             .single();
 
         if (updateErr) throw updateErr;
-        res.json(updated);
 
+        // 4. ОТПРАВКА УВЕДОМЛЕНИЯ ПОЛЬЗОВАТЕЛЮ
+        const isApproved = status === 'approved';
+        await notifyAndEmail({
+            userId: request.user_id,
+            type: 'system', // или 'order'
+            email: request.users?.email, // Отправит и на почту, если email есть
+            title: isApproved ? '✅ Возврат одобрен' : '❌ Возврат отклонен',
+            message: isApproved 
+                ? `Ваша заявка на возврат по заказу №${request.order_id} одобрена. Товар принят обратно.`
+                : `Ваша заявка на возврат по заказу №${request.order_id} была отклонена менеджером.`,
+            templateName: 'notification_general.html', // шаблон письма
+            templateVars: {
+                first_name: request.users?.first_name || 'Клиент'
+            }
+        });
+
+        res.json(updated);
     } catch (e) {
-        console.error('Ошибка при обработке возврата:', e);
+        console.error('Ошибка обработки возврата:', e);
         res.status(500).json({ error: e.message });
     }
 });
