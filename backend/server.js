@@ -47,27 +47,21 @@ app.use(cors({
 
 app.use(express.json());
 
-// --- 4. Настройка почтовика (Nodemailer) ---
+// --- 4. Настройка почтовика (Nodemailer - GMAIL) ---
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.yandex.ru',
-    port: 465, // Согласно инструкции Яндекса
-    secure: true, // Защита соединения - SSL
+    service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-    },
-    family: 4, // ВАЖНО: Заставляем Node.js использовать только IPv4 (убирает ошибку ENETUNREACH)
-    tls: {
-        rejectUnauthorized: false
     }
 });
 
 // Проверка подключения почты при запуске
 transporter.verify((error, success) => {
     if (error) {
-        console.error('⚠️ Ошибка подключения к SMTP:', error.message);
+        console.error('⚠️ Ошибка подключения к Gmail:', error.message);
     } else {
-        console.log('✅ 📧 Почтовый сервер Яндекса успешно подключен и готов к отправке писем!');
+        console.log('✅ 📧 Почтовый сервер Gmail успешно подключен и готов к отправке писем!');
     }
 });
 
