@@ -904,3 +904,4 @@
 {"id":"17780455993559cyyz","timestamp":"06.05.2026, 13:33:19","type":"ACTION","action":"POST_REQUEST","message":"Успешный запрос на /api/products/recent","user":{"id":"111","name":"Admin2","role":"admin"},"ip":"::1","details":{}}
 {"id":"1778045841395a15cy","timestamp":"06.05.2026, 13:37:21","type":"ACTION","action":"POST_REQUEST","message":"Успешный запрос на /api/products/recent","user":{"id":"111","name":"Admin2","role":"admin"},"ip":"::1","details":{}}
 {"id":"1778045847147hyhh8","timestamp":"06.05.2026, 13:37:27","type":"ACTION","action":"PUT_REQUEST","message":"Успешный запрос на /api/users/profile/111","user":{"id":"111","name":"Admin2","role":"admin"},"ip":"::1","details":{}}
+{"id":"556fdc34","timestamp":"12.05.2026, 14:39:13","action":"POST","url":"/api/users/register","message":"Успешный запрос: POST /api/users/register","user":{"id":"guest","name":"Anonymous"},"ip":"::1","status":200}

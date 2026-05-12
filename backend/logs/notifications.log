@@ -25,3 +25,4 @@
 {"id":"e58d648e","timestamp":"11.05.2026, 11:36:24","userId":"111","type":"order","title":"Заказ №65 выдан","message":"Ваш заказ был выдан.","emailSentTo":"monsschogath@gmail.com"}
 {"id":"3e747aeb","timestamp":"11.05.2026, 11:43:33","userId":"111","type":"order","title":"Заказ №66 выдан","message":"Ваш заказ был выдан.","emailSentTo":"monsschogath@gmail.com"}
 {"id":"27f3c703","timestamp":"11.05.2026, 11:44:41","userId":"111","type":"system","title":"✅ Возврат одобрен","message":"Ваша заявка на возврат по заказу №66 одобрена. Товар принят обратно.","emailSentTo":"monsschogath@gmail.com"}
+{"id":"9d9cd384","timestamp":"12.05.2026, 14:39:11","userId":"168cd044-a016-4422-a9d0-13998cad8618","type":"system","title":"Подтверждение регистрации","message":"Добро пожаловать в ApexDrive! Подтвердите вашу почту.","emailSentTo":"school7343173@gmail.com"}

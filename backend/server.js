@@ -53,7 +53,9 @@ const transporter = nodemailer.createTransport({
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-    }
+    },
+    // Заставляем Render.com использовать только IPv4
+    family: 4 
 });
 
 // Проверка подключения почты при запуске
