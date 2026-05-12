@@ -51,11 +51,20 @@ app.use(express.json());
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT || 465,
-    secure: true, // true для 465 порта, false для 587
+    secure: true, 
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-    }
+    },
+    // Явно заставляем использовать IPv4 (исправляет ENETUNREACH)
+    connectionTimeout: 10000, // 10 секунд на ожидание
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+    tls: {
+        // Не падать, если сертификат кажется подозрительным
+        rejectUnauthorized: false
+    },
+    family: 4 // <--- ДОБАВЬТЕ ЭТУ СТРОКУ
 });
 
 // Проверка подключения почты при запуске
