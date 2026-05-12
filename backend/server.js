@@ -9,7 +9,6 @@ const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const https = require('https');
 const querystring = require('querystring');
-const nodemailer = require('nodemailer');
 
 // 1. Настройка DNS (IPv4 first)
 const dns = require('dns');
@@ -47,36 +46,7 @@ app.use(cors({
 
 app.use(express.json());
 
-// --- 4. Настройка почтовика (Nodemailer - GMAIL) ---
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    // Заставляем Render.com использовать только IPv4
-    family: 4 
-});
-
-// Проверка подключения почты при запуске
-transporter.verify((error, success) => {
-    if (error) {
-        console.error('⚠️ Ошибка подключения к Gmail:', error.message);
-    } else {
-        console.log('✅ 📧 Почтовый сервер Gmail успешно подключен и готов к отправке писем!');
-    }
-});
-
-// Проверка подключения почты при запуске
-transporter.verify((error, success) => {
-    if (error) {
-        console.error('⚠️ Ошибка подключения к SMTP (почта не будет отправляться):', error.message);
-    } else {
-        console.log('📧 Почтовый сервер готов к отправке писем');
-    }
-});
-
-// --- 5. Системное Логирование ---
+// --- 4. Системное Логирование ---
 const LOGS_DIR = path.join(__dirname, 'logs');
 const ERROR_LOG = path.join(LOGS_DIR, 'errors.log');
 const ACTIONS_LOG = path.join(LOGS_DIR, 'actions.log');
@@ -155,7 +125,7 @@ const getEmailTemplate = (templateName, variables = {}) => {
     return html;
 };
 
-// --- Уведомления и email (Nodemailer) ---
+// --- Уведомления и email (Через API Brevo по HTTPS) ---
 const notifyAndEmail = async ({ userId, type, title, message, email, templateName, templateVars = {} }) => {
     writeLog(NOTIFICATIONS_LOG, { userId, type, title, message, emailSentTo: email });
 
@@ -170,16 +140,23 @@ const notifyAndEmail = async ({ userId, type, title, message, email, templateNam
                 { title, message, ...templateVars }
             );
 
-            await transporter.sendMail({
-                from: `"ApexDrive" <${process.env.EMAIL_USER}>`,
-                to: email,
+            // Отправляем HTTP запрос к API Brevo (Render не блокирует это соединение)
+            await axios.post('https://api.brevo.com/v3/smtp/email', {
+                sender: { name: "ApexDrive", email: process.env.EMAIL_USER },
+                to: [{ email: email }],
                 subject: title,
-                html: html
+                htmlContent: html
+            }, {
+                headers: {
+                    'api-key': process.env.BREVO_API_KEY,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
             });
 
-            console.log(`✅ Письмо успешно отправлено на ${email}`);
+            console.log(`✅ Письмо успешно отправлено через Brevo API на ${email}`);
         } catch (e) {
-            console.error(`❌ Ошибка отправки письма на ${email}:`, e.message);
+            console.error(`❌ Ошибка отправки письма Brevo на ${email}:`, e.response?.data || e.message);
             logError(e);
         }
     }
@@ -1190,18 +1167,19 @@ app.delete('/api/storage/:bucket/:filename', verifyAdmin, async (req, res) => {
     }
 });
 
-// Форма обратной связи
+// Форма обратной связи (Через API Brevo)
 app.post('/api/feedback/send', async (req, res) => {
     const { name, contact, message } = req.body;
     if (!name || !contact || !message) {
         return res.status(400).json({ error: 'Все поля обязательны' });
     }
+    
     try {
-        await transporter.sendMail({
-            from: `"ApexDrive Сайт" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER, // Отправляем админу
+        await axios.post('https://api.brevo.com/v3/smtp/email', {
+            sender: { name: "ApexDrive", email: process.env.EMAIL_USER },
+            to: [{ email: process.env.EMAIL_USER }], // Отправляем себе (админу)
             subject: `🔥 Новое сообщение с сайта от ${name}`,
-            html: `
+            htmlContent: `
                 <h3>Новое обращение через форму контактов</h3>
                 <p><b>Имя клиента:</b> ${name}</p>
                 <p><b>Контактные данные:</b> ${contact}</p>
@@ -1209,11 +1187,18 @@ app.post('/api/feedback/send', async (req, res) => {
                 <p><b>Сообщение:</b></p>
                 <p>${message.replace(/\n/g, '<br>')}</p>
             `
+        }, {
+            headers: {
+                'api-key': process.env.BREVO_API_KEY,
+                'Content-Type': 'application/json'
+            }
         });
+        
         res.json({ success: true, message: 'Сообщение отправлено' });
     } catch (e) {
         logError(e, req);
-        res.status(500).json({ error: 'Ошибка отправки' });
+        console.error('Ошибка формы контактов Brevo:', e.response?.data || e.message);
+        res.status(500).json({ error: 'Не удалось отправить сообщение. Попробуйте позже.' });
     }
 });
 
