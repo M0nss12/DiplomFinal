@@ -49,22 +49,26 @@ app.use(express.json());
 
 // --- 4. Настройка почтовика (Nodemailer) ---
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT || 465,
-    secure: false, 
+    host: process.env.SMTP_HOST || 'smtp.yandex.ru',
+    port: 465, // Согласно инструкции Яндекса
+    secure: true, // Защита соединения - SSL
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
-    // Явно заставляем использовать IPv4 (исправляет ENETUNREACH)
-    connectionTimeout: 10000, // 10 секунд на ожидание
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
+    family: 4, // ВАЖНО: Заставляем Node.js использовать только IPv4 (убирает ошибку ENETUNREACH)
     tls: {
-        // Не падать, если сертификат кажется подозрительным
         rejectUnauthorized: false
-    },
-    family: 4 // <--- ДОБАВЬТЕ ЭТУ СТРОКУ
+    }
+});
+
+// Проверка подключения почты при запуске
+transporter.verify((error, success) => {
+    if (error) {
+        console.error('⚠️ Ошибка подключения к SMTP:', error.message);
+    } else {
+        console.log('✅ 📧 Почтовый сервер Яндекса успешно подключен и готов к отправке писем!');
+    }
 });
 
 // Проверка подключения почты при запуске
