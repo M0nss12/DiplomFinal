@@ -9,6 +9,7 @@ const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const https = require('https');
 const querystring = require('querystring');
+const nodemailer = require('nodemailer');
 
 // 1. Настройка DNS (IPv4 first)
 const dns = require('dns');
@@ -46,7 +47,27 @@ app.use(cors({
 
 app.use(express.json());
 
-// --- 4. Системное Логирование ---
+// --- 4. Настройка почтовика (Nodemailer) ---
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT || 465,
+    secure: true, // true для 465 порта, false для 587
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+// Проверка подключения почты при запуске
+transporter.verify((error, success) => {
+    if (error) {
+        console.error('⚠️ Ошибка подключения к SMTP (почта не будет отправляться):', error.message);
+    } else {
+        console.log('📧 Почтовый сервер готов к отправке писем');
+    }
+});
+
+// --- 5. Системное Логирование ---
 const LOGS_DIR = path.join(__dirname, 'logs');
 const ERROR_LOG = path.join(LOGS_DIR, 'errors.log');
 const ACTIONS_LOG = path.join(LOGS_DIR, 'actions.log');
@@ -125,7 +146,7 @@ const getEmailTemplate = (templateName, variables = {}) => {
     return html;
 };
 
-// --- Уведомления и email (Unisender Go REST API) ---
+// --- Уведомления и email (Nodemailer) ---
 const notifyAndEmail = async ({ userId, type, title, message, email, templateName, templateVars = {} }) => {
     writeLog(NOTIFICATIONS_LOG, { userId, type, title, message, emailSentTo: email });
 
@@ -140,25 +161,17 @@ const notifyAndEmail = async ({ userId, type, title, message, email, templateNam
                 { title, message, ...templateVars }
             );
 
-            await axios.post('https://goapi.unisender.ru/ru/transactional/api/v1/email/send.json', {
-                message: {
-                    recipients: [{ email: email }],
-                    subject: title,
-                    body: { html: html },
-                    from_email: process.env.EMAIL_USER
-                }
-            }, {
-                headers: {
-                    'X-API-KEY': process.env.UNISENDER_API_KEY,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                timeout: 10000
+            await transporter.sendMail({
+                from: `"ApexDrive" <${process.env.EMAIL_USER}>`,
+                to: email,
+                subject: title,
+                html: html
             });
 
-            console.log(`✅ Письмо отправлено через Unisender на ${email}`);
+            console.log(`✅ Письмо успешно отправлено на ${email}`);
         } catch (e) {
-            console.error('❌ Ошибка отправки через Unisender:', e.response?.data || e.message);
+            console.error(`❌ Ошибка отправки письма на ${email}:`, e.message);
+            logError(e);
         }
     }
 };
@@ -1175,24 +1188,20 @@ app.post('/api/feedback/send', async (req, res) => {
         return res.status(400).json({ error: 'Все поля обязательны' });
     }
     try {
-        await axios.post('https://goapi.unisender.ru/ru/transactional/api/v1/email/send.json', {
-            message: {
-                recipients: [{ email: process.env.EMAIL_USER }],
-                subject: `Новое сообщение от ${name}`,
-                body: {
-                    html: `<p><b>Имя:</b> ${name}</p><p><b>Контакты:</b> ${contact}</p><p><b>Сообщение:</b></p><p>${message}</p>`
-                },
-                from_email: process.env.EMAIL_USER
-            }
-        }, {
-            headers: {
-                'X-API-KEY': process.env.UNISENDER_API_KEY,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            timeout: 10000
+        await transporter.sendMail({
+            from: `"ApexDrive Сайт" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER, // Отправляем админу
+            subject: `🔥 Новое сообщение с сайта от ${name}`,
+            html: `
+                <h3>Новое обращение через форму контактов</h3>
+                <p><b>Имя клиента:</b> ${name}</p>
+                <p><b>Контактные данные:</b> ${contact}</p>
+                <hr>
+                <p><b>Сообщение:</b></p>
+                <p>${message.replace(/\n/g, '<br>')}</p>
+            `
         });
-        res.json({ success: true });
+        res.json({ success: true, message: 'Сообщение отправлено' });
     } catch (e) {
         logError(e, req);
         res.status(500).json({ error: 'Ошибка отправки' });
@@ -1317,20 +1326,25 @@ app.delete('/api/admin/orders/:id', verifyAdmin, async (req, res) => {
         if (items && items.length > 0) {
             for (const item of items) {
                 if (item.warehouse_id) {
-                    const { data: stockData } = await supabase
+                    const { data: stockData, error: stockErr } = await supabase
                         .from('product_stocks')
                         .select('quantity')
                         .eq('product_id', item.product_id)
                         .eq('warehouse_id', item.warehouse_id)
                         .maybeSingle();
 
-                    if (stockData) {
-                        const newQty = (stockData.quantity || 0) + item.quantity;
-                        await supabase
-                            .from('product_stocks')
-                            .update({ quantity: newQty })
-                            .eq('product_id', item.product_id)
-                            .eq('warehouse_id', item.warehouse_id);
+                    if (stockErr) {
+                        console.error('Ошибка получения остатка при возврате:', stockErr);
+                        continue;
+                    }
+                    const newQty = (stockData?.quantity || 0) + item.quantity;
+                    const { error: updateErr } = await supabase
+                        .from('product_stocks')
+                        .update({ quantity: newQty })
+                        .eq('product_id', item.product_id)
+                        .eq('warehouse_id', item.warehouse_id);
+                    if (updateErr) {
+                        console.error('Ошибка возврата остатков при удалении заказа:', updateErr);
                     }
                 }
             }
