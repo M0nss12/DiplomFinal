@@ -48,14 +48,12 @@ onMounted(() => {
         <div class="footer-section links">
           <h4>Магазин</h4>
           <router-link to="/catalog">Каталог товаров</router-link>
-          <router-link to="/catalog">Популярные бренды</router-link>
-          <router-link to="/about">Акции и скидки</router-link>
         </div>
 
         <div class="footer-section links">
           <h4>Информация</h4>
           <router-link to="/about">О компании</router-link>
-          <router-link to="/contacts">Доставка и оплата</router-link>
+          <router-link to="/about">Доставка и оплата</router-link>
           <router-link to="/notifications">Уведомления</router-link>
         </div>
 
