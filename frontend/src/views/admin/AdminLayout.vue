@@ -71,15 +71,14 @@ import { useRoute } from 'vue-router';
 const route = useRoute();
 const userAvatar = localStorage.getItem('user_avatar') || 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/avatars/1.png';
 
+// ОБНОВЛЕННОЕ МЕНЮ (Только основные объединенные страницы)
 const groupedMenu = [
   {
     title: '🛍️ Магазин',
     items: [
-      { name: 'Заказы', path: 'orders', icon: '📦' },
-      { name: 'Журнал продаж', path: 'order_items', icon: '📈' },
+      { name: 'Заказы и Продажи', path: 'orders', icon: '📦' },
       { name: 'Товары', path: 'products', icon: '🛒' },
-      { name: 'Категории', path: 'categories', icon: '📂' },
-      { name: 'Атрибуты', path: 'attributes', icon: '⚙️' },
+      { name: 'Каталог и Атрибуты', path: 'categories', icon: '📂' },
       { name: 'Бренды', path: 'brands', icon: '🏭' },
       { name: 'Отзывы', path: 'reviews', icon: '💬' },
     ]
@@ -88,17 +87,13 @@ const groupedMenu = [
     title: '🚚 Логистика',
     items: [
       { name: 'Остатки', path: 'stocks', icon: '📊' },
-      { name: 'Склады и ПВЗ', path: 'warehouses', icon: '📍' },
-      { name: 'Города', path: 'cities', icon: '🏙️' },
-      { name: 'Возвраты', path: 'returns', icon: '🔄' },
+      { name: 'Города и ПВЗ', path: 'cities', icon: '🌍' },
     ]
   },
   {
     title: '👥 Клиенты',
     items: [
-      { name: 'Пользователи', path: 'users', icon: '👤' },
-      { name: 'Гараж клиентов', path: 'vehicles', icon: '🚗' },
-      { name: 'Избранное', path: 'wishlists', icon: '❤️' },
+      { name: 'Пользователи и Данные', path: 'users', icon: '👤' },
       { name: 'Рассылка', path: 'notifications', icon: '🔔' },
     ]
   },
@@ -106,8 +101,6 @@ const groupedMenu = [
     title: '🛡️ Система',
     items: [
       { name: 'Логи сервера', path: 'logs', icon: '📜' },
-      { name: 'Заказы (лог)', path: 'history', icon: '⏳' },
-      { name: 'Безопасность', path: 'tokens', icon: '🔑' },
     ]
   }
 ];

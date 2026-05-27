@@ -1,58 +1,69 @@
+// server.negative.test.js
+
+// Устанавливаем фиктивные переменные окружения
+process.env.SUPABASE_URL = 'https://mocked.supabase.co';
+process.env.SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mocked_service_key';
+process.env.ADMIN_SECRET = 'my_super_secret_admin_123';
+process.env.EMAIL_USER = 'test@yandex.ru';
+process.env.BREVO_API_KEY = 'mock_brevo_key';
+process.env.YANDEX_API_KEY = 'mock_captcha_key';
+
 const request = require('supertest');
-const crypto = require('crypto');
 const axios = require('axios');
 const fs = require('fs');
+const https = require('https');
 
-// --- 1. МОКИРОВАНИЕ ---
+// =================================================================
+// 1. НАСТРОЙКА МОКОВ (Имитация сломанных систем)
+// =================================================================
 
+// Мокаем файловую систему
 jest.mock('fs', () => ({
     ...jest.requireActual('fs'),
-    appendFile: jest.fn((path, data, cb) => cb(new Error('Disk Write Error'))), // Имитируем поломку диска
-    writeFileSync: jest.fn(),
-    existsSync: jest.fn().mockReturnValue(false), // Притворяемся, что папок для логов нет
+    appendFile: jest.fn((path, data, cb) => cb(null)),
+    existsSync: jest.fn().mockReturnValue(true),
     mkdirSync: jest.fn(),
-    readFileSync: jest.fn().mockReturnValue('NOT_A_JSON_FORMAT') // Ломаем парсинг логов
-}));
-
-jest.mock('axios');
-
-jest.mock('nodemailer', () => ({
-    createTransport: jest.fn().mockReturnValue({
-        verify: jest.fn((cb) => cb(new Error('SMTP connection failed'))), // Почта всегда "лежит"
-        sendMail: jest.fn().mockRejectedValue(new Error('Internal Mail Error'))
+    readFileSync: jest.fn().mockImplementation(() => {
+        throw new Error('File read error'); // Имитируем ошибку чтения логов
     })
 }));
 
-// Универсальный "хитрый" мок для Supabase (настроен на провал)
+// Мокаем Axios (Brevo и прочее всегда "падают")
+jest.mock('axios');
+
+// Гибкий мок Supabase (по умолчанию настроен на возврат пустых данных или ошибок)
 const mockSupabaseQuery = () => {
     const chain = {
-        select: jest.fn(() => chain),
-        insert: jest.fn(() => chain),
-        update: jest.fn(() => chain),
-        delete: jest.fn(() => chain),
-        eq: jest.fn(() => chain),
-        or: jest.fn(() => chain),
-        in: jest.fn(() => chain),
-        ilike: jest.fn(() => chain),
-        not: jest.fn(() => chain),
-        order: jest.fn(() => chain),
-        limit: jest.fn(() => chain),
-        // Возвращаем ошибки вместо данных
-        single: jest.fn().mockResolvedValue({ data: null, error: { message: 'Database is down' } }),
-        maybeSingle: jest.fn().mockResolvedValue({ data: null, error: { message: 'NotFound' } }),
-        then: jest.fn(function (resolve) { resolve({ data: null, error: 'Fatal error' }); })
+        select: jest.fn().mockReturnThis(),
+        insert: jest.fn().mockReturnThis(),
+        update: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        neq: jest.fn().mockReturnThis(),
+        gt: jest.fn().mockReturnThis(),
+        gte: jest.fn().mockReturnThis(),
+        or: jest.fn().mockReturnThis(),
+        in: jest.fn().mockReturnThis(),
+        ilike: jest.fn().mockReturnThis(),
+        not: jest.fn().mockReturnThis(),
+        order: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        // По умолчанию имитируем, что запись не найдена
+        single: jest.fn().mockResolvedValue({ data: null, error: { message: 'Not found' } }),
+        maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+        then: jest.fn(function (resolve) { resolve({ data: null, error: { message: 'DB Error' } }); })
     };
     return chain;
 };
 
 const mockSupabase = {
     from: jest.fn(() => mockSupabaseQuery()),
-    rpc: jest.fn().mockResolvedValue({ data: false, error: 'Auth failed' }), // Пароли никогда не подходят
+    rpc: jest.fn().mockResolvedValue({ data: null, error: { message: 'RPC Error' } }),
     storage: {
         from: jest.fn(() => ({
-            upload: jest.fn().mockResolvedValue({ data: null, error: 'Storage full' }),
-            getPublicUrl: jest.fn().mockReturnValue({ data: { publicUrl: '' } }),
-            remove: jest.fn().mockResolvedValue({ data: null, error: 'Delete failed' })
+            // Имитируем падение хранилища
+            upload: jest.fn().mockResolvedValue({ data: null, error: { message: 'Storage is full' } }),
+            remove: jest.fn().mockResolvedValue({ data: null, error: { message: 'Delete failed' } })
         }))
     }
 };
@@ -61,253 +72,252 @@ jest.mock('@supabase/supabase-js', () => ({
     createClient: jest.fn(() => mockSupabase)
 }));
 
-const app = require('./server'); 
+// Имитируем провал проверки Яндекс.Капчи
+jest.mock('https', () => ({
+    request: jest.fn((options, cb) => {
+        const res = {
+            on: jest.fn((event, handler) => {
+                if (event === 'data') handler('{"status":"failed"}'); // Капча не пройдена
+                if (event === 'end') handler();
+            }),
+            statusCode: 200
+        };
+        cb(res);
+        return { on: jest.fn(), end: jest.fn() };
+    })
+}));
 
-// --- 2. ТЕСТЫ (ПОЛНОСТЬЮ ПРОВАЛЬНЫЕ) ---
+const app = require('./server');
 
-describe('🚀 ApexDrive FULL API Test Suite', () => {
+// =================================================================
+// 2. НАБОР ТЕСТОВ (NEGATIVE TESTING)
+// =================================================================
+
+describe('🛑 ApexDrive FULL API Test Suite (Negative Testing)', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    // =================================================================
-    // 📁 БЛОК: ФАЙЛОВАЯ СИСТЕМА И STORAGE
-    // =================================================================
-    describe('Storage API', () => {
-        test('POST /api/upload/:folder - Should upload file and return URL', async () => {
+    // -----------------------------------------------------------------
+    // 🔐 БЛОК: БЕЗОПАСНОСТЬ И АВТОРИЗАЦИЯ
+    // -----------------------------------------------------------------
+    describe('Security & Admin Access', () => {
+        test('GET /api/admin/users - Should return 403 (Forbidden) without Admin Key', async () => {
+            const res = await request(app).get('/api/admin/users');
+            // Сервер должен заблокировать доступ
+            expect(res.statusCode).toBe(403);
+            expect(res.body.error).toBe('Доступ запрещен.');
+        });
+
+        test('GET /api/admin/users - Should return 403 with wrong Admin Key', async () => {
             const res = await request(app)
-                .post('/api/upload/avatars')
-                .attach('file', Buffer.from('fake_image_data'), 'test.jpg'); 
+                .get('/api/admin/users')
+                .set('x-admin-key', 'hacker_key_123');
             
-            // ПРОВАЛ: Ждем 200, но сервер вернет 500 из-за ошибки в моке upload
-            expect(res.statusCode).toBe(200);
-            expect(res.body.url).toBe('http://mock-url.com/img.jpg');
+            expect(res.statusCode).toBe(403);
         });
 
-        test('DELETE /api/storage/:folder/:filename - Should remove file (Admin)', async () => {
-            const res = await request(app)
-                .delete('/api/storage/avatars/test.jpg')
-                .set('x-admin-key', 'my_super_secret_admin_123');
-            
-            // ПРОВАЛ: Ждем true, но сервер вернет 500 из-за ошибки в моке remove
-            expect(res.statusCode).toBe(200);
-            expect(res.body.success).toBe(true);
+        test('PATCH /api/orders/:id - Should return 401 without x-user-id header', async () => {
+            const res = await request(app).patch('/api/orders/1').send({ delivery_status: 'cancelled' });
+            // Без заголовка авторизации пользователь не может отменить заказ
+            expect(res.statusCode).toBe(401);
+            expect(res.body.error).toBe('Требуется авторизация');
         });
     });
 
-    // =================================================================
-    // 🏠 БЛОК: МАРКЕТИНГ И ВНЕШНИЕ API
-    // =================================================================
-    describe('Marketing API', () => {
-        test('GET /api/marketing/currency - Should parse CBR data', async () => {
-            axios.get.mockResolvedValueOnce({
-                data: { Valute: { } } // Ломаем структуру
-            });
-            const res = await request(app).get('/api/marketing/currency');
-            
-            // ПРОВАЛ: Ждем конкретное число, но придут дефолтные значения из catch блока сервера
-            expect(res.statusCode).toBe(200);
-            expect(res.body.usd).toBe('92.50');
-        });
-
-        test('GET /api/marketing/news - Should return empty array if no API key', async () => {
-            // ПРОВАЛ: Ждем, что в массиве будет новость, но сервер вернет [] т.к. в тестах нет ключа
-            const res = await request(app).get('/api/marketing/news');
-            expect(res.statusCode).toBe(200);
-            expect(res.body).toEqual([{ title: 'Fake News' }]);
-        });
-
-        test('POST /api/feedback/send - Should send email via Nodemailer', async () => {
-            const res = await request(app).post('/api/feedback/send').send({
-                name: 'Test', contact: '12345', message: 'Hello'
-            });
-            
-            // ПРОВАЛ: Ждем успех, но Nodemailer мок настроен на rejected (вернет 500)
-            expect(res.statusCode).toBe(200);
-            expect(res.body.success).toBe(true);
-        });
-    });
-
-    // =================================================================
-    // 🛒 БЛОК: КАТАЛОГ И ПОИСК
-    // =================================================================
-    describe('Catalog API', () => {
-        test('GET /api/categories - Should return list', async () => {
-            // ПРОВАЛ: Ждем успех, но Supabase в .then вернет error -> сервер выдаст 500
-            const res = await request(app).get('/api/categories');
-            expect(res.statusCode).toBe(200);
-            expect(Array.isArray(res.body)).toBe(true);
-        });
-
-        test('GET /api/global-search - Should return empty if query < 2 chars', async () => {
-            const res = await request(app).get('/api/global-search?q=a');
-            
-            // ПРОВАЛ: Ждем, что товаров будет > 0 (хотя по логике сервера их будет 0)
-            expect(res.body.products.length).toBeGreaterThan(0);
-        });
-
-        test('POST /api/products/recent - Should return products by IDs', async () => {
-            const res = await request(app).post('/api/products/recent').send({ ids: [1, 2, 3] });
-            
-            // ПРОВАЛ: Ждем статус 404, хотя роут существует и вернет либо 200, либо 500
-            expect(res.statusCode).toBe(404);
-        });
-    });
-
-    // =================================================================
-    // 👤 БЛОК: ПОЛЬЗОВАТЕЛИ
-    // =================================================================
+    // -----------------------------------------------------------------
+    // 👤 БЛОК: ПОЛЬЗОВАТЕЛИ (ОШИБКИ ВВОДА)
+    // -----------------------------------------------------------------
     describe('Users API', () => {
-        test('POST /api/users/login - Success login', async () => {
-            // Настраиваем мок на ошибку
+        test('POST /api/users/login - Should return 401 if user not found', async () => {
+            // База вернет null (пользователь не найден)
             const queryMock = mockSupabaseQuery();
-            queryMock.maybeSingle.mockResolvedValueOnce({ data: null, error: 'Database error' });
+            queryMock.maybeSingle.mockResolvedValueOnce({ data: null });
             mockSupabase.from.mockReturnValueOnce(queryMock);
 
-            const res = await request(app).post('/api/users/login').send({ login: 'test', password: '123' });
+            const res = await request(app).post('/api/users/login').send({ login: 'ghost@mail.ru', password: '123' });
             
-            // ПРОВАЛ: Ждем успех, но получим 401 "Пользователь не найден"
-            expect(res.statusCode).toBe(200);
-            expect(res.body.id).toBe('123');
+            expect(res.statusCode).toBe(401);
+            expect(res.body.error).toBe('Пользователь не найден');
         });
 
-        test('POST /api/users/login - Wrong password', async () => {
+        test('POST /api/users/login - Should return 401 for wrong password', async () => {
+            // Пользователь найден, но функция verify_user_password возвращает false
             const queryMock = mockSupabaseQuery();
-            queryMock.maybeSingle.mockResolvedValueOnce({ data: { id: '123' } });
+            queryMock.maybeSingle.mockResolvedValueOnce({ data: { id: 'user_1' } });
             mockSupabase.from.mockReturnValueOnce(queryMock);
-            mockSupabase.rpc.mockResolvedValueOnce({ data: true }); // Имитируем ПРАВИЛЬНЫЙ пароль
+            mockSupabase.rpc.mockResolvedValueOnce({ data: false }); // Пароль не совпал
 
-            const res = await request(app).post('/api/users/login').send({ login: 'test', password: 'wrong' });
+            const res = await request(app).post('/api/users/login').send({ login: 'admin@mail.ru', password: 'wrong' });
             
-            // ПРОВАЛ: Ждем ошибку 401, но из-за rpc:true получим 200
             expect(res.statusCode).toBe(401);
             expect(res.body.error).toBe('Неверный пароль');
         });
 
-        test('PUT /api/users/profile/:id - Update profile', async () => {
-            const queryMock = mockSupabaseQuery();
-            queryMock.select.mockResolvedValueOnce({ data: null, error: 'Save failed' });
-            mockSupabase.from.mockReturnValueOnce(queryMock);
-
-            const res = await request(app).put('/api/users/profile/123').send({ first_name: 'Ivan' });
-            
-            // ПРОВАЛ: Ждем 201, но метод PUT возвращает 200 или 500
-            expect(res.statusCode).toBe(201);
+        test('POST /api/users/register - Should return 400 if Captcha fails', async () => {
+            const res = await request(app).post('/api/users/register').send({ 
+                email: 'bot@mail.ru', password: '123', captchaToken: 'bad_token' 
+            });
+            // Https мок настроен на возврат status: "failed"
+            expect(res.statusCode).toBe(400);
+            expect(res.body.error).toBe('Проверка на робота не пройдена');
         });
     });
 
-    // =================================================================
-    // 💳 БЛОК: КАРТЫ ПОЛЬЗОВАТЕЛЕЙ
-    // =================================================================
-    describe('User Cards API', () => {
-        test('POST /api/cards - Should mask card number and detect brand', async () => {
+    // -----------------------------------------------------------------
+    // 📦 БЛОК: ЗАКАЗЫ И ОСТАТКИ (БИЗНЕС-ЛОГИКА)
+    // -----------------------------------------------------------------
+    describe('Orders API', () => {
+        test('POST /api/orders - Should return 400 if Warehouse not found', async () => {
             const queryMock = mockSupabaseQuery();
-            queryMock.select.mockResolvedValueOnce({ 
-                data: [{ card_number_masked: 'XXXX', brand: 'wrong-brand' }] 
-            });
-            mockSupabase.from.mockReturnValueOnce(queryMock);
-
-            const res = await request(app).post('/api/cards').send({
-                user_id: '123', number: '4276000000001234', holder: 'IVAN', expiry: '12/25'
-            });
-
-            // ПРОВАЛ: Ждем конкретный бренд, но мок вернет другой
-            expect(res.statusCode).toBe(201);
-            expect(res.body.brand).toBe('visa');
-        });
-    });
-
-    // =================================================================
-    // 🛍️ БЛОК: ЗАКАЗЫ И ОПЛАТА
-    // =================================================================
-    describe('Orders & Payment API', () => {
-        test('POST /api/orders - Reject if warehouse not found', async () => {
-            const queryMock = mockSupabaseQuery();
-            queryMock.select.mockResolvedValueOnce({ data: [{ id: 999 }] }); // Имитируем, что склад ЕСТЬ
+            queryMock.single.mockResolvedValueOnce({ data: null, error: { message: 'Not found' } });
             mockSupabase.from.mockReturnValueOnce(queryMock);
 
             const res = await request(app).post('/api/orders').send({
-                customer_name: 'Test', warehouse_id: 999, payment_method: 'card', items: []
+                warehouse_id: 9999, items: []
             });
 
-            // ПРОВАЛ: Ждем 400 (ошибку), но сервер найдет склад по моку и вернет 200 или 500
             expect(res.statusCode).toBe(400);
-            expect(res.body.error).toBe('Пункт выдачи не найден');
+            expect(res.body.error).toBe('Склад не найден');
         });
 
-        test('POST /api/payment/tinkoff-init - Generate Token and get URL', async () => {
-            axios.post.mockResolvedValueOnce({ data: { Success: false, Message: 'Internal Error' } });
-
-            const res = await request(app).post('/api/payment/tinkoff-init').send({
-                amount: 1000, orderId: 5, customerEmail: 'test@test.ru'
+        test('POST /api/orders - Should return 409 if insufficient stock', async () => {
+            // 1. Склад найден
+            // 2. Доставка посчитана
+            // 3. Товар найден
+            // 4. Склады в городе найдены
+            // 5. Остаток найден, но quantity меньше, чем просит клиент!
+            
+            mockSupabase.rpc.mockResolvedValueOnce({ data: { total: 0 }, error: null });
+            
+            const insertMock = mockSupabaseQuery();
+            mockSupabase.from.mockImplementation((table) => {
+                const chain = mockSupabaseQuery();
+                if (table === 'warehouses') chain.single.mockResolvedValue({ data: { cities: { id: 1 } } });
+                if (table === 'products') chain.single.mockResolvedValue({ data: { price: 1000 } });
+                if (table === 'product_stocks') {
+                    // Имитируем, что на складе 0 штук
+                    chain.maybeSingle.mockResolvedValue({ data: { warehouse_id: 1 } });
+                    chain.single.mockResolvedValue({ data: { quantity: 0 } }); 
+                }
+                return chain;
             });
 
-            // ПРОВАЛ: Ждем 200, но из-за Success:false сервер кинет 500
-            expect(res.statusCode).toBe(200);
-            expect(res.body.confirmation_url).toBe('https://pay.tinkoff.ru/123');
-        });
-    });
+            const res = await request(app).post('/api/orders').send({
+                warehouse_id: 1, items: [{ product_id: 5, quantity: 2 }]
+            });
 
-    // =================================================================
-    // 💬 БЛОК: ОТЗЫВЫ
-    // =================================================================
-    describe('Reviews API', () => {
-        test('POST /api/reviews - Add review', async () => {
+            // Ожидаем конфликт (Conflict), так как товара не хватает
+            expect(res.statusCode).toBe(409);
+            expect(res.body.error).toMatch(/Недостаточно остатков/);
+        });
+
+        test('PATCH /api/orders/:id - Should return 400 if trying to cancel delivered order', async () => {
             const queryMock = mockSupabaseQuery();
-            queryMock.select.mockResolvedValueOnce({ data: null, error: 'DB Crash' });
+            // Имитируем, что заказ УЖЕ доставлен
+            queryMock.maybeSingle.mockResolvedValueOnce({ data: { id: 1, delivery_status: 'delivered' } });
             mockSupabase.from.mockReturnValueOnce(queryMock);
 
-            const res = await request(app).post('/api/reviews').send({ product_id: 1, rating: 5 });
-            
-            // ПРОВАЛ: Ждем статус 201 Created, сервер вернет 500
-            expect(res.statusCode).toBe(201);
+            const res = await request(app)
+                .patch('/api/orders/1')
+                .set('x-user-id', 'user_123')
+                .send({ delivery_status: 'cancelled' });
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body.error).toBe('Невозможно отменить данный заказ');
         });
     });
 
-    // =================================================================
-    // 👑 БЛОК: АДМИНКА
-    // =================================================================
-    describe('Admin System API', () => {
-        test('GET /api/admin/system/logs - Return parsed logs', async () => {
+    // -----------------------------------------------------------------
+    // ↩️ БЛОК: ВОЗВРАТЫ
+    // -----------------------------------------------------------------
+    describe('Returns API', () => {
+        test('POST /api/orders/:id/return - Should return 400 if order is NOT delivered', async () => {
+            const queryMock = mockSupabaseQuery();
+            // Заказ еще в пути (shipping)
+            queryMock.single.mockResolvedValueOnce({ data: { id: 1, delivery_status: 'shipping', payment_status: 'paid' } });
+            mockSupabase.from.mockReturnValueOnce(queryMock);
+
             const res = await request(app)
-                .get('/api/admin/system/logs')
-                .set('x-admin-key', 'my_super_secret_admin_123');
-            
-            // ПРОВАЛ: Мок readFileSync вернет битую строку. Сервер вернет [], а мы ждем длину > 0.
-            expect(res.statusCode).toBe(201);
-            expect(res.body.length).toBeGreaterThan(0);
+                .post('/api/orders/1/return')
+                .set('x-user-id', 'user_123')
+                .send({ reason: 'Брак детали' });
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body.error).toBe('Возврат возможен только для оплаченных и полученных заказов');
         });
 
-        test('DELETE /api/admin/products/1 - Delete generic record', async () => {
+        test('POST /api/orders/:id/return - Should return 400 if return request already exists', async () => {
+            const queryMock = mockSupabaseQuery();
+            // Заказ выдан
+            queryMock.single.mockResolvedValueOnce({ data: { id: 1, delivery_status: 'delivered', payment_status: 'paid' } });
+            // Но заявка на возврат УЖЕ ЕСТЬ
+            queryMock.maybeSingle.mockResolvedValueOnce({ data: { id: 10 } });
+            mockSupabase.from.mockReturnValue(queryMock);
+
             const res = await request(app)
-                .delete('/api/admin/products/1')
-                .set('x-admin-key', 'WRONG_KEY'); // ПРОВАЛ: Неверный ключ
-            
-            expect(res.statusCode).toBe(200);
-            expect(res.text).toBe('Удалено');
+                .post('/api/orders/1/return')
+                .set('x-user-id', 'user_123')
+                .send({ reason: 'Не подошло' });
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body.error).toBe('Заявка на возврат уже подана');
         });
     });
 
-    // =================================================================
-    // 🚨 БЛОК: ОБРАБОТКА ОШИБОК И FALLBACK
-    // =================================================================
-    describe('Global Handlers', () => {
-        test('GET /unknown/route - Should return index.html (SPA Fallback)', async () => {
-            const res = await request(app).get('/some/vue/route');
+    // -----------------------------------------------------------------
+    // 📁 БЛОК: УПРАВЛЕНИЕ ФАЙЛАМИ И ВНЕШНИЕ API
+    // -----------------------------------------------------------------
+    describe('Storage & External API', () => {
+        test('POST /api/upload/:folder - Should return 500 if Supabase storage fails', async () => {
+            const res = await request(app)
+                .post('/api/upload/avatars')
+                .attach('file', Buffer.from('fake'), 'test.jpg'); 
             
-            // ПРОВАЛ: Ждем 404, хотя роут (.*) всегда вернет 200 (index.html)
-            expect(res.statusCode).toBe(404);
-        });
-
-        test('POST /api/orders - DB Error Catch 500', async () => {
-            // Имитируем УСПЕШНЫЙ ответ базы
-            mockSupabase.from.mockReturnValueOnce({ select: jest.fn().mockResolvedValue({ data: [{id:1}] }) });
-            
-            const res = await request(app).post('/api/orders').send({});
-            
-            // ПРОВАЛ: Мы ожидаем ошибку 500, но из-за мока сервер вернет что-то другое
+            // Наш мок storage возвращает ошибку
             expect(res.statusCode).toBe(500);
+            expect(res.body.error).toBe('Storage is full');
+        });
+
+        test('POST /api/feedback/send - Should return 500 if Brevo API is down', async () => {
+            // Имитируем падение сервиса Brevo
+            axios.post.mockRejectedValueOnce(new Error('Brevo Network Error'));
+
+            const res = await request(app).post('/api/feedback/send').send({
+                name: 'Test', contact: '123', message: 'Hello'
+            });
+
+            expect(res.statusCode).toBe(500);
+            expect(res.body.error).toBe('Не удалось отправить сообщение. Попробуйте позже.');
+        });
+    });
+
+    // -----------------------------------------------------------------
+    // 💥 БЛОК: КРАШ-ТЕСТЫ БАЗЫ ДАННЫХ
+    // -----------------------------------------------------------------
+    describe('Database Crash Handling', () => {
+        test('GET /api/categories - Should catch DB error and return 500', async () => {
+            // Насильно заставляем Supabase выкинуть ошибку при вызове .then()
+            const queryMock = mockSupabaseQuery();
+            queryMock.then = jest.fn((resolve) => resolve({ data: null, error: { message: 'Database disconnected' } }));
+            mockSupabase.from.mockReturnValueOnce(queryMock);
+
+            const res = await request(app).get('/api/categories');
+            
+            expect(res.statusCode).toBe(500);
+            expect(res.body.error).toBe('Database disconnected');
+        });
+
+        test('GET /api/products/:id - Should return 404 if product not found', async () => {
+            const queryMock = mockSupabaseQuery();
+            queryMock.single.mockResolvedValueOnce({ data: null, error: { message: 'Row not found' } });
+            mockSupabase.from.mockReturnValueOnce(queryMock);
+
+            const res = await request(app).get('/api/products/999');
+            
+            expect(res.statusCode).toBe(404);
+            expect(res.body.error).toBe('Товар не найден');
         });
     });
 });

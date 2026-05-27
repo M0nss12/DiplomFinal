@@ -123,25 +123,24 @@ const router = createRouter({
       },
       children: [
         { path: '', redirect: '/admin/orders' },
-        { path: 'users', component: () => import('@/views/admin/AdminUsers.vue') },
-        { path: 'products', component: () => import('@/views/admin/AdminProducts.vue') },
+        
+        // 🛍️ Магазин
         { path: 'orders', component: () => import('@/views/admin/AdminOrders.vue') },
-        { path: 'stocks', component: () => import('@/views/admin/AdminStocks.vue') },
+        { path: 'products', component: () => import('@/views/admin/AdminProducts.vue') },
         { path: 'categories', component: () => import('@/views/admin/AdminCategories.vue') },
         { path: 'brands', component: () => import('@/views/admin/AdminBrands.vue') },
-        { path: 'warehouses', component: () => import('@/views/admin/AdminWarehouses.vue') },
         { path: 'reviews', component: () => import('@/views/admin/AdminReviews.vue') },
-        { path: 'logs', component: () => import('@/views/admin/AdminLogs.vue') },
-        // Новые страницы админки под все таблицы
+
+        // 🚚 Логистика
+        { path: 'stocks', component: () => import('@/views/admin/AdminStocks.vue') },
         { path: 'cities', component: () => import('@/views/admin/AdminCities.vue') },
-        { path: 'vehicles', component: () => import('@/views/admin/AdminVehicles.vue') },
-        { path: 'tokens', component: () => import('@/views/admin/AdminResetTokens.vue') },
+
+        // 👥 Клиенты
+        { path: 'users', component: () => import('@/views/admin/AdminUsers.vue') },
         { path: 'notifications', component: () => import('@/views/admin/AdminNotifications.vue') },
-        { path: 'order_items', component: () => import('@/views/admin/AdminOrderItems.vue') },
-        { path: 'history', component: () => import('@/views/admin/AdminOrderHistory.vue') },
-        { path: 'returns', component: () => import('@/views/admin/AdminReturns.vue') },
-        { path: 'attributes', component: () => import('@/views/admin/AdminAttributes.vue') },
-        { path: 'wishlists', component: () => import('@/views/admin/AdminWishlist.vue') },
+        
+        // 🛡️ Система
+        { path: 'logs', component: () => import('@/views/admin/AdminLogs.vue') },
       ]
     },
 
