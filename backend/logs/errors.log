@@ -34,3 +34,4 @@
 {"id":"954caa97","timestamp":"28.05.2026, 01:53:14","type":"ERROR","message":"TypeError: fetch failed","url":"/api/admin/password_reset_tokens","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e"}
 {"id":"eb5d9ea3","timestamp":"28.05.2026, 01:53:14","type":"ERROR","message":"TypeError: fetch failed","url":"/api/admin/wishlists","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e"}
 {"id":"a83e17b3","timestamp":"28.05.2026, 02:04:29","type":"ERROR","message":"TypeError: terminated","url":"/api/admin/categories","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e"}
+{"id":"99353345","timestamp":"28.05.2026, 14:26:59","type":"ERROR","message":"TypeError: terminated","url":"/api/admin/reviews","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e","ip":"::1"}

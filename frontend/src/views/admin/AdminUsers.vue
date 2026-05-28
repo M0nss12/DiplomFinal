@@ -15,7 +15,6 @@
     <!-- НАВИГАЦИЯ ПО ВКЛАДКАМ -->
     <div class="admin-tabs glass-card">
       <button :class="{ active: currentTab === 'users' }" @click="currentTab = 'users'">👤 Пользователи</button>
-      <button :class="{ active: currentTab === 'vehicles' }" @click="currentTab = 'vehicles'">🚗 Автомобили ({{ vehicles.length }})</button>
       <button :class="{ active: currentTab === 'tokens' }" @click="currentTab = 'tokens'">🔑 Токены сброса</button>
       <button :class="{ active: currentTab === 'wishlist' }" @click="currentTab = 'wishlist'">❤️ Избранное</button>
     </div>

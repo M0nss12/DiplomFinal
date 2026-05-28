@@ -144,7 +144,6 @@
               <router-link to="/orders" class="dropdown-item" @click="isProfileDropdownOpen = false"><span class="menu-icon">📦</span> Заказы</router-link>
               <router-link to="/wishlist" class="dropdown-item" @click="isProfileDropdownOpen = false"><span class="menu-icon">❤️</span> Избранное</router-link>
               <router-link to="/settings" class="dropdown-item" @click="isProfileDropdownOpen = false"><span class="menu-icon">⚙️</span> Настройки</router-link>
-              <router-link to="/garage" class="dropdown-item" @click="isProfileDropdownOpen = false"><span class="menu-icon">🚗</span> Мой гараж</router-link>
               <hr class="dropdown-divider" />
               <button @click="handleLogout" class="dropdown-item logout-item"><span class="menu-icon">🚪</span> Выйти</button>
             </div>

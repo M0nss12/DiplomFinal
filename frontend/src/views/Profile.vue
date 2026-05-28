@@ -38,32 +38,6 @@
         <h2 class="stat-value">{{ wishlistCount }}</h2>
         <router-link to="/wishlist" class="stat-link">Перейти →</router-link>
       </div>
-      <div class="stat-card glass-card">
-        <div class="stat-icon">🚗</div>
-        <small class="stat-label">ГАРАЖ</small>
-        <h2 class="stat-value">{{ vehiclesCount }}</h2>
-        <router-link to="/garage" class="stat-link">Мои авто →</router-link>
-      </div>
-    </section>
-
-    <!-- 3. ГАРАЖ -->
-    <section v-if="userVehicles.length > 0" class="garage-section glass-card">
-      <div class="section-header">
-        <h3 class="section-title">🚗 Ваш гараж</h3>
-        <router-link to="/garage" class="view-all-link">Все авто →</router-link>
-      </div>
-      <div class="garage-list">
-        <div v-for="car in userVehicles.slice(0, 3)" :key="car.id" class="garage-item">
-          <span class="car-icon">🚙</span>
-          <div class="car-details">
-            <strong>{{ car.brand }} {{ car.model }}</strong>
-            <small>{{ car.year || '—' }} г.в.</small>
-          </div>
-        </div>
-      </div>
-    </section>
-    <section v-else class="glass-card p-5 text-center text-muted">
-      <p>У вас пока нет автомобилей. <router-link to="/garage" class="text-primary font-bold">Добавить</router-link></p>
     </section>
 
     <!-- 4. КНОПКИ ДЕЙСТВИЙ -->
