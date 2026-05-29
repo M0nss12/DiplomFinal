@@ -13,7 +13,7 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
-  // --- НАСТРОЙКА БИЛДА В BACKEND ---
+  // --- НАСТРОЙКА Сборки В BACKEND ---
   build: {
     // Готовые файлы кладем в папку backend/public
     outDir: path.resolve(__dirname, '../backend/public'),
