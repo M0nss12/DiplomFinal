@@ -1,13 +1,135 @@
 <!-- App.vue -->
 <script setup>
-import { onMounted } from 'vue';
-import { RouterView } from 'vue-router';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { RouterView, useRoute } from 'vue-router';
 import Navbar from './components/Navbar.vue';
 import { useAppStore } from '@/stores/appStore';
 import { useCartStore } from '@/stores/cartStore';
+import axios from 'axios';
 
 const appStore = useAppStore();
 const cartStore = useCartStore();
+const route = useRoute();
+
+// --- ГЛОБАЛЬНАЯ ЛОГИКА "НЕДАВНО ПРОСМОТРЕННЫЕ" ---
+const recentProducts = ref([]);
+const recentRef = ref(null);
+const tiltStyles = ref({});
+const wishlistIds = ref([]);
+
+let isDragging = false;
+let startX = 0;
+let scrollLeft = 0;
+
+// Загрузка ID избранного для корректного отображения сердечек
+const loadWishlistIds = async () => {
+  const uid = localStorage.getItem('user_id');
+  if (uid) {
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/wishlist/${uid}`);
+      wishlistIds.value = res.data.map(i => i.product_id);
+    } catch (e) { console.error('Ошибка загрузки избранного', e); }
+  } else {
+    wishlistIds.value = [];
+  }
+};
+
+// Загрузка недавно просмотренных товаров
+const loadRecentProducts = async () => {
+  try {
+    const recentIds = JSON.parse(localStorage.getItem('recent_views') || '[]');
+    if (recentIds.length > 0) {
+      const res = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/products/recent`, { ids: recentIds.slice(0, 15) });
+      // Восстанавливаем порядок сортировки (от новых просмотров к старым)
+      const productsMap = new Map(res.data.map(p => [p.id, p]));
+      recentProducts.value = recentIds.map(id => productsMap.get(id)).filter(p => p);
+    } else {
+      recentProducts.value = [];
+    }
+  } catch (e) {
+    console.error('Ошибка загрузки недавно просмотренных', e);
+  }
+};
+
+// Тогл избранного
+const toggleWishlist = async (id) => {
+  const uid = localStorage.getItem('user_id');
+  if (!uid) return alert('Войдите в аккаунт.');
+  try {
+    const API_URL = import.meta.env.VITE_API_URL || '';
+    if (wishlistIds.value.includes(id)) {
+      await axios.delete(`${API_URL}/api/wishlist/${uid}/${id}`);
+      wishlistIds.value = wishlistIds.value.filter(i => i !== id);
+    } else {
+      await axios.post(`${API_URL}/api/wishlist`, { user_id: uid, product_id: id });
+      wishlistIds.value.push(id);
+    }
+    // Вызываем глобальное событие, чтобы обновить счетчик в Navbar
+    window.dispatchEvent(new Event('wishlist-updated'));
+  } catch (e) { console.error(e); }
+};
+
+// Добавление в корзину
+const handleAddToCart = (p) => {
+  const totalStock = p.product_stocks?.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0) || 0;
+  cartStore.addToCart({ ...p, stock_quantity: totalStock });
+};
+
+// Логика карусели (Drag-to-scroll)
+const scroll = (dir) => {
+  if (recentRef.value) recentRef.value.scrollBy({ left: 320 * dir, behavior: 'smooth' });
+};
+const startDrag = (e) => {
+  isDragging = true;
+  startX = e.pageX - recentRef.value.offsetLeft;
+  scrollLeft = recentRef.value.scrollLeft;
+  recentRef.value.classList.add('dragging');
+};
+const duringDrag = (e) => {
+  if (!isDragging) return;
+  e.preventDefault();
+  const x = e.pageX - recentRef.value.offsetLeft;
+  const walk = (x - startX) * 2;
+  recentRef.value.scrollLeft = scrollLeft - walk;
+};
+const stopDrag = () => {
+  isDragging = false;
+  if (recentRef.value) recentRef.value.classList.remove('dragging');
+};
+
+// Эффект 3D наклона карточки
+const handle3DTilt = (e, id) => {
+  const card = e.currentTarget;
+  const rect = card.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+  const rotateX = ((y - centerY) / centerY) * 10;
+  const rotateY = ((x - centerX) / centerX) * 10;
+  tiltStyles.value[id] = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+};
+const resetTilt = (id) => tiltStyles.value[id] = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)';
+const getTiltStyle = (id) => tiltStyles.value[id] || '';
+
+// Утилиты
+const getStockInCity = (p) => {
+  if (!p.product_stocks || !appStore.city) return 0;
+  return p.product_stocks
+    .filter(s => {
+      const wCity = s.warehouses?.cities?.name || s.warehouses?.city_name;
+      return wCity?.trim().toLowerCase() === appStore.city.trim().toLowerCase();
+    })
+    .reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
+};
+const getTotalStock = (p) => p.product_stocks?.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0) || 0;
+
+// Условие отображения блока (Скрываем в админке, при входе и оформлении заказа)
+const showRecentBlock = computed(() => {
+  const hiddenRoutes = ['/admin', '/login', '/register', '/checkout'];
+  const isHidden = hiddenRoutes.some(path => route.path.includes(path));
+  return recentProducts.value.length > 0 && !isHidden;
+});
 
 onMounted(() => {
   appStore.initTheme();
@@ -15,6 +137,19 @@ onMounted(() => {
   if (localStorage.getItem('user_id')) {
     cartStore.syncCartFromDB();
   }
+  loadWishlistIds();
+  loadRecentProducts();
+
+  window.addEventListener('wishlist-updated', loadWishlistIds);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('wishlist-updated', loadWishlistIds);
+});
+
+// Обновляем список просмотров при смене роута (если юзер зашел на другой товар)
+watch(() => route.path, () => {
+  loadRecentProducts();
 });
 </script>
 
@@ -28,6 +163,46 @@ onMounted(() => {
         </transition>
       </router-view>
     </main>
+
+    <!-- ГЛОБАЛЬНЫЙ БЛОК: НЕДАВНО ПРОСМОТРЕННЫЕ -->
+    <section v-if="showRecentBlock" class="global-recent-section">
+      <div class="carousel-header">
+        <h2>🕒 Вы недавно смотрели</h2>
+        <div class="carousel-controls">
+          <button @click="scroll(-1)" class="ctrl-btn glass-card">←</button>
+          <button @click="scroll(1)" class="ctrl-btn glass-card">→</button>
+        </div>
+      </div>
+
+      <div class="scroll-container" ref="recentRef" @mousedown="startDrag" @mousemove="duringDrag" @mouseup="stopDrag">
+        <div v-for="p in recentProducts" :key="p.id" class="product-card glass-card" @mousemove="handle3DTilt($event, 'gr'+p.id)" @mouseleave="resetTilt('gr'+p.id)" :style="getTiltStyle('gr'+p.id)">
+          <button @click.stop="toggleWishlist(p.id)" class="wishlist-btn" :class="{ active: wishlistIds.includes(p.id) }">❤</button>
+          
+          <router-link :to="'/product/' + p.id" class="card-link">
+            <div class="img-wrapper">
+              <img :src="p.images && p.images.length > 0 ? p.images[0] : '/assets/images/no-image.png'" class="product-img" loading="lazy" />
+            </div>
+            <div class="card-info-bottom">
+              <h4 class="product-title">{{ p.name }}</h4>
+              <div class="price-block">
+                <s class="old-price" v-if="p.discount_price">{{ p.price }} ₽</s>
+                <strong class="new-price" :style="{ color: p.discount_price ? 'var(--danger)' : 'var(--text-main)' }">
+                  {{ p.discount_price || p.price }} ₽
+                </strong>
+              </div>
+              <div class="stock-status">
+                <span v-if="getStockInCity(p) > 0" class="in-stock">✅ В {{ appStore.city }}: {{ getStockInCity(p) }} шт.</span>
+                <span v-else class="out-stock">🚢 Под заказ (Межгород)</span>
+              </div>
+            </div>
+          </router-link>
+          
+          <button @click="handleAddToCart(p)" class="btn btn-primary btn-block mt-2" :disabled="getTotalStock(p) === 0">
+            {{ getTotalStock(p) > 0 ? 'В корзину' : 'Нет в наличии' }}
+          </button>
+        </div>
+      </div>
+    </section>
 
     <footer class="main-footer">
       <div class="footer-container">
@@ -78,547 +253,159 @@ onMounted(() => {
   </div>
 </template>
 
-<style>
-/* ==========================================================================
-   ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
-   ========================================================================== */
-:root {
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-light: rgba(37, 99, 235, 0.12);
-  --accent: #0ea5e9;
-  --success: #10b981;
-  --success-light: rgba(16, 185, 129, 0.12);
-  --danger: #ef4444;
-  --danger-light: rgba(239, 68, 68, 0.12);
-  --warning: #f59e0b;
-  --warning-light: rgba(245, 158, 11, 0.12);
-
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-
-  --bg-body: #f8fafc;
-  --bg-card: #ffffff;
-  --bg-input: #ffffff;
-  --border-color: #e2e8f0;
-
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-full: 9999px;
-
-  /* навигация */
-  --nav-bg: rgba(255, 255, 255, 0.85);
+<!-- SCOPED стили для добавленного блока -->
+<style scoped>
+.global-recent-section {
+  max-width: 1400px;
+  margin: 0 auto 60px auto;
+  padding: 0 20px;
+  width: 96%;
 }
 
-/* ==========================================================================
-   ТЁМНАЯ ТЕМА
-   ========================================================================== */
-html.dark {
-  --primary: #60a5fa;
-  --primary-hover: #3b82f6;
-  --primary-light: rgba(96, 165, 250, 0.2);
-  --accent: #38bdf8;
-  --success: #34d399;
-  --success-light: rgba(52, 211, 153, 0.2);
-  --danger: #f87171;
-  --danger-light: rgba(248, 113, 113, 0.2);
-  --warning: #fbbf24;
-  --warning-light: rgba(251, 191, 36, 0.2);
-
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-
-  --bg-body: #0f172a;
-  --bg-card: #1e293b;
-  --bg-input: #1e293b;
-  --border-color: #334155;
-
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.6);
-
-  --nav-bg: rgba(15, 23, 42, 0.9);
-}
-
-/* ==========================================================================
-   БАЗОВЫЕ СБРОСЫ
-   ========================================================================== */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  scroll-behavior: smooth;
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  font-family: 'Inter', -apple-system, sans-serif;
-  background: var(--bg-body);
-  color: var(--text-main);
-  line-height: 1.6;
-  transition: background-color 0.3s ease, color 0.3s ease;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-button {
-  font-family: inherit;
-  cursor: pointer;
-  border: none;
-  background: none;
-  font-size: inherit;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-button:active {
-  transform: scale(0.97);
-}
-
-input,
-select,
-textarea {
-  font-family: inherit;
-  font-size: 16px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  background: var(--bg-input);
-  color: var(--text-main);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  outline: none;
-  width: 100%;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-light);
-}
-
-/* ==========================================================================
-   АНИМАЦИИ
-   ========================================================================== */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
-}
-.animate-fade-in-up {
-  animation: fadeInUp 0.35s ease-out;
-}
-
-/* ==========================================================================
-   КЛАССЫ КОМПОНЕНТОВ (используются везде)
-   ========================================================================== */
-
-/* Карточка */
-.glass-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-.glass-card:hover {
-  box-shadow: var(--shadow-md);
-}
-
-/* Кнопки */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border-radius: var(--radius-full);
-  font-weight: 600;
-  font-size: 0.9rem;
-  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.btn:active {
-  transform: scale(0.97);
-}
-.btn-primary {
-  background: var(--primary);
-  color: white;
-  border: none;
-}
-.btn-primary:hover {
-  background: var(--primary-hover);
-  box-shadow: 0 4px 12px var(--primary-light);
-}
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-}
-.btn-outline:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--primary-light);
-}
-.btn-success {
-  background: var(--success);
-  color: white;
-  border: none;
-}
-.btn-success:hover {
-  opacity: 0.9;
-}
-.btn-danger {
-  background: var(--danger);
-  color: white;
-  border: none;
-}
-.btn-danger:hover {
-  opacity: 0.9;
-}
-.btn-sm {
-  padding: 6px 14px;
-  font-size: 0.8rem;
-}
-.btn-lg {
-  padding: 14px 28px;
-  font-size: 1rem;
-}
-.btn-block {
-  width: 100%;
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Бейджи */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: white;
-  background: var(--primary);
-}
-.badge-success {
-  background: var(--success);
-}
-.badge-danger {
-  background: var(--danger);
-}
-.badge-warning {
-  background: var(--warning);
-}
-
-/* Спиннер */
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--border-color);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  display: inline-block;
-}
-
-/* Сообщения */
-.alert {
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  margin-bottom: 16px;
-}
-.alert-error {
-  background: var(--danger-light);
-  color: var(--danger);
-  border: 1px solid var(--danger);
-}
-.alert-success {
-  background: var(--success-light);
-  color: var(--success);
-  border: 1px solid var(--success);
-}
-.alert-info {
-  background: var(--primary-light);
-  color: var(--primary);
-  border: 1px solid var(--primary);
-}
-.alert-warning {
-  background: var(--warning-light);
-  color: var(--warning);
-  border: 1px solid var(--warning);
-}
-
-/* Разделитель */
-.divider {
-  border: none;
-  height: 1px;
-  background: var(--border-color);
-  margin: 20px 0;
-}
-
-/* Пустое состояние */
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-muted);
-}
-.empty-state-icon {
-  font-size: 3rem;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-.empty-state h3 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: var(--text-main);
-}
-.empty-state p {
-  margin-bottom: 20px;
-  font-size: 0.95rem;
-}
-
-/* Формы */
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 16px;
-  width: 100%;
-}
-.form-group label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* ==========================================================================
-   СТРУКТУРА ПРИЛОЖЕНИЯ
-   ========================================================================== */
-.app-wrapper {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-.main-content {
-  flex: 1;
-}
-
-/* Анимация смены страниц */
-.page-fade-enter-active,
-.page-fade-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-.page-fade-enter-from {
-  opacity: 0;
-  transform: translateY(10px);
-}
-.page-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-/* ==========================================================================
-   ФУТЕР
-   ========================================================================== */
-.main-footer {
-  background-color: var(--bg-card);
-  border-top: 1px solid var(--border-color);
-  padding-top: 60px;
-  margin-top: 80px;
-}
-.footer-container {
-  max-width: 1440px;
-  margin: 0 auto;
-  width: 92%;
-  display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1.2fr;
-  gap: 40px;
-  padding-bottom: 50px;
-}
-.footer-section h4 {
-  color: var(--text-main);
-  font-size: 1rem;
-  font-weight: 800;
-  margin-bottom: 25px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-.footer-logo {
-  font-size: 2rem;
-  text-decoration: none;
-  color: var(--text-main);
-  display: block;
-  margin-bottom: 20px;
-}
-.footer-logo strong {
-  color: var(--primary);
-  font-weight: 900;
-}
-.footer-desc {
-  color: var(--text-muted);
-  line-height: 1.6;
-  font-size: 0.95rem;
-  margin-bottom: 25px;
-}
-.footer-section.links {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.footer-section.links a {
-  text-decoration: none;
-  color: var(--text-muted);
-  font-size: 0.95rem;
-  transition: var(--transition, all 0.3s ease);
-}
-.footer-section.links a:hover {
-  color: var(--primary);
-  transform: translateX(5px);
-}
-.footer-section.contacts {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.footer-phone {
-  font-size: 1.4rem;
-  font-weight: 900;
-  color: var(--text-main);
-  text-decoration: none;
-}
-.footer-email {
-  color: var(--primary);
-  text-decoration: none;
-  font-weight: 700;
-}
-.work-time {
-  margin-top: 10px;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-.social-links {
-  display: flex;
-  gap: 15px;
-}
-.glass-icon {
-  width: 44px;
-  height: 44px;
-  background: rgba(0,0,0,0.03);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  text-decoration: none;
-  color: var(--text-main);
-  font-weight: 800;
-  transition: all 0.3s ease;
-  border: 1px solid var(--border-color);
-}
-html.dark .glass-icon {
-  background: rgba(255,255,255,0.05);
-}
-.social-links a:hover {
-  background: var(--primary);
-  color: #fff;
-  transform: translateY(-3px);
-  border-color: var(--primary);
-  box-shadow: 0 5px 15px rgba(37, 99, 235, 0.3);
-}
-.footer-bottom {
-  border-top: 1px solid var(--border-color);
-  padding: 30px 0;
-  background-color: rgba(0,0,0,0.02);
-}
-html.dark .footer-bottom {
-  background-color: rgba(0,0,0,0.2);
-}
-.bottom-content {
-  max-width: 1440px;
-  margin: 0 auto;
-  width: 92%;
+.carousel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+  margin-bottom: 25px;
 }
-.legal-links {
-  display: flex;
-  gap: 25px;
+.carousel-header h2 {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--text-main);
 }
-.legal-links a {
-  text-decoration: none;
-  color: var(--text-muted);
+.ctrl-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: var(--text-main);
+  margin-left: 12px;
+  border: none;
+  background: var(--bg-card);
 }
-.legal-links a:hover {
-  text-decoration: underline;
+.ctrl-btn:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  transform: scale(1.05);
 }
 
-/* ==========================================================================
-   АДАПТИВНОСТЬ ФУТЕРА
-   ========================================================================== */
-@media (max-width: 1024px) {
-  .footer-container {
-    grid-template-columns: 1fr 1fr;
-    gap: 50px;
-  }
+.scroll-container {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  padding-bottom: 20px;
+  scrollbar-width: none;
+  cursor: grab;
 }
-@media (max-width: 640px) {
-  .footer-container {
-    grid-template-columns: 1fr;
-    text-align: center;
-    width: 90%;
-  }
-  .social-links {
-    justify-content: center;
-  }
-  .bottom-content {
-    flex-direction: column;
-    gap: 20px;
-    text-align: center;
-  }
-  .legal-links {
-    flex-direction: column;
-    gap: 10px;
-  }
+.scroll-container.dragging {
+  cursor: grabbing;
+}
+.scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+.product-card {
+  min-width: 270px;
+  max-width: 270px;
+  padding: 20px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transform-style: preserve-3d;
+}
+.product-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-5px);
+}
+
+.wishlist-btn {
+  position: absolute;
+  right: 15px;
+  top: 15px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+  z-index: 3;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.wishlist-btn:hover, .wishlist-btn.active {
+  color: var(--danger);
+  border-color: var(--danger);
+  transform: scale(1.15);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.card-link {
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.img-wrapper {
+  height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+.product-img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  transition: transform 0.4s ease;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.05));
+}
+.product-card:hover .product-img {
+  transform: scale(1.08);
+}
+
+.product-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  height: 44px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+.price-block {
+  margin-top: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.old-price {
+  text-decoration: line-through;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.new-price {
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+.stock-status {
+  font-size: 0.75rem;
+  margin-top: 8px;
+}
+.in-stock { color: var(--success); font-weight: 700; }
+.out-stock { color: var(--warning); font-weight: 700; }
+
+@media (max-width: 768px) {
+  .product-card { min-width: 240px; max-width: 240px; }
+  .carousel-header h2 { font-size: 1.5rem; }
 }
 </style>

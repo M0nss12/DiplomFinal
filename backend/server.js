@@ -1481,6 +1481,13 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Внутренняя ошибка сервера. Информация сохранена в журнале.' });
 });
 
-app.listen(PORT, () => console.log(`🚀 ApexDrive Server Active: http://localhost:${PORT}`));
+
+
+if (process.env.NODE_ENV !== 'test') {
+    const server = app.listen(PORT, () => console.log(`🚀 ApexDrive Server Active: http://localhost:${PORT}`));
+    app.server = server; // сохраняем сервер для возможного закрытия
+} else {
+    app.server = null; // в тестах сервер не создаётся
+}
 
 module.exports = app;

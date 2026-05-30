@@ -1,6 +1,6 @@
 <template>
   <div class="home-page animate-fade-in">
-    <!-- ДЕКОРАТИВНЫЕ ЭЛЕМЕНТЫ (без изменений) -->
+    <!-- ДЕКОРАТИВНЫЕ ЭЛЕМЕНТЫ -->
     <div class="gear gear-1"></div>
     <div class="gear gear-2"></div>
     <div class="sparkle-container" v-if="!isMobile">
@@ -10,7 +10,7 @@
     <!-- КНОПКА НАВЕРХ -->
     <transition name="fade">
       <button v-if="showScrollTop" @click="scrollToTop" class="scroll-top-btn" title="Наверх">
-        ↑
+        Наверх
       </button>
     </transition>
 
@@ -24,12 +24,11 @@
           <span class="highlight">с доставкой по всей России</span>
         </h1>
         <p class="hero-subtitle">
-          Более 100 000 оригинальных деталей и аналогов. Готовы отправить сегодня в <strong>{{ appStore.city }}</strong>.
+          Большое количество оригинальных деталей и аналогов. Готовы отправить сегодня в ваш город.
         </p>
 
         <div class="hero-search-container" ref="heroSearchRef">
           <div class="hero-search-bar">
-            <span class="search-icon">🔍</span>
             <input
               type="text"
               v-model="searchQuery"
@@ -48,7 +47,7 @@
               <div v-if="heroSearchResults.categories.length" class="hs-group">
                 <div class="hs-label">Категории</div>
                 <router-link v-for="c in heroSearchResults.categories" :key="c.id" :to="`/category/${c.id}`" class="hs-item">
-                  <span class="hs-icon">📂</span> {{ c.name }}
+                  {{ c.name }}
                 </router-link>
               </div>
 
@@ -63,26 +62,32 @@
                 </router-link>
               </div>
 
-              <div v-if="noHeroResults" class="hs-none">Ничего не найдено 😔</div>
+              <div v-if="noHeroResults" class="hs-none">Ничего не найдено</div>
             </div>
           </transition>
         </div>
 
         <div class="hero-buttons">
           <router-link to="/catalog" class="btn btn-primary btn-lg hero-main-btn">
-            <span>📦</span> Открыть каталог
+            Открыть каталог
           </router-link>
           <router-link to="/about" class="btn btn-outline btn-lg hero-secondary-btn">
-            <span>🚚</span> Условия доставки
+            Условия доставки
           </router-link>
         </div>
       </div>
     </section>
 
-    <!-- 2. БЛОК ПРЕИМУЩЕСТВ -->
+    <!-- 2. БЛОК ПРЕИМУЩЕСТВ (фотографии стали ещё больше) -->
     <section class="features-section">
-      <div v-for="(feature, idx) in features" :key="feature.title" class="feature-card glass-card" :class="{ 'feature-visible': animatedFeatures[idx] }" ref="featureRefs">
-        <div class="feature-icon">{{ feature.icon }}</div>
+      <div
+        v-for="(feature, idx) in features"
+        :key="feature.title"
+        class="feature-card glass-card"
+        :class="{ 'feature-visible': animatedFeatures[idx] }"
+        ref="featureRefs"
+      >
+        <img :src="feature.image" :alt="feature.title" class="feature-img" />
         <h3>{{ feature.title }}</h3>
         <p>{{ feature.description }}</p>
         <div class="feature-stat">
@@ -93,150 +98,7 @@
       </div>
     </section>
 
-    <!-- 3. ГОРЯЧИЕ ПРЕДЛОЖЕНИЯ (КАРУСЕЛЬ) -->
-    <section v-if="hotDeals.length" class="carousel-section">
-      <div class="carousel-header">
-        <h2>🔥 Горячие предложения</h2>
-        <div class="carousel-controls">
-          <button @click="scroll('hotDeals', -1)" class="ctrl-btn glass-card">←</button>
-          <button @click="scroll('hotDeals', 1)" class="ctrl-btn glass-card">→</button>
-        </div>
-      </div>
-
-      <div class="scroll-container" ref="hotDealsRef" @mousedown="startDrag" @mousemove="duringDrag" @mouseup="stopDrag">
-        <div v-for="p in hotDeals" :key="p.id" class="product-card glass-card" @mousemove="handle3DTilt($event, p.id)" @mouseleave="resetTilt(p.id)" :style="getTiltStyle(p.id)">
-          <div class="discount-badge" v-if="p.discount_price">-{{ calcDiscount(p.price, p.discount_price) }}%</div>
-          <button @click.stop="toggleWishlist(p.id)" class="wishlist-btn" :class="{ active: wishlistIds.includes(p.id) }">❤</button>
-          <button class="quick-view-btn" @click.stop="openQuickView(p)">🔍</button>
-          <router-link :to="'/product/' + p.id" class="card-link">
-            <img v-if="p.brands?.logo_url" :src="p.brands.logo_url" class="brand-logo" loading="lazy" />
-            <div class="img-wrapper">
-              <img :src="p.images && p.images.length > 0 ? p.images[0] : '/assets/images/no-image.png'" class="product-img" :alt="p.name" loading="lazy" />
-            </div>
-            <div class="card-info-bottom">
-              <h4 class="product-title">{{ p.name }}</h4>
-              <div class="price-block">
-                <span class="old-price">{{ p.price }} ₽</span>
-                <strong class="new-price">{{ p.discount_price || p.price }} ₽</strong>
-              </div>
-              <div class="stock-status">
-                <span v-if="getStockInCity(p) > 0" class="in-stock">✅ В {{ appStore.city }}: {{ getStockInCity(p) }} шт.</span>
-                <span v-else class="out-stock">🚢 Под заказ (Межгород)</span>
-              </div>
-            </div>
-          </router-link>
-          <button @click="handleAddToCart(p)" class="btn btn-primary btn-block mt-2" :disabled="getTotalStock(p) === 0">
-            {{ getTotalStock(p) > 0 ? 'В корзину' : 'Нет в наличии' }}
-          </button>
-        </div>
-      </div>
-      <div class="carousel-dots">
-        <span v-for="(dot, i) in hotDeals" :key="'dot'+i" class="dot" :class="{ active: i === activeHotDealIndex }" @click="scrollToIndex('hotDeals', i)"></span>
-      </div>
-    </section>
-
-    <!-- 4. ТОВАРЫ С РЕЙТИНГОМ 5 (КАРУСЕЛЬ) -->
-    <section v-if="topRatedProducts.length" class="carousel-section top-rated-carousel">
-      <div class="carousel-header">
-        <h2>⭐ Товары с рейтингом 5.0</h2>
-        <div class="carousel-controls">
-          <button @click="scrollTopRated(-1)" class="ctrl-btn glass-card">←</button>
-          <button @click="scrollTopRated(1)" class="ctrl-btn glass-card">→</button>
-        </div>
-      </div>
-
-      <div class="scroll-container" ref="topRatedRef" @mousedown="startDragTopRated" @mousemove="duringDragTopRated" @mouseup="stopDragTopRated">
-        <div v-for="p in topRatedProducts" :key="p.id" class="product-card top-rated-card glass-card" @mousemove="handle3DTilt($event, 't'+p.id)" @mouseleave="resetTilt('t'+p.id)" :style="getTiltStyle('t'+p.id)">
-          <div class="rating-badge">⭐⭐⭐⭐⭐ 5.0</div>
-          <div class="discount-badge" v-if="p.discount_price" style="top: 45px;">-{{ calcDiscount(p.price, p.discount_price) }}%</div>
-          <button @click.stop="toggleWishlist(p.id)" class="wishlist-btn" :class="{ active: wishlistIds.includes(p.id) }">❤</button>
-          <button class="quick-view-btn" @click.stop="openQuickView(p)">🔍</button>
-          <router-link :to="'/product/' + p.id" class="card-link">
-            <img v-if="p.brands?.logo_url" :src="p.brands.logo_url" class="brand-logo" loading="lazy" />
-            <div class="img-wrapper">
-              <img :src="p.images && p.images.length > 0 ? p.images[0] : '/assets/images/no-image.png'" class="product-img" :alt="p.name" loading="lazy" />
-            </div>
-            <div class="card-info-bottom">
-              <h4 class="product-title">{{ p.name }}</h4>
-              <div class="price-block">
-                <span class="old-price" v-if="p.discount_price">{{ p.price }} ₽</span>
-                <strong class="new-price">{{ p.discount_price || p.price }} ₽</strong>
-              </div>
-              <div class="stock-status">
-                <span v-if="getStockInCity(p) > 0" class="in-stock">✅ В {{ appStore.city }}: {{ getStockInCity(p) }} шт.</span>
-                <span v-else class="out-stock">🚢 Под заказ (Межгород)</span>
-              </div>
-            </div>
-          </router-link>
-          <button @click="handleAddToCart(p)" class="btn btn-primary btn-block mt-2" :disabled="getTotalStock(p) === 0">
-            {{ getTotalStock(p) > 0 ? 'В корзину' : 'Нет в наличии' }}
-          </button>
-        </div>
-      </div>
-      <div class="carousel-dots">
-        <span v-for="(dot, i) in topRatedProducts" :key="'tdot'+i" class="dot" :class="{ active: i === activeTopRatedIndex }" @click="scrollToIndex('topRated', i)"></span>
-      </div>
-    </section>
-
-    <!-- 5. БРЕНДЫ -->
-    <section class="brands-section glass-card" style="padding: 20px 0; overflow: hidden;">
-      <div class="section-header" style="text-align: center; margin-bottom: 20px;">
-        <h2>Наши официальные партнёры</h2>
-      </div>
-      <div class="brands-ribbon">
-        <div class="brands-track">
-          <div v-for="brand in brands" :key="brand.id" class="brand-item">
-            <img :src="brand.logo_url" :title="brand.name" loading="lazy" />
-          </div>
-          <div v-for="brand in brands" :key="'dup-' + brand.id" class="brand-item">
-            <img :src="brand.logo_url" :title="brand.name" loading="lazy" />
-          </div>
-        </div>
-      </div>
-      <div class="race-track">
-        <div class="moving-dot"></div>
-        <div class="moving-dot" style="animation-delay: -1s"></div>
-        <div class="moving-dot" style="animation-delay: -2s"></div>
-      </div>
-    </section>
-
-    <!-- 6. НЕДАВНО ПРОСМОТРЕННЫЕ -->
-    <section v-if="recentProducts.length" class="carousel-section">
-      <div class="carousel-header">
-        <h2>🕒 Вы недавно смотрели</h2>
-        <div class="carousel-controls">
-          <button @click="scroll('recent', -1)" class="ctrl-btn glass-card">←</button>
-          <button @click="scroll('recent', 1)" class="ctrl-btn glass-card">→</button>
-        </div>
-      </div>
-
-      <div class="scroll-container" ref="recentRef" @mousedown="startDrag" @mousemove="duringDrag" @mouseup="stopDrag">
-        <div v-for="p in recentProducts" :key="p.id" class="product-card glass-card" @mousemove="handle3DTilt($event, 'r'+p.id)" @mouseleave="resetTilt('r'+p.id)" :style="getTiltStyle('r'+p.id)">
-          <button @click.stop="toggleWishlist(p.id)" class="wishlist-btn" :class="{ active: wishlistIds.includes(p.id) }">❤</button>
-          <button class="quick-view-btn" @click.stop="openQuickView(p)">🔍</button>
-          <router-link :to="'/product/' + p.id" class="card-link">
-            <div class="img-wrapper">
-              <img :src="p.images && p.images.length > 0 ? p.images[0] : '/assets/images/no-image.png'" class="product-img" loading="lazy" />
-            </div>
-            <div class="card-info-bottom">
-              <h4 class="product-title">{{ p.name }}</h4>
-              <div class="price-block">
-                <strong class="new-price" style="color: var(--danger);">{{ p.discount_price || p.price }} ₽</strong>
-              </div>
-              <div class="stock-status">
-                <span v-if="getStockInCity(p) > 0" class="in-stock">✅ В {{ appStore.city }}: {{ getStockInCity(p) }} шт.</span>
-                <span v-else class="out-stock">🚢 Под заказ (Межгород)</span>
-              </div>
-            </div>
-          </router-link>
-          <button @click="handleAddToCart(p)" class="btn btn-primary btn-block mt-2" :disabled="getTotalStock(p) === 0">
-            {{ getTotalStock(p) > 0 ? 'В корзину' : 'Нет в наличии' }}
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- 7. SEO-ТЕКСТ -->
+    <!-- 3. SEO-ТЕКСТ -->
     <section class="seo-description glass-card">
       <h2>Интернет-магазин автозапчастей ApexDrive</h2>
       <p>
@@ -245,126 +107,58 @@
         <b>{{ appStore.city }}</b>.
       </p>
     </section>
-
-    <!-- МОДАЛЬНОЕ ОКНО БЫСТРОГО ПРОСМОТРА (оставлено без изменений, только кнопка заменена на системную) -->
-    <div v-if="quickViewProduct" class="modal-overlay" @click.self="closeQuickView">
-      <div class="modal-content glass-card">
-        <button class="modal-close" @click="closeQuickView">&times;</button>
-        <div class="modal-grid">
-          <div class="modal-images">
-            <img :src="quickViewProduct.images && quickViewProduct.images.length > 0 ? quickViewProduct.images[0] : '/assets/images/no-image.png'" :alt="quickViewProduct.name" />
-          </div>
-          <div class="modal-details">
-            <h2>{{ quickViewProduct.name }}</h2>
-            <p class="modal-sku">Артикул: <b>{{ quickViewProduct.sku }}</b></p>
-            <p class="modal-desc">{{ quickViewProduct.description || 'Описание отсутствует.' }}</p>
-            <div class="modal-price-block">
-              <s v-if="quickViewProduct.discount_price">{{ quickViewProduct.price }} ₽</s>
-              <strong>{{ quickViewProduct.discount_price || quickViewProduct.price }} ₽</strong>
-            </div>
-            <button @click="handleAddToCart(quickViewProduct)" class="btn btn-primary btn-block btn-lg mt-3">
-              В корзину
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { useAppStore } from '@/stores/appStore';
-import { useCartStore } from '@/stores/cartStore';
 
 const router = useRouter();
 const appStore = useAppStore();
-const cartStore = useCartStore();
 
-const brands = ref([]);
-const hotDeals = ref([]);
-const topRatedProducts = ref([]);
-const recentProducts = ref([]);
-const wishlistIds = ref([]);
 const searchQuery = ref('');
-const quickViewProduct = ref(null);
-const isMobile = ref(false);
-
 const isHeroSearchOpen = ref(false);
 const heroSearchRef = ref(null);
 const heroSearchResults = ref({ products: [], categories: [] });
 let heroSearchTimer = null;
 
-const hotDealsRef = ref(null);
-const recentRef = ref(null);
-const topRatedRef = ref(null);
+const isMobile = ref(false);
+const showScrollTop = ref(false);
 
-let isDragging = false;
-let startX = 0;
-let scrollLeft = 0;
-let isDraggingTopRated = false;
-let startXTopRated = 0;
-let scrollLeftTopRated = 0;
-
-const tiltStyles = ref({});
+// Анимации для преимуществ
 const featureRefs = ref([]);
 const animatedFeatures = ref([false, false, false]);
 const animatedCounts = ref([0, 0, 0]);
-const activeHotDealIndex = ref(0);
-const activeTopRatedIndex = ref(0);
-const showScrollTop = ref(false);
 
+// Три фотографии для преимуществ
 const features = ref([
-  { icon: '🚚', title: 'Умная логистика', description: 'Бесплатное перемещение товаров между складами вашего города.', countNum: 24, countUnit: 'часа' },
-  { icon: '🛡️', title: '100% Оригинал', description: 'Прямые контракты с производителями. Гарантия до 24 месяцев.', countNum: 100, countUnit: '%' },
-  { icon: '↩️', title: 'Легкий возврат', description: 'Не подошла деталь? Вернем деньги без лишних вопросов в течение 14 дней.', countNum: 14, countUnit: 'дней' },
+  {
+    image: '/assets/images/logistics.jpg',
+    title: 'Умная логистика',
+    description: 'Бесплатное перемещение товаров между складами вашего города.',
+    countNum: 24,
+    countUnit: 'часа'
+  },
+  {
+    image: '/assets/images/original.jpg',
+    title: '100% Оригинал',
+    description: 'Прямые контракты с производителями.',
+    countNum: 100,
+    countUnit: '%'
+  },
+  {
+    image: '/assets/images/return.jpg',
+    title: 'Легкий возврат',
+    description: 'Не подошла деталь? Вернем деньги без лишних вопросов в течение 14 дней.',
+    countNum: 14,
+    countUnit: 'дней'
+  }
 ]);
 
-const calcDiscount = (oldP, newP) => Math.round(((oldP - newP) / oldP) * 100);
-const isSameCity = (c1, c2) => c1?.trim().toLowerCase() === c2?.trim().toLowerCase();
-
-const getStockInCity = (p) => {
-  if (!p.product_stocks || !appStore.city) return 0;
-  return p.product_stocks
-    .filter(s => {
-      const wCity = s.warehouses?.cities?.name || s.warehouses?.city_name;
-      return isSameCity(wCity, appStore.city);
-    })
-    .reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
-};
-
-const getTotalStock = (p) => p.product_stocks?.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0) || 0;
-
-const loadData = async () => {
-  try {
-    const API_URL = import.meta.env.VITE_API_URL || '';
-    const [b, pRes] = await Promise.all([
-      axios.get(`/api/admin/brands`, { headers: {'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123'} }).catch(() => ({data: []})),
-      axios.get(`${API_URL}/api/products`)
-    ]);
-    brands.value = b.data.filter(br => br.logo_url);
-    const withDiscount = pRes.data.filter(p => p.discount_price && p.discount_price < p.price);
-    hotDeals.value = withDiscount.slice(0, 10);
-    topRatedProducts.value = pRes.data.slice(0, 12);
-
-    const uid = localStorage.getItem('user_id');
-    if (uid) {
-      const w = await axios.get(`${API_URL}/api/wishlist/${uid}`);
-      wishlistIds.value = w.data.map(i => i.product_id);
-    }
-
-    const recentIds = JSON.parse(localStorage.getItem('recent_views') || '[]');
-    if (recentIds.length) {
-      const recentRes = await axios.post(`${API_URL}/api/products/recent`, { ids: recentIds.slice(0, 15) });
-      recentProducts.value = recentRes.data;
-    }
-  } catch (e) {
-    console.error('Ошибка загрузки данных главной страницы', e);
-  }
-};
-
+// Поиск в герое
 const handleHeroSearch = () => {
   clearTimeout(heroSearchTimer);
   if (searchQuery.value.length < 2) {
@@ -399,117 +193,7 @@ const handleClickOutside = (event) => {
   }
 };
 
-const toggleWishlist = async (id) => {
-  const uid = localStorage.getItem('user_id');
-  if (!uid) return alert('Войдите в аккаунт.');
-  try {
-    const API_URL = import.meta.env.VITE_API_URL || '';
-    if (wishlistIds.value.includes(id)) {
-      await axios.delete(`${API_URL}/api/wishlist/${uid}/${id}`);
-      wishlistIds.value = wishlistIds.value.filter(i => i !== id);
-    } else {
-      await axios.post(`${API_URL}/api/wishlist`, { user_id: uid, product_id: id });
-      wishlistIds.value.push(id);
-    }
-    window.dispatchEvent(new Event('wishlist-updated'));
-  } catch (e) {
-    console.error(e);
-  }
-};
-
-const handleAddToCart = (p) => {
-  cartStore.addToCart({ ...p, stock_quantity: getTotalStock(p) });
-  closeQuickView();
-};
-
-const scroll = (name, dir) => {
-  const el = name === 'hotDeals' ? hotDealsRef.value : recentRef.value;
-  if (el) el.scrollBy({ left: 320 * dir, behavior: 'smooth' });
-};
-
-const startDrag = (e) => {
-  isDragging = true;
-  const el = e.currentTarget;
-  startX = e.pageX - el.offsetLeft;
-  scrollLeft = el.scrollLeft;
-  el.classList.add('dragging');
-};
-
-const duringDrag = (e) => {
-  if (!isDragging) return;
-  e.preventDefault();
-  const el = e.currentTarget;
-  const x = e.pageX - el.offsetLeft;
-  const walk = (x - startX) * 2;
-  el.scrollLeft = scrollLeft - walk;
-};
-
-const stopDrag = () => {
-  isDragging = false;
-  const el = hotDealsRef.value || recentRef.value;
-  if (el) el.classList.remove('dragging');
-};
-
-const scrollTopRated = (dir) => {
-  if (topRatedRef.value) {
-    topRatedRef.value.scrollBy({ left: 320 * dir, behavior: 'smooth' });
-  }
-};
-
-const startDragTopRated = (e) => {
-  isDraggingTopRated = true;
-  const el = e.currentTarget;
-  startXTopRated = e.pageX - el.offsetLeft;
-  scrollLeftTopRated = el.scrollLeft;
-  el.classList.add('dragging');
-};
-
-const duringDragTopRated = (e) => {
-  if (!isDraggingTopRated) return;
-  e.preventDefault();
-  const el = e.currentTarget;
-  const x = e.pageX - el.offsetLeft;
-  const walk = (x - startXTopRated) * 2;
-  el.scrollLeft = scrollLeftTopRated - walk;
-};
-
-const stopDragTopRated = () => {
-  isDraggingTopRated = false;
-  if (topRatedRef.value) topRatedRef.value.classList.remove('dragging');
-};
-
-const handle3DTilt = (e, id) => {
-  const card = e.currentTarget;
-  const rect = card.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  const centerX = rect.width / 2;
-  const centerY = rect.height / 2;
-  const rotateX = ((y - centerY) / centerY) * 10;
-  const rotateY = ((x - centerX) / centerX) * 10;
-  tiltStyles.value[id] = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
-};
-
-const resetTilt = (id) => {
-  tiltStyles.value[id] = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)';
-};
-
-const getTiltStyle = (id) => tiltStyles.value[id] || '';
-
-const openQuickView = async (product) => {
-  try {
-    const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/products/${product.id}`);
-    quickViewProduct.value = res.data;
-  } catch (e) {
-    console.error('Ошибка при загрузке данных быстрого просмотра', e);
-    quickViewProduct.value = product;
-  }
-};
-
-const closeQuickView = () => {
-  quickViewProduct.value = null;
-};
-
+// Счётчики в преимуществах
 const animateCounter = (el, target, index) => {
   let start = 0;
   const duration = 1500;
@@ -545,6 +229,7 @@ const setupObservers = () => {
   featureElements.forEach(el => countObserver.observe(el));
 };
 
+// Декоративные искры
 const getRandomSparkleStyle = () => {
   return {
     left: Math.random() * 100 + '%',
@@ -555,6 +240,7 @@ const getRandomSparkleStyle = () => {
   };
 };
 
+// Адаптив и кнопка наверх
 const checkMobile = () => {
   isMobile.value = window.innerWidth <= 768;
 };
@@ -567,35 +253,13 @@ const handleScroll = () => {
   showScrollTop.value = window.pageYOffset > 600;
 };
 
-const updateHotDealActiveIndex = () => {
-  if (!hotDealsRef.value) return;
-  const el = hotDealsRef.value;
-  const index = Math.round(el.scrollLeft / 280);
-  activeHotDealIndex.value = index >= 0 ? index : 0;
-};
-
-const updateTopRatedActiveIndex = () => {
-  if (!topRatedRef.value) return;
-  const el = topRatedRef.value;
-  const index = Math.round(el.scrollLeft / 280);
-  activeTopRatedIndex.value = index >= 0 ? index : 0;
-};
-
-const scrollToIndex = (name, index) => {
-  const el = name === 'hotDeals' ? hotDealsRef.value : topRatedRef.value;
-  if (el) el.scrollTo({ left: index * 280, behavior: 'smooth' });
-};
-
 onMounted(() => {
-  loadData();
   window.addEventListener('click', handleClickOutside);
   window.addEventListener('scroll', handleScroll);
   checkMobile();
   window.addEventListener('resize', checkMobile);
   nextTick(() => {
     setupObservers();
-    if (hotDealsRef.value) hotDealsRef.value.addEventListener('scroll', updateHotDealActiveIndex);
-    if (topRatedRef.value) topRatedRef.value.addEventListener('scroll', updateTopRatedActiveIndex);
   });
 });
 
@@ -604,19 +268,13 @@ onUnmounted(() => {
   window.removeEventListener('click', handleClickOutside);
   window.removeEventListener('scroll', handleScroll);
   window.removeEventListener('resize', checkMobile);
-  if (hotDealsRef.value) hotDealsRef.value.removeEventListener('scroll', updateHotDealActiveIndex);
-  if (topRatedRef.value) topRatedRef.value.removeEventListener('scroll', updateTopRatedActiveIndex);
 });
-
-watch(() => appStore.city, loadData);
-</script>\
+</script>
 
 <style scoped>
 /* ==========================================================================
-   ТОЛЬКО УНИКАЛЬНЫЕ СТИЛИ (глобальный CSS используется для glass-card, btn и анимаций)
+   УНИКАЛЬНЫЕ СТИЛИ
    ========================================================================== */
-
-/* Легкий блюр для стеклянных карточек в этом компоненте */
 .glass-card {
   backdrop-filter: blur(10px);
 }
@@ -644,7 +302,7 @@ watch(() => appStore.city, loadData);
 .scroll-top-btn {
   position: fixed; bottom: 30px; right: 30px; width: 48px; height: 48px;
   border-radius: 50%; background: var(--primary); color: white;
-  display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+  display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: bold;
   cursor: pointer; z-index: 900; box-shadow: 0 4px 12px rgba(37,99,235,0.3);
   transition: transform 0.2s, background 0.2s;
   border: none;
@@ -683,7 +341,6 @@ watch(() => appStore.city, loadData);
 }
 :global(.dark) .hero-search-bar { background: #0f172a; border-color: #334155; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); }
 .hero-search-bar:focus-within { box-shadow: 0 0 0 4px rgba(37,99,235,0.15), 0 10px 25px -5px rgba(0,0,0,0.1); transform: scale(1.01); border-color: var(--primary); }
-.search-icon { font-size: 1.2rem; color: var(--text-muted); margin-right: 10px; }
 .hero-search-bar input { flex: 1; border: none; background: transparent; padding: 14px 0; font-size: 1rem; outline: none; color: var(--text-main); }
 
 .hero-search-btn {
@@ -725,12 +382,19 @@ watch(() => appStore.city, loadData);
 :global(.dark) .hero-secondary-btn { background: rgba(255,255,255,0.02); border-color: #334155; }
 .hero-secondary-btn:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-3px); background: var(--bg-card); }
 
-/* ПРЕИМУЩЕСТВА */
+/* ПРЕИМУЩЕСТВА — ФОТО СТАЛИ ЕЩЁ БОЛЬШЕ */
 .features-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-bottom: 60px; }
 .feature-card { position: relative; padding: 30px 20px; text-align: center; overflow: hidden; }
 .feature-card:hover { transform: translateY(-8px); border-color: var(--primary); }
-.feature-icon { font-size: 3rem; margin-bottom: 15px; transition: transform 0.3s; }
-.feature-card:hover .feature-icon { transform: scale(1.1) rotate(5deg); }
+.feature-img {
+  width: 100%;
+  height: 380px; /* было 240px, увеличено */
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+  transition: transform 0.3s;
+}
+.feature-card:hover .feature-img { transform: scale(1.03); }
 .feature-card h3 { color: var(--text-main); font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
 .feature-card p { color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; }
 .feature-stat { font-size: 1.3rem; font-weight: 800; color: var(--primary); margin-top: 15px; }
@@ -738,102 +402,14 @@ watch(() => appStore.city, loadData);
 .feature-glow { position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg, transparent, var(--primary), transparent); opacity: 0; transition: opacity 0.3s; }
 .feature-card:hover .feature-glow { opacity: 1; }
 
-/* КАРУСЕЛИ */
-.carousel-section { margin-bottom: 60px; }
-.carousel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-.carousel-header h2 { font-size: 1.8rem; font-weight: 900; color: var(--text-main); }
-.ctrl-btn { width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 1.3rem; cursor: pointer; color: var(--text-main); margin-left: 12px; border: none; background: var(--bg-card); }
-.ctrl-btn:hover { background: var(--primary); color: white; border-color: var(--primary); transform: scale(1.05); }
-
-.scroll-container { display: flex; gap: 24px; overflow-x: auto; padding-bottom: 20px; scrollbar-width: none; cursor: grab; }
-.scroll-container.dragging { cursor: grabbing; }
-.scroll-container::-webkit-scrollbar { display: none; }
-
-/* КАРТОЧКА ТОВАРА */
-.product-card {
-  min-width: 270px; max-width: 270px; padding: 20px; position: relative;
-  display: flex; flex-direction: column; transform-style: preserve-3d;
-}
-.product-card:hover { border-color: var(--primary); transform: translateY(-5px); }
-.discount-badge { position: absolute; top: 15px; left: 15px; background: linear-gradient(135deg, var(--danger), #dc2626); color: white; padding: 4px 12px; border-radius: 30px; font-weight: 800; font-size: 0.75rem; z-index: 3; box-shadow: 0 2px 4px rgba(239,68,68,0.3); }
-.wishlist-btn, .quick-view-btn { position: absolute; right: 15px; width: 36px; height: 36px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; transition: all 0.2s; z-index: 3; cursor: pointer; color: var(--text-muted); }
-.wishlist-btn { top: 15px; }
-.quick-view-btn { top: 60px; }
-.wishlist-btn:hover, .quick-view-btn:hover { transform: scale(1.15); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-.wishlist-btn:hover { color: var(--danger); border-color: var(--danger); }
-.quick-view-btn:hover { color: var(--primary); border-color: var(--primary); }
-.wishlist-btn.active { color: var(--danger); border-color: var(--danger); }
-
-.card-link { text-decoration: none; display: flex; flex-direction: column; flex: 1; }
-.img-wrapper { height: 170px; display: flex; align-items: center; justify-content: center; margin-bottom: 15px; }
-.product-img { max-height: 100%; max-width: 100%; object-fit: contain; transition: transform 0.4s ease; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.05)); }
-.product-card:hover .product-img { transform: scale(1.08); }
-
-.brand-logo {
-  position: absolute; top: 15px; right: 55px; height: 24px; width: auto; max-width: 60px;
-  object-fit: contain; z-index: 3; background: rgba(255,255,255,0.8); padding: 2px 4px; border-radius: 4px;
-}
-
-.product-title { font-size: 0.95rem; font-weight: 700; color: var(--text-main); height: 44px; overflow: hidden; margin-bottom: 10px; line-height: 1.4; }
-.price-block { margin-top: auto; display: flex; align-items: baseline; gap: 8px; }
-.old-price { text-decoration: line-through; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; }
-.new-price { font-size: 1.3rem; font-weight: 900; color: var(--danger); }
-.stock-status { font-size: 0.75rem; margin-top: 8px; }
-.in-stock { color: var(--success); font-weight: 700; }
-.out-stock { color: var(--warning); font-weight: 700; }
-
-/* Рейтинговая плашка */
-.rating-badge {
-  position: absolute; top: 15px; left: 15px; background: rgba(255, 193, 7, 0.15); color: #f59e0b;
-  padding: 4px 10px; border-radius: 30px; font-weight: 800; font-size: 0.75rem; z-index: 3; border: 1px solid rgba(255, 193, 7, 0.5); backdrop-filter: blur(4px);
-}
-
-/* БРЕНДЫ */
-.brands-section h2 { color: var(--text-main); font-weight: 800; font-size: 1.8rem; }
-.brands-ribbon { overflow: hidden; white-space: nowrap; position: relative; padding: 20px 0; }
-.brands-track { display: inline-flex; gap: 40px; animation: scrollBrands 20s linear infinite; }
-.brand-item { min-width: 120px; height: 70px; display: inline-flex; align-items: center; justify-content: center; padding: 10px; transition: all 0.3s; }
-.brand-item img { max-width: 90%; max-height: 90%; filter: grayscale(100%); opacity: 0.5; transition: all 0.3s; }
-:global(.dark) .brand-item img { filter: grayscale(100%) invert(1); }
-.brand-item:hover img { filter: grayscale(0); opacity: 1; transform: scale(1.1); }
-:global(.dark) .brand-item:hover img { filter: grayscale(0) invert(0); background: #fff; padding: 4px; border-radius: 4px; }
-.race-track { position: relative; height: 4px; background: rgba(0,0,0,0.05); margin: 0 40px 10px; border-radius: 2px; overflow: hidden; }
-:global(.dark) .race-track { background: rgba(255,255,255,0.05); }
-.moving-dot { position: absolute; width: 8px; height: 8px; background: var(--primary); border-radius: 50%; top: -2px; animation: moveDot 3s linear infinite; }
-
 /* SEO */
 .seo-description { padding: 40px; margin-bottom: 40px; text-align: center; }
 .seo-description h2 { color: var(--text-main); margin-bottom: 15px; font-weight: 800; }
 .seo-description p { color: var(--text-muted); line-height: 1.6; font-size: 1.05rem; max-width: 800px; margin: 0 auto; }
 
-/* МОДАЛКА */
-.modal-overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
-  display: flex; align-items: center; justify-content: center; z-index: 2000;
-}
-.modal-content { width: 850px; max-width: 95%; padding: 30px; position: relative; }
-.modal-close { position: absolute; top: 15px; right: 15px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.05); border: none; font-size: 24px; cursor: pointer; transition: all 0.2s; color: var(--text-main); display: flex; align-items: center; justify-content: center; }
-:global(.dark) .modal-close { background: rgba(255,255,255,0.05); color: #f8fafc; }
-.modal-close:hover { background: rgba(239,68,68,0.1); color: var(--danger); transform: rotate(90deg); }
-.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-.modal-images img { width: 100%; height: 300px; object-fit: contain; background: #fff; border-radius: var(--radius-md); padding: 10px; border: 1px solid var(--border-color); }
-.modal-details h2 { font-size: 1.6rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; }
-.modal-sku { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px; }
-.modal-desc { font-size: 0.95rem; color: var(--text-main); line-height: 1.6; margin-bottom: 20px; }
-.modal-price-block { margin: 20px 0; font-size: 2rem; font-weight: 900; color: var(--danger); display: flex; align-items: baseline; gap: 10px; }
-.modal-price-block s { font-size: 1.1rem; color: var(--text-muted); font-weight: 600; }
-
-/* ТОЧКИ КАРУСЕЛИ */
-.carousel-dots { display: flex; justify-content: center; gap: 8px; margin-top: 15px; }
-.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-color); cursor: pointer; transition: background 0.2s; }
-.dot.active { background: var(--primary); }
-
-/* АНИМАЦИИ (уникальные, не конфликтуют с глобальными) */
+/* АНИМАЦИИ */
 @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-@keyframes moveDot { 0% { left: -10px; opacity: 1; } 100% { left: 100%; opacity: 0; } }
 @keyframes sparkle { 0% { transform: translateY(-100vh) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(100vh) rotate(360deg); opacity: 0; } }
-@keyframes scrollBrands { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
 
 /* АДАПТИВ */
 @media (max-width: 1024px) {
@@ -847,9 +423,7 @@ watch(() => appStore.city, loadData);
   .hero-search-btn { width: 100%; margin-top: 10px; }
   .hero-buttons { flex-direction: column; gap: 12px; }
   .features-section { grid-template-columns: 1fr; }
-  .modal-grid { grid-template-columns: 1fr; }
-  .modal-images img { height: 200px; }
-  .product-card { min-width: 240px; max-width: 240px; }
+  .feature-img { height: 420px; } /* ещё больше на мобильных */
   .gear, .sparkle-container { display: none; }
 }
 </style>

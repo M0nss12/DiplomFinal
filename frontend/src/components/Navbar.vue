@@ -632,4 +632,28 @@ background: var(--nav-bg);
   .logo { font-size: 1.4rem; }
   .nav-icon-btn, .heart-icon { font-size: 1.4rem; }
 }
+
+.cart-icon-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cart-icon-wrapper .badge {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 5px;
+  border-radius: 20px;
+  border: 2px solid var(--bg-card);
+  min-width: 18px;
+  text-align: center;
+  background: var(--success);
+  color: white;
+  line-height: 1;
+  z-index: 2;
+}
 </style>

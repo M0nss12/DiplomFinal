@@ -12,27 +12,26 @@
         <router-link to="/catalog" class="btn btn-primary btn-lg hero-cta">Перейти в каталог</router-link>
       </div>
       <div class="hero-image hidden-mobile">
-        <div class="shape shape-1"></div>
-        <div class="shape shape-2"></div>
+        <img src="/assets/images/about-hero.jpg" alt="ApexDrive" class="hero-img" />
       </div>
     </section>
 
     <!-- 2. КАЛЬКУЛЯТОР ДОСТАВКИ -->
     <section class="calculator-section glass-card">
-      <h2>🚚 Калькулятор доставки</h2>
+      <h2>Калькулятор доставки</h2>
       <p class="calc-subtitle">Узнайте примерную стоимость доставки с центрального склада (Москва) в выбранный пункт выдачи</p>
 
       <form @submit.prevent="calculateShipping" class="calc-form">
         <div class="calc-row">
           <div class="form-group">
-            <label>🏙️ Город получения</label>
+            <label>Город получения</label>
             <select v-model="calcCityId" @change="onCityChange">
               <option :value="null" disabled>-- Выберите город --</option>
               <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
           </div>
           <div class="form-group">
-            <label>📍 Пункт выдачи (ПВЗ)</label>
+            <label>Пункт выдачи (ПВЗ)</label>
             <select v-model="calcWarehouseId" :disabled="!calcCityId">
               <option :value="null" disabled>-- Выберите ПВЗ --</option>
               <option v-for="w in filteredWarehouses" :key="w.id" :value="w.id">
@@ -41,11 +40,11 @@
             </select>
           </div>
           <div class="form-group">
-            <label>⚖️ Вес заказа (кг)</label>
+            <label>Вес заказа (кг)</label>
             <input v-model.number="calcWeight" type="number" step="0.1" min="0.1" required placeholder="Например, 4.5" />
           </div>
           <div class="form-group">
-            <label>💰 Стоимость товаров (₽, для ограничения 22%)</label>
+            <label>Стоимость товаров (руб., для ограничения 22%)</label>
             <input v-model.number="calcItemsCost" type="number" min="0" placeholder="Необязательно" />
           </div>
         </div>
@@ -57,7 +56,7 @@
 
       <transition name="fade">
         <div v-if="calcResult" class="calc-result glass-card">
-          <h3>📊 Результат расчёта</h3>
+          <h3>Результат расчёта</h3>
           <div class="result-grid">
             <div class="r-item">
               <span class="r-label">Город</span>
@@ -113,32 +112,32 @@
       </div>
     </section>
 
-    <!-- 4. УМНАЯ ЛОГИСТИКА -->
+    <!-- 4. УМНАЯ ЛОГИСТИКА (3 фотографии) -->
     <section class="logistics-section glass-card">
       <div class="logistics-info">
-        <h2>📦 Умная логистика ApexDrive</h2>
+        <h2>Умная логистика ApexDrive</h2>
         <p class="section-subtitle">Мы оптимизировали доставку так, чтобы она зависела от реального наличия товара в вашем регионе:</p>
         
         <div class="logistics-grid">
           <div class="logistics-item">
-            <span class="logistics-icon">🏙️</span>
-            <div>
+            <img src="/assets/images/about-local.jpg" alt="Локальный склад" class="logistics-img" />
+            <div class="logistics-text">
               <strong>Внутри вашего города</strong>
               <p>Если товар есть на складе в вашем городе, перемещение в выбранный ПВЗ абсолютно <b>бесплатно</b>.</p>
             </div>
           </div>
           
           <div class="logistics-item">
-            <span class="logistics-icon">🚚</span>
-            <div>
+            <img src="/assets/images/about-intercity.jpg" alt="Межгород" class="logistics-img" />
+            <div class="logistics-text">
               <strong>Межгород (до ПВЗ)</strong>
               <p>Если товара нет в вашем регионе, мы привезем его с ближайшего хаба. Стоимость рассчитывается по прозрачной формуле: <b>расстояние (км) × вес (кг) × коэффициент + базовая ставка</b>.</p>
             </div>
           </div>
           
           <div class="logistics-item">
-            <span class="logistics-icon">⚖️</span>
-            <div>
+            <img src="/assets/images/about-heavy.jpg" alt="Тяжёлые грузы" class="logistics-img" />
+            <div class="logistics-text">
               <strong>Тяжёлые грузы</strong>
               <p>Чем тяжелее заказ, тем ниже коэффициент за килограмм‑километр. Мы не берём заоблачных сумм за крупногабарит.</p>
             </div>
@@ -146,72 +145,25 @@
         </div>
 
         <div class="logistics-cta">
-          <router-link to="/catalog" class="btn btn-primary btn-lg">🛒 Начать покупки</router-link>
+          <router-link to="/catalog" class="btn btn-primary btn-lg">Начать покупки</router-link>
           <p class="city-note">Наличие в <b>г. {{ appStore.city || 'вашем городе' }}</b> обновляется в реальном времени.</p>
         </div>
       </div>
     </section>
 
-    <!-- 5. ИНТЕГРАЦИЯ API: ФИНАНСОВЫЙ РАДАР (ИСПРАВЛЕН) -->
-    <section class="currency-radar-section glass-card">
-      <div class="currency-content">
-        <h2>Финансовый радар закупок</h2>
-        <p>Поскольку 80% автокомпонентов импортируются, мы мониторим курсы валют ЦБ РФ в реальном времени, чтобы удерживать цены на складах максимально долго.</p>
-        
-        <div v-if="loadingCurrency" class="loading-state flex items-center gap-2">
-          <span class="spinner"></span> Получение данных с биржи...
-        </div>
-
-        <div v-else-if="currencyData" class="currency-dashboard">
-          <div class="currency-metrics">
-            <div class="c-metric">
-              <span class="c-flag">🇺🇸</span>
-              <div class="c-val">{{ currencyData.usd }} ₽</div>
-              <div class="c-lbl">USD (ЦБ РФ)</div>
-            </div>
-            <div class="c-metric">
-              <span class="c-flag">🇪🇺</span>
-              <div class="c-val">{{ currencyData.eur }} ₽</div>
-              <div class="c-lbl">EUR (ЦБ РФ)</div>
-            </div>
-            <div class="c-metric">
-              <span class="c-flag">🇨🇳</span>
-              <div class="c-val">{{ currencyData.cny }} ₽</div>
-              <div class="c-lbl">CNY (Китай)</div>
-            </div>
-          </div>
-
-          <div class="price-index-box" :class="priceIndex.status">
-            <div class="i-icon">{{ priceIndex.icon }}</div>
-            <div>
-              <strong>Индекс цен ApexDrive: {{ priceIndex.title }}</strong>
-              <p>{{ priceIndex.desc }}</p>
-            </div>
-          </div>
-        </div>
+    <!-- 5. НАША КОМАНДА (1 фотография) -->
+    <section class="team-section glass-card">
+      <h2>Наша команда</h2>
+      <div class="team-content">
+        <img src="/assets/images/about-team.jpg" alt="Команда ApexDrive" class="team-img" />
+        <p class="team-text">Профессионалы с многолетним опытом, готовые помочь вам.</p>
       </div>
     </section>
 
-    <!-- 6. НАШИ ПАРТНЕРЫ -->
-    <section v-if="stats.brandsList && stats.brandsList.length" class="brands-section">
-      <h2>С нами работают</h2>
-      <div class="brands-grid">
-        <div v-for="brand in stats.brandsList" :key="brand.name" class="brand-card glass-card">
-          <img :src="brand.logo_url" :alt="brand.name" v-if="brand.logo_url" loading="lazy" />
-          <div v-else class="brand-letter">{{ brand.name.charAt(0) }}</div>
-          <div class="brand-name">{{ brand.name }}</div>
-        </div>
-      </div>
-    </section>
-    
-    <section v-else-if="loadingStats" class="brands-section text-center">
-      <h2>Загрузка партнеров...</h2>
-    </section>
-
-    <!-- 7. FAQ -->
+    <!-- 6. FAQ -->
     <section class="faq-section">
       <div class="section-header text-center">
-        <h2>❓ Ответы на частые вопросы</h2>
+        <h2>Ответы на частые вопросы</h2>
       </div>
       
       <div class="faq-accordion">
@@ -225,13 +177,6 @@
           </div>
         </div>
       </div>
-    </section>
-
-    <!-- 8. КАРТА -->
-    <section class="map-section glass-card">
-      <h2>Наш главный распределительный центр</h2>
-      <p class="map-subtitle">Центральный хаб: г. Москва, ул. Тверская, д. 1. Отсюда осуществляются все межрегиональные отправки.</p>
-      <div id="map" class="map-container"></div>
     </section>
   </div>
 </template>
@@ -261,29 +206,6 @@ const loadAboutData = async () => {
     loadingStats.value = false;
   }
 };
-
-const currencyData = ref(null);
-const loadingCurrency = ref(true);
-
-const fetchCurrency = async () => {
-  loadingCurrency.value = true;
-  try {
-    const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/marketing/currency`);
-    currencyData.value = res.data;
-  } catch (e) {
-    console.error("Ошибка получения валют", e);
-  } finally {
-    loadingCurrency.value = false;
-  }
-};
-
-const priceIndex = computed(() => {
-  if (!currencyData.value) return { status: 'normal', icon: '🛡️', title: 'Ожидание данных', desc: 'Связь с ЦБ РФ...' };
-  const usd = Number(currencyData.value.usd);
-  if (usd > 105) return { status: 'danger', icon: '📈', title: 'Ожидается повышение', desc: 'В связи с высоким курсом закупки новые партии деталей могут подорожать. Рекомендуем покупать из наличия.' };
-  if (usd < 85) return { status: 'success', icon: '📉', title: 'Благоприятный фон', desc: 'Курс валют снижается. Мы ожидаем падение цен на аналоги в ближайшие недели.' };
-  return { status: 'normal', icon: '🛡️', title: 'Цены заморожены', desc: 'Мы зафиксировали цены на складские остатки. Текущий курс не влияет на детали в наличии.' };
-});
 
 const faqs = ref([
   { question: 'Что делать, если деталь мне не подошла?', answer: 'Мы понимаем, что подбор автозапчастей — сложный процесс. Если деталь не подошла к вашему авто, вы можете вернуть ее в любой из наших ПВЗ в течение 14 дней без объяснения причин. Средства вернутся на вашу карту.' },
@@ -344,30 +266,8 @@ const calculateShipping = async () => {
   }
 };
 
-const initMap = () => {
-  if (window.ymaps) {
-    window.ymaps.ready(() => {
-      const map = new window.ymaps.Map('map', { center: [55.7558, 37.6173], zoom: 13, controls: ['zoomControl'] });
-      map.geoObjects.add(new window.ymaps.Placemark([55.7558, 37.6173], { balloonContent: 'Главный склад ApexDrive' }));
-    });
-  } else {
-    const script = document.createElement('script');
-    const apiKey = import.meta.env.VITE_YANDEX_API_KEY || '37b759c1-0a59-4439-bb59-f6607a62ed50';
-    script.src = `https://api-maps.yandex.ru/2.1/?apikey=${apiKey}&lang=ru_RU`;
-    script.onload = () => {
-      window.ymaps.ready(() => {
-        const map = new window.ymaps.Map('map', { center: [55.7558, 37.6173], zoom: 13, controls: ['zoomControl'] });
-        map.geoObjects.add(new window.ymaps.Placemark([55.7558, 37.6173], { balloonContent: 'ApexDrive Hub' }));
-      });
-    };
-    document.head.appendChild(script);
-  }
-};
-
 onMounted(() => {
   loadAboutData();
-  fetchCurrency();
-  initMap();
   loadCities();
   loadWarehouses();
 });
@@ -380,6 +280,7 @@ onMounted(() => {
   padding: 20px 16px 60px;
 }
 
+/* HERO — ФОТО СТАЛО ЕЩЁ БОЛЬШЕ */
 .hero-about {
   display: flex;
   align-items: center;
@@ -426,34 +327,20 @@ onMounted(() => {
 .hero-image {
   flex: 1;
   position: relative;
-  height: 250px;
+  height: 480px; /* УВЕЛИЧЕНО с 350px до 480px */
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.shape {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.1;
+.hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-md);
 }
 
-.shape-1 {
-  width: 300px;
-  height: 300px;
-  background: var(--primary);
-  top: -50px;
-  right: -50px;
-}
-
-.shape-2 {
-  width: 150px;
-  height: 150px;
-  background: var(--accent);
-  bottom: 0;
-  left: 0;
-}
-
+/* КАЛЬКУЛЯТОР */
 .calculator-section {
   margin: 4rem 0;
   padding: 3rem;
@@ -524,6 +411,7 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
+/* СТАТИСТИКА */
 .stats-section {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -557,6 +445,7 @@ onMounted(() => {
   margin-top: 8px;
 }
 
+/* ЛОГИСТИКА — ФОТО ЕЩЁ БОЛЬШЕ */
 .logistics-section {
   margin: 4rem 0;
   padding: 3rem;
@@ -583,13 +472,12 @@ onMounted(() => {
 
 .logistics-item {
   display: flex;
-  align-items: flex-start;
-  gap: 1rem;
+  flex-direction: column;
   background: var(--bg-body);
-  padding: 1.5rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   transition: transform 0.2s, border-color 0.2s;
+  overflow: hidden;
 }
 
 .logistics-item:hover {
@@ -597,22 +485,27 @@ onMounted(() => {
   border-color: var(--primary);
 }
 
-.logistics-icon {
-  font-size: 2.2rem;
-  line-height: 1;
+.logistics-img {
+  width: 100%;
+  height: 340px; /* УВЕЛИЧЕНО с 260px до 340px */
+  object-fit: cover;
 }
 
-.logistics-item strong {
+.logistics-text {
+  padding: 1.5rem;
+}
+
+.logistics-text strong {
   display: block;
   margin-bottom: 0.5rem;
   color: var(--text-main);
   font-size: 1.1rem;
 }
 
-.logistics-item p {
+.logistics-text p {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   line-height: 1.5;
 }
 
@@ -628,180 +521,44 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
-/* ИСПРАВЛЕНО: убраны фиксированные цвета */
-.currency-radar-section {
+/* НАША КОМАНДА */
+.team-section {
   margin: 4rem 0;
   padding: 3rem;
-  background: linear-gradient(135deg, var(--bg-card) 0%, var(--primary-light) 100%);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
-}
-
-.currency-content h2 {
-  color: var(--text-main) !important;
-  margin-bottom: 10px;
-  font-size: 2.2rem;
-  font-weight: 800;
-}
-
-.currency-content p {
-  color: var(--text-muted);
-  margin-bottom: 30px;
-  font-size: 1.1rem;
-  max-width: 800px;
-}
-
-.currency-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
-
-.c-metric {
-  background: var(--bg-card);
-  padding: 20px;
-  border-radius: var(--radius-md);
-  text-align: center;
-  border: 1px solid var(--border-color);
-  transition: transform 0.2s, background 0.2s;
-}
-
-.c-metric:hover {
-  background: var(--primary-light);
-  transform: translateY(-3px);
-}
-
-.c-flag {
-  font-size: 2.2rem;
-  display: block;
-  margin-bottom: 10px;
-}
-
-.c-val {
-  font-size: 1.8rem;
-  font-weight: 800;
-  color: var(--text-main);
-}
-
-.c-lbl {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  margin-top: 5px;
-  font-weight: 700;
-}
-
-.price-index-box {
-  display: flex;
-  align-items: flex-start;
-  gap: 15px;
-  padding: 20px;
-  border-radius: var(--radius-md);
-  margin-top: 10px;
-}
-
-.price-index-box.normal {
-  background: var(--primary-light);
-  border: 1px solid var(--primary);
-}
-.price-index-box.normal strong { color: var(--primary); }
-
-.price-index-box.danger {
-  background: var(--danger-light);
-  border: 1px solid var(--danger);
-}
-.price-index-box.danger strong { color: var(--danger); }
-
-.price-index-box.success {
-  background: var(--success-light);
-  border: 1px solid var(--success);
-}
-.price-index-box.success strong { color: var(--success); }
-
-.i-icon {
-  font-size: 2.5rem;
-  line-height: 1;
-}
-
-.price-index-box p {
-  margin: 5px 0 0 0;
-  font-size: 0.95rem;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-
-.brands-section {
-  margin: 4rem 0;
   text-align: center;
 }
 
-.brands-section h2 {
-  margin-bottom: 30px;
+.team-section h2 {
   font-size: 2.2rem;
+  margin-bottom: 2rem;
   color: var(--text-main);
 }
 
-.brands-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1.5rem;
-}
-
-.brand-card {
-  width: 140px;
-  height: 100px;
+.team-content {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  padding: 10px;
+  gap: 2rem;
 }
 
-.brand-card:hover {
-  border-color: var(--primary);
-  transform: translateY(-3px);
+.team-img {
+  max-width: 800px;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  box-shadow: var(--shadow-md);
 }
 
-.brand-card img {
-  max-width: 80%;
-  max-height: 45px;
-  object-fit: contain;
-  margin-bottom: 8px;
-  filter: grayscale(1) opacity(0.7);
-  transition: filter 0.3s;
+.team-text {
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--text-main);
+  max-width: 800px;
+  line-height: 1.6;
 }
 
-:global(.dark) .brand-card img {
-  filter: grayscale(1) opacity(0.7) invert(1);
-}
-
-.brand-card:hover img {
-  filter: grayscale(0) opacity(1);
-}
-
-:global(.dark) .brand-card:hover img {
-  filter: grayscale(0) opacity(1) invert(0);
-  background: #fff;
-  border-radius: 4px;
-  padding: 2px;
-}
-
-.brand-letter {
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--primary);
-  margin-bottom: 5px;
-}
-
-.brand-name {
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  text-align: center;
-  line-height: 1.1;
-}
-
+/* FAQ */
 .faq-section {
   margin: 5rem auto;
   max-width: 800px;
@@ -858,31 +615,7 @@ onMounted(() => {
   padding-top: 20px;
 }
 
-.map-section {
-  margin: 4rem 0;
-  padding: 2rem;
-}
-
-.map-section h2 {
-  margin-bottom: 10px;
-  color: var(--text-main);
-}
-
-.map-subtitle {
-  color: var(--text-muted);
-  margin-bottom: 20px;
-}
-
-.map-container {
-  width: 100%;
-  height: 450px;
-  background: var(--bg-body);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  border: 1px solid var(--border-color);
-}
-
-
+/* Адаптив */
 @media (max-width: 950px) {
   .hero-about {
     flex-direction: column;
@@ -890,11 +623,14 @@ onMounted(() => {
     text-align: center;
   }
   .hero-image {
-    height: 200px;
+    height: 300px; /* немного уменьшаем на планшетах */
   }
   .stats-section {
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
+  }
+  .team-img {
+    max-width: 100%;
   }
 }
 
@@ -904,24 +640,22 @@ onMounted(() => {
   }
   .calculator-section,
   .logistics-section,
-  .currency-radar-section {
+  .team-section {
     padding: 2rem 1.5rem;
-  }
-  .currency-metrics {
-    grid-template-columns: 1fr;
-  }
-  .price-index-box {
-    flex-direction: column;
-    text-align: center;
-    align-items: center;
   }
   .logistics-cta {
     align-items: center;
     text-align: center;
     width: 100%;
   }
-  .map-container {
-    height: 300px;
+  .logistics-img {
+    height: 380px; /* на мобильных тоже очень крупные */
+  }
+  .hero-image {
+    height: 250px;
+  }
+  .team-text {
+    font-size: 1.2rem;
   }
 }
 

@@ -35,3 +35,8 @@
 {"id":"eb5d9ea3","timestamp":"28.05.2026, 01:53:14","type":"ERROR","message":"TypeError: fetch failed","url":"/api/admin/wishlists","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e"}
 {"id":"a83e17b3","timestamp":"28.05.2026, 02:04:29","type":"ERROR","message":"TypeError: terminated","url":"/api/admin/categories","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e"}
 {"id":"99353345","timestamp":"28.05.2026, 14:26:59","type":"ERROR","message":"TypeError: terminated","url":"/api/admin/reviews","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e","ip":"::1"}
+{"id":"3c809e0b","timestamp":"30.05.2026, 14:58:09","type":"ERROR","message":"TypeError: fetch failed","url":"/api/admin/reviews","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e"}
+{"id":"6c7c37c5","timestamp":"30.05.2026, 14:58:54","type":"ERROR","message":"TypeError: terminated","url":"/api/admin/users","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e"}
+{"id":"60bb2f0b","timestamp":"30.05.2026, 14:58:54","type":"ERROR","message":"TypeError: terminated","url":"/api/admin/products","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e","ip":"::1"}
+{"id":"7bb43087","timestamp":"30.05.2026, 16:25:57","type":"ERROR","message":"TypeError: terminated","url":"/api/admin/product_stocks","method":"GET","user":"ae766c65-ff8d-4f21-a28b-9642ba6ab53e"}
+{"id":"c029ec91","timestamp":"30.05.2026, 16:43:40","type":"ERROR","message":"ENOENT: no such file or directory, stat 'D:\\Tehan\\4kurs\\Diplom\\DiplomFinal\\backend\\public\\index.html'","stack":"Error: ENOENT: no such file or directory, stat 'D:\\Tehan\\4kurs\\Diplom\\DiplomFinal\\backend\\public\\index.html'","url":"/","method":"GET","user":"guest","ip":"::1"}

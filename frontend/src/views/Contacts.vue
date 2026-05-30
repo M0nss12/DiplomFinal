@@ -1,10 +1,53 @@
 <template>
   <main class="contacts-page animate-fade-in" aria-labelledby="contacts-heading">
-    <!-- ЗАГОЛОВОК -->
-    <header class="contacts-page-header">
-      <h1 id="contacts-heading">Связь с поддержкой</h1>
-      <p>Мы всегда на связи, чтобы помочь вам с выбором или решить любую проблему.</p>
-    </header>
+    <!-- ГЕРОЙ-БЛОК с увеличенным изображением -->
+    <section class="hero-contacts glass-card">
+      <div class="hero-content">
+        <h1>
+          Связь с поддержкой 
+          <span class="highlight">ApexDrive</span>
+        </h1>
+        <p class="hero-subtitle">
+          Мы всегда на связи, чтобы помочь вам с выбором или решить любую проблему.
+          Наша команда экспертов отвечает быстро, профессионально и с заботой о каждом клиенте.
+        </p>
+        <button @click="scrollToForm" class="btn btn-primary btn-lg hero-cta">
+          Написать в поддержку
+        </button>
+      </div>
+      <div class="hero-image">
+        <img 
+          src="/assets/images/contacts-hero.jpg" 
+          alt="Служба поддержки ApexDrive" 
+          class="hero-img"
+          loading="eager"
+        />
+      </div>
+    </section>
+
+    <!-- БЛОК КЛЮЧЕВЫХ ПОКАЗАТЕЛЕЙ -->
+    <section class="support-stats-grid" aria-label="Показатели качества поддержки">
+      <div class="stat-card glass-card">
+        <div class="stat-icon">⭐</div>
+        <div class="stat-value">4.9 / 5</div>
+        <div class="stat-label">Рейтинг поддержки</div>
+      </div>
+      <div class="stat-card glass-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-value">&lt; 2 мин</div>
+        <div class="stat-label">Среднее время ответа</div>
+      </div>
+      <div class="stat-card glass-card">
+        <div class="stat-icon">🏆</div>
+        <div class="stat-value">99%</div>
+        <div class="stat-label">Решенных обращений</div>
+      </div>
+      <div class="stat-card glass-card">
+        <div class="stat-icon">🕒</div>
+        <div class="stat-value">24/7</div>
+        <div class="stat-label">Онлайн-чат</div>
+      </div>
+    </section>
 
     <!-- ТОСТ-УВЕДОМЛЕНИЯ -->
     <transition name="toast-fade">
@@ -13,20 +56,24 @@
       </div>
     </transition>
 
-    <!-- 1. ОСНОВНЫЕ КОНТАКТЫ (СЕТКА) -->
+    <!-- 1. ОСНОВНЫЕ КОНТАКТЫ – фото увеличены -->
     <section class="contacts-info-grid" aria-label="Основные контакты">
-      <!-- ОФИС -->
       <article class="contact-item glass-card">
-        <h3>📍 Центральный офис</h3>
+        <div class="contact-photo-wrapper">
+          <img src="/assets/images/contacts-office.jpg" alt="Центральный офис" class="contact-photo" />
+        </div>
+        <h3>Центральный офис</h3>
         <address class="contact-address">
           <p>г. Москва, ул. Тверская, д. 1</p>
         </address>
         <a href="https://yandex.ru/maps/-/CCUZZM~6~A" target="_blank" class="map-link" rel="noopener noreferrer">Показать на карте →</a>
       </article>
 
-      <!-- ТЕЛЕФОН -->
       <article class="contact-item glass-card">
-        <h3>📞 Горячая линия</h3>
+        <div class="contact-photo-wrapper">
+          <img src="/assets/images/contacts-phone.jpg" alt="Горячая линия" class="contact-photo" />
+        </div>
+        <h3>Горячая линия</h3>
         <p class="copy-trigger" @click="copyToClipboard('+79991234567')">
           +7 (999) 123-45-67
           <span class="tooltip" ref="phoneTooltip">Скопировать</span>
@@ -34,9 +81,11 @@
         <small>Ежедневно с 09:00 до 21:00</small>
       </article>
 
-      <!-- ПОЧТА -->
       <article class="contact-item glass-card">
-        <h3>✉️ Общая почта</h3>
+        <div class="contact-photo-wrapper">
+          <img src="/assets/images/contacts-email.jpg" alt="Электронная почта" class="contact-photo" />
+        </div>
+        <h3>Общая почта</h3>
         <p class="copy-trigger" @click="copyToClipboard('monsschogath@gmail.com')">
           monsschogath@gmail.com
           <span class="tooltip" ref="emailTooltip">Скопировать</span>
@@ -44,9 +93,11 @@
         <small>Отвечаем в течение 15 минут</small>
       </article>
 
-      <!-- СТАТУС -->
-      <article class="contact-item status-box glass-card">
-        <h3>🕒 Текущее время</h3>
+      <article class="contact-item glass-card">
+        <div class="contact-photo-wrapper">
+          <img src="/assets/images/contacts-hours.jpg" alt="Режим работы" class="contact-photo" />
+        </div>
+        <h3>Текущее время</h3>
         <div class="status-indicator" :class="isStoreOpen ? 'status-open' : 'status-closed'">
           <span class="dot"></span>
           {{ isStoreOpen ? 'Сейчас мы работаем' : 'Сейчас мы закрыты' }}
@@ -55,7 +106,7 @@
       </article>
     </section>
 
-    <!-- 2. СПРАВОЧНИК ОТДЕЛОВ -->
+    <!-- 2. СПРАВОЧНИК ОТДЕЛОВ (фото отдела увеличено) -->
     <section class="departments-section" aria-labelledby="departments-heading">
       <h2 id="departments-heading" class="section-title">Выберите нужный отдел</h2>
       
@@ -69,7 +120,7 @@
           :aria-selected="activeDept.id === dept.id"
           role="tab"
         >
-          <span class="dept-icon">{{ dept.icon }}</span> {{ dept.name }}
+          {{ dept.name }}
         </button>
       </div>
 
@@ -90,10 +141,10 @@
             </div>
             <div class="dept-messengers">
               <a v-if="activeDept.telegram" :href="'https://t.me/' + activeDept.telegram" target="_blank" class="msg-link telegram" aria-label="Написать в Telegram">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" alt="Telegram" class="msg-icon"> Telegram
+                Telegram ↗
               </a>
               <a v-if="activeDept.whatsapp" :href="'https://wa.me/' + activeDept.whatsapp" target="_blank" class="msg-link whatsapp" aria-label="Написать в WhatsApp">
-                <span class="msg-icon">💬</span> WhatsApp
+                WhatsApp ↗
               </a>
             </div>
           </div>
@@ -104,16 +155,18 @@
               {{ isDeptOpen(activeDept) ? 'Открыто' : 'Закрыто' }}
             </div>
           </div>
+          <div class="department-photo-wrapper">
+            <img src="/assets/images/contacts-department.jpg" alt="Отдел поддержки" class="department-photo" />
+          </div>
         </div>
       </transition>
     </section>
 
     <hr class="section-divider" />
 
-    <!-- 3. БЛОК С ФОРМОЙ И СОЦСЕТЯМИ -->
+    <!-- 3. ФОРМА И СОЦСЕТИ -->
     <div class="support-split-section">
-      <!-- ЛЕВАЯ: ФОРМА -->
-      <section class="feedback-form-container" aria-labelledby="feedback-heading">
+      <section class="feedback-form-container" aria-labelledby="feedback-heading" ref="formContainerRef">
         <h2 id="feedback-heading">Написать письмо</h2>
         <p class="section-desc">Для сложных вопросов, требующих детального разбора.</p>
         
@@ -141,40 +194,28 @@
         </form>
       </section>
 
-      <!-- ПРАВАЯ: СОЦСЕТИ -->
       <section class="social-links-container" aria-labelledby="social-heading">
         <h2 id="social-heading">Мы в соцсетях</h2>
         <p class="section-desc">Подпишитесь, чтобы следить за новостями, или напишите нам в личные сообщения.</p>
 
         <div class="social-grid">
-          <!-- VK -->
           <a href="https://vk.com/mr.monss" target="_blank" class="social-card vk glass-card" rel="noopener noreferrer" aria-label="Группа ВКонтакте">
-            <div class="social-icon">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/2/21/VK.com-logo.svg" alt="VK">
-            </div>
             <div class="social-info">
               <strong>ВКонтакте</strong>
               <span>Новости и акции</span>
             </div>
-            <div class="social-arrow">↗</div>
           </a>
 
-          <!-- TELEGRAM -->
           <a href="https://t.me/M0nss" target="_blank" class="social-card tg glass-card" rel="noopener noreferrer" aria-label="Telegram канал">
-            <div class="social-icon">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" alt="TG">
-            </div>
             <div class="social-info">
               <strong>Telegram</strong>
               <span>Быстрая поддержка</span>
             </div>
-            <div class="social-arrow">↗</div>
           </a>
         </div>
 
         <div class="support-hint glass-card">
-          <span class="hint-icon">💡</span>
-          <span>Самый быстрый ответ — в <b>Telegram</b>. Время ожидания: ~2 минуты.</span>
+          <span>⚡ Самый быстрый ответ — в <b>Telegram</b>. Время ожидания: ~2 минуты.</span>
         </div>
       </section>
     </div>
@@ -182,15 +223,14 @@
 </template>
 
 <script setup>
-// (скрипт без изменений, приведён полностью для копирования)
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, onUnmounted } from 'vue';
 import axios from 'axios';
 
-// ---------- ТОСТ ----------
+// --- toast уведомления ---
 const toast = reactive({
   show: false,
   message: '',
-  type: 'success' // 'success' / 'error'
+  type: 'success'
 });
 
 const showToast = (msg, type = 'success') => {
@@ -200,7 +240,7 @@ const showToast = (msg, type = 'success') => {
   setTimeout(() => { toast.show = false; }, 3000);
 };
 
-// ---------- ОБРАТНАЯ СВЯЗЬ ----------
+// --- форма обратной связи ---
 const feedback = reactive({
   name: '',
   contact: '',
@@ -226,20 +266,20 @@ const submitFeedback = async () => {
       contact: feedback.contact,
       message: feedback.message
     });
-    showToast('✅ Сообщение успешно отправлено! Мы ответим вам на почту.');
+    showToast('Сообщение успешно отправлено! Мы ответим вам на почту.');
     feedback.name = '';
     feedback.contact = '';
     feedback.message = '';
     emailValid.value = true;
   } catch (e) {
     console.error("Ошибка формы обратной связи:", e);
-    showToast('❌ Не удалось отправить сообщение. Попробуйте позже.', 'error');
+    showToast('Не удалось отправить сообщение. Попробуйте позже.', 'error');
   } finally {
     loading.value = false;
   }
 };
 
-// ---------- КОПИРОВАНИЕ ----------
+// --- копирование в буфер ---
 const copyToClipboard = async (text) => {
   try {
     await navigator.clipboard.writeText(text);
@@ -263,11 +303,11 @@ const copyToClipboard = async (text) => {
     textarea.select();
     document.execCommand('copy');
     document.body.removeChild(textarea);
-    showToast('Скопировано (устаревший метод)');
+    showToast('Скопировано');
   }
 };
 
-// ---------- ВРЕМЯ РАБОТЫ ----------
+// --- текущее время ---
 const currentTime = ref('');
 let timer = null;
 
@@ -280,17 +320,17 @@ timer = setInterval(updateTime, 1000);
 
 onUnmounted(() => clearInterval(timer));
 
+// --- статус магазина ---
 const isStoreOpen = computed(() => {
   const h = new Date().getHours();
   return h >= 9 && h < 21;
 });
 
-// ---------- ОТДЕЛЫ ----------
+// --- справочник отделов ---
 const departments = [
   { 
     id: 'sales', 
     name: 'Отдел продаж', 
-    icon: '🛒', 
     desc: 'Консультации по подбору запчастей, оформление заказов и вопросы оплаты.',
     phone: '+7 (999) 123-45-67 (доб. 1)',
     phoneDigits: '+79991234567',
@@ -303,7 +343,6 @@ const departments = [
   { 
     id: 'warranty', 
     name: 'Возврат и Гарантия', 
-    icon: '🛡️', 
     desc: 'Вопросы по возврату товаров, гарантийным случаям и претензиям.',
     phone: '+7 (999) 123-45-67 (доб. 2)',
     phoneDigits: '+79991234567',
@@ -316,7 +355,6 @@ const departments = [
   { 
     id: 'b2b', 
     name: 'Оптовый отдел', 
-    icon: '🤝', 
     desc: 'Сотрудничество с СТО, таксопарками и магазинами. Оптовые прайс-листы.',
     phone: '+7 (999) 123-45-67 (доб. 3)',
     phoneDigits: '+79991234567',
@@ -340,12 +378,15 @@ const isDeptOpen = (dept) => {
   const closeMinutes = dept.schedule.close * 60;
   return dept.schedule.days.includes(day) && currentMinutes >= openMinutes && currentMinutes < closeMinutes;
 };
+
+// --- плавный скролл к форме ---
+const formContainerRef = ref(null);
+const scrollToForm = () => {
+  formContainerRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 </script>
 
 <style scoped>
-/* ==========================================================================
-   УНИКАЛЬНЫЕ СТИЛИ (всё общее убрано, используется глобальный CSS)
-   ========================================================================== */
 .contacts-page {
   padding-top: 40px;
   padding-bottom: 60px;
@@ -354,227 +395,535 @@ const isDeptOpen = (dept) => {
   width: 96%;
 }
 
-/* Заголовок */
-.contacts-page-header { text-align: center; margin-bottom: 50px; }
-.contacts-page-header h1 { font-size: 2.8rem; font-weight: 900; margin-bottom: 10px; color: var(--text-main); }
-.contacts-page-header p { color: var(--text-muted); font-size: 1.1rem; }
+/* ГЕРОЙ-БЛОК */
+.hero-contacts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 50px;
+  padding: 50px 50px;
+  margin-bottom: 60px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(2px);
+  border-radius: 40px;
+  transition: all 0.3s;
+}
+.hero-content {
+  flex: 1;
+}
+.hero-content h1 {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 20px;
+  color: var(--text-main);
+}
+.highlight {
+  background: linear-gradient(135deg, var(--primary), #8b5cf6);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+.hero-subtitle {
+  font-size: 1.15rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin-bottom: 30px;
+  max-width: 90%;
+}
+.hero-cta {
+  padding: 14px 36px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2);
+}
+.hero-image {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+.hero-img {
+  width: 100%;
+  max-width: 600px;
+  height: auto;
+  border-radius: 32px;
+  object-fit: cover;
+  box-shadow: 0 30px 45px -12px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease;
+}
+.hero-img:hover {
+  transform: scale(1.02);
+}
 
-/* Сетка контактов */
+/* Статистика */
+.support-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 28px;
+  margin-bottom: 70px;
+}
+.stat-card {
+  padding: 24px 16px;
+  text-align: center;
+  border-radius: 32px;
+  transition: transform 0.2s, background 0.2s;
+}
+.stat-card:hover {
+  transform: translateY(-6px);
+}
+.stat-icon {
+  font-size: 2.8rem;
+  margin-bottom: 14px;
+}
+.stat-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: 6px;
+}
+.stat-label {
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+/* Основные контакты */
 .contacts-info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 25px;
-  margin-bottom: 50px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 32px;
+  margin-bottom: 70px;
 }
-
 .contact-item {
-  padding: 30px;
+  padding: 24px 20px 28px;
   text-align: center;
-  position: relative;
+  border-radius: 32px;
+  transition: all 0.25s;
 }
 .contact-item:hover {
-  transform: translateY(-5px);
+  transform: translateY(-8px);
   border-color: var(--primary);
+  box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.15);
 }
-.contact-item h3 { font-size: 1.1rem; margin-bottom: 15px; color: var(--text-muted); font-weight: 700; }
-.contact-item p { font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 5px; }
-.contact-address p { cursor: default; font-style: normal; }
-
-.map-link { color: var(--primary); font-weight: 600; text-decoration: none; transition: color 0.2s; }
-.map-link:hover { color: var(--primary-hover); text-decoration: underline; }
-
-/* Копирование */
-.copy-trigger { position: relative; display: inline-block; cursor: pointer; }
-.copy-trigger:hover { color: var(--primary); }
+.contact-photo-wrapper {
+  overflow: hidden;
+  border-radius: 24px;
+  margin-bottom: 20px;
+}
+.contact-photo {
+  width: 100%;
+  height: 360px;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+  border-radius: 24px;
+}
+.contact-item:hover .contact-photo {
+  transform: scale(1.04);
+}
+.contact-item h3 {
+  font-size: 1.3rem;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+.contact-address p {
+  font-style: normal;
+  font-weight: 500;
+}
+.map-link {
+  display: inline-block;
+  margin-top: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.map-link:hover {
+  text-decoration: underline;
+}
+.copy-trigger {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 1.2rem;
+  transition: color 0.2s;
+}
+.copy-trigger:hover {
+  color: var(--primary);
+}
 .tooltip {
   visibility: hidden;
   background-color: var(--text-main);
   color: var(--bg-card);
-  text-align: center;
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 8px 14px;
+  border-radius: 12px;
   position: absolute;
-  z-index: 10;
-  bottom: 120%;
+  bottom: 130%;
   left: 50%;
   transform: translateX(-50%) translateY(5px);
-  font-size: 0.75rem;
-  font-weight: 600;
-  opacity: 0;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.8rem;
   white-space: nowrap;
+  opacity: 0;
+  transition: 0.2s;
 }
-:global(.dark) .tooltip { background-color: #f8fafc; color: #0f172a; }
-.tooltip::after {
-  content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
-  border-width: 5px; border-style: solid; border-color: var(--text-main) transparent transparent transparent;
+.copy-trigger:hover .tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
-:global(.dark) .tooltip::after { border-color: #f8fafc transparent transparent transparent; }
-.copy-trigger:hover .tooltip { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
-.tooltip.copied { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); background-color: var(--success); color: white; }
-.tooltip.copied::after { border-color: var(--success) transparent transparent transparent; }
-
-.contact-item small { display: block; margin-top: 10px; color: var(--text-muted); font-size: 0.85rem; font-weight: 500; }
-
-/* Индикатор статуса */
+.tooltip.copied {
+  visibility: visible;
+  opacity: 1;
+  background-color: var(--success);
+  color: white;
+}
+.contact-item small {
+  display: block;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
 .status-indicator {
-  display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
-  border-radius: 50px; font-weight: 800; font-size: 0.95rem; margin: 10px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 50px;
+  font-weight: 800;
+  margin: 10px 0;
 }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; box-shadow: 0 0 8px currentColor; }
-.status-open { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-.status-closed { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-
-/* Тост */
-.toast {
-  position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 16px 24px;
-  border-radius: var(--radius-md); font-weight: 600; display: flex; align-items: center; gap: 10px;
-  backdrop-filter: blur(10px); box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
 }
-.toast.success { background: rgba(16, 185, 129, 0.9); color: white; }
-.toast.error { background: rgba(239, 68, 68, 0.9); color: white; }
-.toast-fade-enter-active, .toast-fade-leave-active { transition: all 0.3s ease; }
-.toast-fade-enter-from, .toast-fade-leave-to { opacity: 0; transform: translateX(30px); }
+.status-open {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+}
+.status-closed {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
 
 /* Отделы */
-.section-title { text-align: center; margin-bottom: 30px; font-size: 2rem; color: var(--text-main); }
-
-.dept-tabs { display: flex; justify-content: center; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; }
-
-/* Кнопка таба отделов */
-.dept-tab-btn {
-  border-radius: 40px;
-  font-weight: 600;
-  padding: 12px 24px;
-  font-size: 1rem;
-  transition: all 0.3s;
+.section-title {
+  text-align: center;
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin-bottom: 35px;
 }
-.dept-tab-btn:hover {
-  transform: translateY(-2px);
+.dept-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+.dept-tab-btn {
+  border-radius: 60px;
+  font-weight: 700;
+  padding: 12px 32px;
+  font-size: 1.05rem;
+  transition: all 0.25s;
 }
 .dept-tab-btn.active {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.4);
 }
-.dept-icon { margin-right: 6px; }
-
-/* Карточка информации отдела */
 .dept-info-card {
-  padding: 40px;
+  padding: 45px 40px;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  max-width: 950px;
-  margin: 0 auto;
-  border-top: 4px solid var(--primary);
   flex-wrap: wrap;
-  gap: 25px;
+  gap: 45px;
+  border-radius: 40px;
+  border-top: 4px solid var(--primary);
+  align-items: center;
+  justify-content: center;
 }
-
-.dept-details { flex: 1; }
-.dept-details h3 { font-size: 1.6rem; margin-bottom: 15px; color: var(--text-main); font-weight: 800; }
-.dept-details p { color: var(--text-muted); margin-bottom: 25px; max-width: 500px; font-size: 1.05rem; line-height: 1.5; }
-
-.dept-contacts { display: flex; gap: 40px; flex-wrap: wrap; margin-bottom: 20px; }
-.dc-item { display: flex; flex-direction: column; }
-.dc-item span { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
-.dc-item b { font-size: 1.2rem; color: var(--primary); margin-top: 5px; font-weight: 800; }
-:global(.dark) .dc-item b { color: #60a5fa; }
-.phone-link { text-decoration: none; color: inherit; }
-
-.dept-messengers { display: flex; gap: 15px; margin-top: 15px; }
+.dept-details {
+  flex: 2;
+  min-width: 240px;
+}
+.dept-details h3 {
+  font-size: 1.8rem;
+  margin-bottom: 15px;
+}
+.dept-details p {
+  font-size: 1.1rem;
+  margin-bottom: 25px;
+  color: var(--text-muted);
+}
+.dept-contacts {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.dc-item {
+  display: flex;
+  flex-direction: column;
+}
+.dc-item span {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.dc-item b {
+  font-size: 1.3rem;
+  color: var(--primary);
+  margin-top: 5px;
+}
+.phone-link {
+  text-decoration: none;
+  color: inherit;
+}
+.dept-messengers {
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
+}
 .msg-link {
-  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 30px;
-  background: rgba(0,0,0,0.03); border: 1px solid var(--border-color);
-  font-weight: 600; font-size: 0.95rem; color: var(--text-main); text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border-radius: 40px;
+  background: rgba(0,0,0,0.03);
+  border: 1px solid var(--border-color);
+  font-weight: 600;
+  text-decoration: none;
   transition: all 0.2s;
 }
-:global(.dark) .msg-link { background: rgba(255,255,255,0.05); border-color: #475569; color: #f8fafc; }
-.msg-link:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-.msg-icon { width: 20px; height: 20px; object-fit: contain; }
-.telegram:hover { background: #24A1DE; color: white; border-color: #24A1DE; }
-.whatsapp:hover { background: #25D366; color: white; border-color: #25D366; }
-
-.dept-hours { text-align: right; min-width: 200px; }
-.dept-hours span { display: block; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 5px; }
-.hours-badge {
-  background: rgba(0,0,0,0.03); padding: 12px 24px; border-radius: var(--radius-md);
-  font-weight: 800; color: var(--text-main); border: 1px solid var(--border-color);
-  margin-bottom: 10px;
+.msg-link:hover {
+  transform: translateY(-2px);
 }
-:global(.dark) .hours-badge { background: rgba(255,255,255,0.05); border-color: #475569; color: #f8fafc; }
-.dept-status { font-weight: 800; font-size: 0.9rem; }
-.dept-status.open { color: var(--success); }
-.dept-status.closed { color: var(--danger); }
+.telegram:hover {
+  background: #24A1DE;
+  color: white;
+  border-color: #24A1DE;
+}
+.whatsapp:hover {
+  background: #25D366;
+  color: white;
+  border-color: #25D366;
+}
+.dept-hours {
+  text-align: center;
+  min-width: 180px;
+}
+.dept-hours span {
+  display: block;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.hours-badge {
+  background: rgba(0,0,0,0.03);
+  padding: 14px 28px;
+  border-radius: 40px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  border: 1px solid var(--border-color);
+  margin-bottom: 12px;
+}
+.dept-status {
+  font-weight: 800;
+  font-size: 1rem;
+}
+.dept-status.open {
+  color: var(--success);
+}
+.dept-status.closed {
+  color: var(--danger);
+}
+.department-photo-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+.department-photo {
+  width: 380px;
+  height: 380px;
+  object-fit: cover;
+  border-radius: 32px;
+  box-shadow: 0 20px 30px rgba(0,0,0,0.15);
+  transition: transform 0.3s;
+}
+.department-photo:hover {
+  transform: scale(1.03);
+}
 
 /* Форма и соцсети */
-.support-split-section { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; }
-.section-divider { border: 0; border-top: 1px solid var(--border-color); margin: 60px 0; }
-
-.feedback-form-container h2, .social-links-container h2 { font-size: 2rem; margin-bottom: 10px; color: var(--text-main); font-weight: 800; }
-.section-desc { color: var(--text-muted); margin-bottom: 25px; font-size: 1.05rem; }
-
-.feedback-form { padding: 30px; }
-
-/* Поля формы используют глобальные стили, только подсветка ошибки */
-.form-group { margin-bottom: 20px; }
-.form-group label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 0.95rem; color: var(--text-main); }
-.form-group input.invalid, .form-group textarea.invalid { border-color: var(--danger); }
-.error-hint { color: var(--danger); font-size: 0.85rem; margin-top: 5px; display: block; font-weight: 500; }
-
-/* Кнопка отправки формы – глобальный .btn .btn-primary .btn-block */
-/* (стилизация находится в глобальном CSS) */
-
-/* Соцсети */
-.social-links-container { display: flex; flex-direction: column; }
-.social-grid { display: flex; flex-direction: column; gap: 15px; }
-
-.social-card {
-  display: flex; align-items: center; padding: 15px 20px; text-decoration: none; color: var(--text-main);
+.section-divider {
+  border: 0;
+  border-top: 1px solid var(--border-color);
+  margin: 60px 0;
 }
-.social-card:hover { transform: translateX(8px); border-color: currentColor; }
-
-.social-icon img { width: 42px; height: 42px; object-fit: contain; }
-.social-info { flex: 1; margin-left: 20px; display: flex; flex-direction: column; }
-.social-info strong { font-size: 1.15rem; font-weight: 800; margin-bottom: 2px; }
-.social-info span { font-size: 0.9rem; color: var(--text-muted); font-weight: 500; }
-.social-arrow { font-size: 1.5rem; color: var(--text-muted); transition: transform 0.3s; }
-.social-card:hover .social-arrow { transform: translate(3px, -3px) scale(1.1); color: currentColor; }
-
-.vk:hover { color: #0077FF; border-color: #0077FF; }
-.tg:hover { color: #24A1DE; border-color: #24A1DE; }
-
-.support-hint {
-  margin-top: 30px;
-  background: rgba(37, 99, 235, 0.05);
-  padding: 20px;
+.support-split-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+}
+.feedback-form-container h2,
+.social-links-container h2 {
+  font-size: 2rem;
+  margin-bottom: 10px;
+  font-weight: 800;
+}
+.section-desc {
+  color: var(--text-muted);
+  margin-bottom: 25px;
+  font-size: 1.05rem;
+}
+.feedback-form {
+  padding: 38px;
+  border-radius: 36px;
+}
+.form-group {
+  margin-bottom: 20px;
+}
+.form-group label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.form-group input.invalid {
+  border-color: var(--danger);
+}
+.error-hint {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin-top: 5px;
+}
+.btn-block {
+  width: 100%;
+}
+.social-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.social-card {
   display: flex;
   align-items: center;
-  gap: 15px;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  border-left: 4px solid var(--primary);
+  padding: 20px 28px;
+  text-decoration: none;
   color: var(--text-main);
+  border-radius: 28px;
+  transition: transform 0.2s, border 0.2s;
 }
-:global(.dark) .support-hint { background: rgba(37, 99, 235, 0.1); color: #e2e8f0; }
-.hint-icon { font-size: 1.8rem; }
-.support-hint b { color: var(--primary); }
-:global(.dark) .support-hint b { color: #60a5fa; }
+.social-card:hover {
+  transform: translateX(10px);
+}
+.social-info {
+  flex: 1;
+}
+.social-info strong {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.social-info span {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.vk:hover {
+  color: #0077FF;
+  border-color: #0077FF;
+}
+.tg:hover {
+  color: #24A1DE;
+  border-color: #24A1DE;
+}
+.support-hint {
+  margin-top: 30px;
+  padding: 22px;
+  border-radius: 28px;
+  background: rgba(37, 99, 235, 0.05);
+  border-left: 4px solid var(--primary);
+  font-size: 1rem;
+}
+
+/* Тост */
+.toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  padding: 16px 28px;
+  border-radius: 60px;
+  backdrop-filter: blur(12px);
+  font-weight: 600;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.2);
+}
+.toast.success {
+  background: rgba(16, 185, 129, 0.9);
+  color: white;
+}
+.toast.error {
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+}
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: all 0.3s ease;
+}
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
 
 /* Адаптивность */
-@media (max-width: 950px) {
-  .support-split-section { grid-template-columns: 1fr; gap: 50px; }
-  .dept-info-card { flex-direction: column; text-align: center; gap: 25px; }
-  .dept-contacts { flex-direction: column; gap: 15px; align-items: center; }
-  .dept-hours { text-align: center; }
-  .dept-messengers { justify-content: center; }
+@media (max-width: 1000px) {
+  .hero-contacts {
+    flex-direction: column;
+    text-align: center;
+    padding: 40px 30px;
+  }
+  .hero-subtitle {
+    max-width: 100%;
+  }
+  .hero-img {
+    max-width: 500px;
+  }
+  .contact-photo {
+    height: 300px;
+  }
+  .department-photo {
+    width: 320px;
+    height: 320px;
+  }
+  .support-split-section {
+    grid-template-columns: 1fr;
+  }
 }
-
-@media (max-width: 600px) {
-  .contacts-page-header h1 { font-size: 2.2rem; }
-  .contact-item { padding: 20px; }
-  .feedback-form { padding: 20px; }
+@media (max-width: 700px) {
+  .contacts-info-grid {
+    grid-template-columns: 1fr;
+  }
+  .contact-photo {
+    height: 280px;
+  }
+  .department-photo {
+    width: 280px;
+    height: 280px;
+  }
+  .hero-img {
+    max-width: 100%;
+  }
+  .hero-content h1 {
+    font-size: 2.4rem;
+  }
+  .dept-info-card {
+    padding: 30px 20px;
+  }
+  .dept-details h3 {
+    font-size: 1.5rem;
+  }
 }
 </style>
