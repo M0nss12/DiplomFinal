@@ -409,3 +409,4 @@ watch(() => route.path, () => {
   .carousel-header h2 { font-size: 1.5rem; }
 }
 </style>
+

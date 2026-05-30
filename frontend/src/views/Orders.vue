@@ -726,13 +726,13 @@ onMounted(loadOrders);
 }
 
 .item-img-link img {
-  width: 60px;
-  height: 60px;
+  width: 160px;
+  height: 160px;
   object-fit: contain;
   background: white;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 4px;
+  padding: 10px;
   transition: transform 0.3s;
 }
 :global(.dark) .item-img-link img {
@@ -844,5 +844,29 @@ onMounted(loadOrders);
   .footer-actions {
     flex-direction: column;
   }
+}
+/* Переопределяем глобальный absolute, если он есть */
+.order-statuses {
+  position: relative;          /* на случай, если absolute цепляется за предка */
+}
+
+.orders-page .badge {
+  position: static !important; /* отключаем любое абсолютное позиционирование */
+  display: inline-flex;        /* чтобы текст и иконка не разъезжались */
+  align-items: center;
+  gap: 4px;
+  /* остальные твои стили остаются */
+  padding: 6px 14px;
+  border-radius: 40px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Чтобы payment-badge не терял фон и обводку */
+.payment-badge {
+  background: transparent !important;
+  border: 1px solid currentColor;
 }
 </style>
