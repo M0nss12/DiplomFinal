@@ -68,9 +68,12 @@
 
         <div v-if="filteredProducts.length > 0" class="products-list-vertical">
           <div v-for="p in filteredProducts" :key="p.id" class="product-list-item glass-card">
-            
             <div class="item-image-col">
-              <img :src="p.images && p.images.length > 0 ? p.images[0] : '/assets/images/no-image.png'" :alt="p.name" loading="lazy" />
+              <img
+                :src="p.images && p.images.length > 0 ? p.images[0] : '/assets/images/no-image.png'"
+                :alt="p.name"
+                loading="lazy"
+              />
               <button
                 @click.stop="toggleWishlist(p.id)"
                 class="wishlist-btn"
@@ -86,11 +89,11 @@
                 <img v-if="p.brands?.logo_url" :src="p.brands.logo_url" class="brand-logo-mini" />
                 <span v-else class="brand-name-text">{{ p.brands?.name }}</span>
               </div>
-              
+
               <router-link :to="'/product/' + p.id" class="product-link">
                 {{ p.name }}
               </router-link>
-              
+
               <div class="product-meta">
                 <span>Арт: {{ p.sku }}</span>
               </div>
@@ -98,18 +101,18 @@
               <!-- Рейтинг товара -->
               <div class="product-rating" v-if="getRating(p.id).count > 0">
                 <span class="stars-small">
-                  <span v-for="n in 5" :key="n" class="star-small" :class="{ filled: n <= Math.round(getRating(p.id).avg) }">★</span>
+                  <span
+                    v-for="n in 5"
+                    :key="n"
+                    class="star-small"
+                    :class="{ filled: n <= Math.round(getRating(p.id).avg) }"
+                  >★</span>
                 </span>
                 <span class="rating-value-small">{{ getRating(p.id).avg }}</span>
                 <span class="rating-count">({{ getRating(p.id).count }} отз.)</span>
               </div>
 
               <p class="product-desc">{{ p.description }}</p>
-
-              <div class="stock-status">
-                <span v-if="getStockInCity(p) > 0" class="badge badge-success">✅ В наличии (г. {{ appStore.city }})</span>
-                <span v-else class="badge badge-warning">🚚 Доставка (Межгород)</span>
-              </div>
             </div>
 
             <div class="item-action-col">
@@ -120,6 +123,22 @@
                 </div>
                 <h2 v-else class="regular-price">{{ p.price }} ₽</h2>
               </div>
+
+              <!-- СТАТУС НАЛИЧИЯ ПОД ЦЕНОЙ -->
+<div class="stock-status" style="margin-top: 12px; text-align: right;">
+  <span 
+    v-if="getTotalStock(p) === 0"
+    style="display: inline-block; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid #ef4444; border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;"
+  >❌ Нет в наличии</span>
+  <span 
+    v-else-if="getStockInCity(p) > 0"
+    style="display: inline-block; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid #10b981; border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;"
+  >✅ В наличии (г. {{ appStore.city }})</span>
+  <span 
+    v-else
+    style="display: inline-block; background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid #f59e0b; border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;"
+  >🚚 Доставка (Межгород)</span>
+</div>
 
               <button
                 @click="handleAddToCart(p)"
@@ -182,7 +201,7 @@ const loadRatings = async () => {
       headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_SECRET || 'my_super_secret_admin_123' }
     });
     const allReviews = res.data.filter(r => productIds.includes(r.product_id) && r.is_approved);
-    
+
     const map = {};
     allReviews.forEach(r => {
       if (!map[r.product_id]) map[r.product_id] = { sum: 0, count: 0 };
@@ -207,16 +226,13 @@ const loadData = async () => {
   const uid = localStorage.getItem('user_id');
 
   try {
-    const [cRes, pRes] = await Promise.all([
-      axios.get('/api/categories'),
-      axios.get('/api/products')
-    ]);
-    
+    const [cRes, pRes] = await Promise.all([axios.get('/api/categories'), axios.get('/api/products')]);
+
     allCategories.value = cRes.data;
-    
+
     const allowedCategoryIds = [categoryId];
     getAllChildCategoryIds(categoryId, allowedCategoryIds);
-    
+
     products.value = pRes.data.filter(p => allowedCategoryIds.includes(p.category_id));
 
     await loadRatings();
@@ -226,21 +242,28 @@ const loadData = async () => {
       wishlistIds.value = wRes.data.map(i => i.product_id);
     }
 
-    availableSpecs.value.forEach(s => {
-      if (!activeSpecFilters[s.name]) activeSpecFilters[s.name] = [];
+    // Инициализация активных фильтров для характеристик
+    const specsMap = {};
+    products.value.forEach(p => {
+      const chars = p.characteristics || {};
+      Object.keys(chars).forEach(key => {
+        if (!specsMap[key]) specsMap[key] = [];
+      });
     });
-
-  } catch (e) { 
-    console.error("Ошибка загрузки товаров:", e); 
-  } finally { 
-    loading.value = false; 
+    Object.keys(specsMap).forEach(spec => {
+      if (!activeSpecFilters[spec]) activeSpecFilters[spec] = [];
+    });
+  } catch (e) {
+    console.error('Ошибка загрузки товаров:', e);
+  } finally {
+    loading.value = false;
   }
 };
 
 const toggleWishlist = async (id) => {
   const uid = localStorage.getItem('user_id');
   if (!uid) {
-    alert("Пожалуйста, войдите в аккаунт, чтобы добавить товар в избранное.");
+    alert('Пожалуйста, войдите в аккаунт, чтобы добавить товар в избранное.');
     return;
   }
   try {
@@ -252,7 +275,9 @@ const toggleWishlist = async (id) => {
       wishlistIds.value.push(id);
     }
     window.dispatchEvent(new Event('wishlist-updated'));
-  } catch (e) { console.error("Ошибка избранного:", e); }
+  } catch (e) {
+    console.error('Ошибка избранного:', e);
+  }
 };
 
 const currentCategory = computed(() => allCategories.value.find(c => c.id === Number(route.params.id)));
@@ -281,13 +306,16 @@ const getStockInCity = (p) => {
     .reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
 };
 
-const getTotalStock = (p) => p.product_stocks?.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0) || 0;
+const getTotalStock = (p) =>
+  p.product_stocks?.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0) || 0;
 
 const filteredProducts = computed(() => {
   let res = [...products.value];
   if (filterOnlyInMyCity.value) res = res.filter(p => getStockInCity(p) > 0);
-  if (filterPriceMin.value !== null && filterPriceMin.value !== '') res = res.filter(p => (p.discount_price || p.price) >= filterPriceMin.value);
-  if (filterPriceMax.value !== null && filterPriceMax.value !== '') res = res.filter(p => (p.discount_price || p.price) <= filterPriceMax.value);
+  if (filterPriceMin.value !== null && filterPriceMin.value !== '')
+    res = res.filter(p => (p.discount_price || p.price) >= filterPriceMin.value);
+  if (filterPriceMax.value !== null && filterPriceMax.value !== '')
+    res = res.filter(p => (p.discount_price || p.price) <= filterPriceMax.value);
 
   Object.keys(activeSpecFilters).forEach(name => {
     const selectedVals = activeSpecFilters[name];
@@ -326,21 +354,24 @@ const resetFilters = () => {
   filterPriceMin.value = null;
   filterPriceMax.value = null;
   filterOnlyInMyCity.value = false;
-  Object.keys(activeSpecFilters).forEach(k => activeSpecFilters[k] = []);
+  Object.keys(activeSpecFilters).forEach(k => (activeSpecFilters[k] = []));
 };
 
-const handleAddToCart = (p) => cartStore.addToCart(p);
+const handleAddToCart = p => cartStore.addToCart(p);
 
 onMounted(loadData);
-watch(() => route.params.id, () => {
-  resetFilters();
-  loadData();
-});
+watch(
+  () => route.params.id,
+  () => {
+    resetFilters();
+    loadData();
+  }
+);
 </script>
 
 <style scoped>
 /* ==========================================================================
-   ЛОКАЛЬНЫЕ СТИЛИ СТРАНИЦЫ (НЕ КОНФЛИКТУЮТ С ГЛОБАЛЬНЫМИ)
+   ЛОКАЛЬНЫЕ СТИЛИ СТРАНИЦЫ
    ========================================================================== */
 .category-products-page {
   padding: 40px 20px;
@@ -350,60 +381,184 @@ watch(() => route.params.id, () => {
 
 /* Хлебные крошки */
 .breadcrumbs {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 25px; font-size: 0.9rem; color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 25px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
 }
-.breadcrumbs a { color: var(--primary); font-weight: 600; }
-.breadcrumbs a:hover { text-decoration: underline; }
-.separator { margin: 0 4px; }
-.current { font-weight: 700; color: var(--text-main); }
+.breadcrumbs a {
+  color: var(--primary);
+  font-weight: 600;
+}
+.breadcrumbs a:hover {
+  text-decoration: underline;
+}
+.separator {
+  margin: 0 4px;
+}
+.current {
+  font-weight: 700;
+  color: var(--text-main);
+}
 
-h1 { font-size: 2.2rem; font-weight: 900; margin-bottom: 30px; }
+h1 {
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin-bottom: 30px;
+}
 
 /* Каркас: Сайдбар + Контент */
-.content-wrapper { display: flex; gap: 30px; align-items: flex-start; }
+.content-wrapper {
+  display: flex;
+  gap: 30px;
+  align-items: flex-start;
+}
 
 /* САЙДБАР ФИЛЬТРОВ */
-.filters-sidebar { width: 280px; flex-shrink: 0; }
-.filters-box { padding: 25px; position: sticky; top: 100px; }
-.filters-box h3 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; font-weight: 800; }
+.filters-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+}
+.filters-box {
+  padding: 25px;
+  position: sticky;
+  top: 100px;
+}
+.filters-box h3 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+  font-weight: 800;
+}
 
-.filter-group { margin-bottom: 25px; }
-.filter-group label { display: block; font-size: 0.9rem; font-weight: 700; margin-bottom: 10px; }
+.filter-group {
+  margin-bottom: 25px;
+}
+.filter-group label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
 
-.price-range-inputs { display: flex; align-items: center; gap: 8px; }
-.price-range-inputs input { width: 100%; }
-.price-separator { color: var(--text-muted); font-weight: bold; }
+.price-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.price-range-inputs input {
+  width: 100%;
+}
+.price-separator {
+  color: var(--text-muted);
+  font-weight: bold;
+}
 
 /* Чекбоксы фильтров */
-.custom-checkbox { position: relative; display: flex; align-items: center; padding-left: 30px; cursor: pointer; font-size: 0.9rem; font-weight: 500; margin-bottom: 10px; user-select: none; }
-.custom-checkbox input { position: absolute; opacity: 0; height: 0; width: 0; }
-.checkmark { position: absolute; top: 50%; left: 0; transform: translateY(-50%); height: 20px; width: 20px; background-color: var(--bg-input); border: 2px solid var(--border-color); border-radius: 4px; transition: 0.2s; }
-.custom-checkbox:hover input ~ .checkmark { border-color: var(--primary); }
-.custom-checkbox input:checked ~ .checkmark { background-color: var(--primary); border-color: var(--primary); }
-.checkmark:after { content: ""; position: absolute; display: none; left: 5px; top: 1px; width: 5px; height: 10px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-.custom-checkbox input:checked ~ .checkmark:after { display: block; }
+.custom-checkbox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: 30px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 10px;
+  user-select: none;
+}
+.custom-checkbox input {
+  position: absolute;
+  opacity: 0;
+  height: 0;
+  width: 0;
+}
+.checkmark {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  height: 20px;
+  width: 20px;
+  background-color: var(--bg-input);
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  transition: 0.2s;
+}
+.custom-checkbox:hover input ~ .checkmark {
+  border-color: var(--primary);
+}
+.custom-checkbox input:checked ~ .checkmark {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+.checkmark:after {
+  content: '';
+  position: absolute;
+  display: none;
+  left: 5px;
+  top: 1px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.custom-checkbox input:checked ~ .checkmark:after {
+  display: block;
+}
 
-.spec-group { border-top: 1px solid var(--border-color); padding-top: 15px; }
-.spec-group b { display: block; margin-bottom: 10px; font-size: 0.95rem; }
+.spec-group {
+  border-top: 1px solid var(--border-color);
+  padding-top: 15px;
+}
+.spec-group b {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
 
-/* СПИСОК ТОВАРОВ (ИСПРАВЛЕНО: Вертикальный список) */
-.products-list-container { flex: 1; }
+/* СПИСОК ТОВАРОВ */
+.products-list-container {
+  flex: 1;
+}
 
-.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 16px 24px; }
-.found-count { color: var(--text-muted); font-size: 0.95rem; }
-.found-count b { color: var(--text-main); font-weight: 800; }
-.sort-select { padding: 8px 12px; max-width: 200px; cursor: pointer; font-weight: 600; }
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 16px 24px;
+}
+.found-count {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+.found-count b {
+  color: var(--text-main);
+  font-weight: 800;
+}
+.sort-select {
+  padding: 8px 12px;
+  max-width: 200px;
+  cursor: pointer;
+  font-weight: 600;
+}
 
 .products-list-vertical {
   display: flex;
   flex-direction: column;
-  gap: 20px; /* Отступы между карточками по вертикали */
+  gap: 20px;
 }
 
 /* Строка товара */
 .product-list-item {
   display: flex;
-  flex-direction: row; /* Выстраиваем в ряд */
+  flex-direction: row;
   align-items: stretch;
   padding: 24px;
   gap: 24px;
@@ -422,15 +577,40 @@ h1 { font-size: 2.2rem; font-weight: 900; margin-bottom: 30px; }
   border: 1px solid var(--border-color);
   padding: 10px;
 }
-:global(.dark) .item-image-col { background: #0f172a; border-color: #334155; }
-.item-image-col img { max-width: 100%; max-height: 180px; object-fit: contain; }
+:global(.dark) .item-image-col {
+  background: #0f172a;
+  border-color: #334155;
+}
+.item-image-col img {
+  max-width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+}
 
 .wishlist-btn {
-  position: absolute; top: 8px; right: 8px; background: var(--bg-card); border: 1px solid var(--border-color);
-  border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: var(--text-muted); font-size: 1.2rem; transition: 0.2s; box-shadow: var(--shadow-sm);
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  transition: 0.2s;
+  box-shadow: var(--shadow-sm);
 }
-.wishlist-btn:hover, .wishlist-btn.active { color: var(--danger); border-color: var(--danger); transform: scale(1.1); }
+.wishlist-btn:hover,
+.wishlist-btn.active {
+  color: var(--danger);
+  border-color: var(--danger);
+  transform: scale(1.1);
+}
 
 /* Средняя колонка: Инфо */
 .item-info-col {
@@ -440,28 +620,88 @@ h1 { font-size: 2.2rem; font-weight: 900; margin-bottom: 30px; }
   justify-content: flex-start;
 }
 
-.brand-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.brand-logo-mini { height: 20px; max-width: 80px; object-fit: contain; filter: grayscale(1); opacity: 0.7; }
-.brand-name-text { font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.brand-logo-mini {
+  height: 20px;
+  max-width: 80px;
+  object-fit: contain;
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+.brand-name-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+}
 
-.product-link { font-size: 1.4rem; font-weight: 800; margin-bottom: 8px; transition: color 0.2s; }
-.product-link:hover { color: var(--primary); }
+.product-link {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+  transition: color 0.2s;
+}
+.product-link:hover {
+  color: var(--primary);
+}
 
-.product-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; font-weight: 600; font-family: monospace; }
-.product-desc { font-size: 0.95rem; color: var(--text-muted); margin-bottom: 15px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-:global(.dark) .product-desc { color: #cbd5e1; }
+.product-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  font-weight: 600;
+  font-family: monospace;
+}
+.product-desc {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin-bottom: 15px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-clamp: 2; /* для совместимости */
+}
+:global(.dark) .product-desc {
+  color: #cbd5e1;
+}
 
-.product-rating { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
-.stars-small { display: inline-flex; }
-.star-small { font-size: 1.1rem; color: #e2e8f0; }
-:global(.dark) .star-small { color: #334155; }
-.star-small.filled { color: #f59e0b; }
-.rating-value-small { font-weight: 800; font-size: 1rem; margin-left: 4px; }
-.rating-count { color: var(--text-muted); font-size: 0.85rem; }
+.product-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.stars-small {
+  display: inline-flex;
+}
+.star-small {
+  font-size: 1.1rem;
+  color: #e2e8f0;
+}
+:global(.dark) .star-small {
+  color: #334155;
+}
+.star-small.filled {
+  color: #f59e0b;
+}
+.rating-value-small {
+  font-weight: 800;
+  font-size: 1rem;
+  margin-left: 4px;
+}
+.rating-count {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
 
-.stock-status { margin-top: auto; }
-
-/* Правая колонка: Цена и Кнопка */
+/* Правая колонка: Цена, статус и кнопка */
 .item-action-col {
   width: 220px;
   flex-shrink: 0;
@@ -473,33 +713,131 @@ h1 { font-size: 2.2rem; font-weight: 900; margin-bottom: 30px; }
   padding-left: 24px;
 }
 
-.price-container { text-align: right; margin-bottom: 20px; }
-.new-price, .regular-price { font-size: 1.8rem; font-weight: 900; margin: 0; line-height: 1; }
-.new-price { color: var(--danger); }
-.old-price { color: var(--text-muted); text-decoration: line-through; font-size: 1rem; font-weight: 600; display: block; margin-bottom: 5px; }
+.price-container {
+  text-align: right;
+  margin-bottom: 15px;
+}
+.new-price,
+.regular-price {
+  font-size: 1.8rem;
+  font-weight: 900;
+  margin: 0;
+  line-height: 1;
+}
+.new-price {
+  color: var(--danger);
+}
+.old-price {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  font-size: 1rem;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 5px;
+}
+
+/* СТАТУС НАЛИЧИЯ – ПРИНУДИТЕЛЬНАЯ ВИДИМОСТЬ */
+.stock-status {
+  width: 100%;
+  text-align: right;
+  margin: 12px 0 16px;
+}
+
+.stock-status .badge {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  padding: 4px 12px !important;
+  border-radius: 20px !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+  line-height: 1.4 !important;
+}
+
+.stock-status .badge-danger {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #ef4444 !important;
+  border: 1px solid #ef4444 !important;
+}
+
+.stock-status .badge-success {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #10b981 !important;
+  border: 1px solid #10b981 !important;
+}
+
+.stock-status .badge-warning {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #f59e0b !important;
+  border: 1px solid #f59e0b !important;
+}
 
 /* ЗАГРУЗКА И ОШИБКИ */
-.loading-state { text-align: center; padding: 100px 20px; }
+.loading-state {
+  text-align: center;
+  padding: 100px 20px;
+}
 
 /* АДАПТИВНОСТЬ */
 @media (max-width: 1024px) {
-  .product-list-item { gap: 16px; padding: 16px; }
-  .item-image-col { width: 180px; }
-  .item-action-col { width: 180px; padding-left: 16px; }
+  .product-list-item {
+    gap: 16px;
+    padding: 16px;
+  }
+  .item-image-col {
+    width: 180px;
+  }
+  .item-action-col {
+    width: 180px;
+    padding-left: 16px;
+  }
 }
 
 @media (max-width: 900px) {
-  .content-wrapper { flex-direction: column; }
-  .filters-sidebar { width: 100%; }
-  .filters-box { position: static; margin-bottom: 20px; }
+  .content-wrapper {
+    flex-direction: column;
+  }
+  .filters-sidebar {
+    width: 100%;
+  }
+  .filters-box {
+    position: static;
+    margin-bottom: 20px;
+  }
 }
 
 @media (max-width: 600px) {
-  .product-list-item { flex-direction: column; }
-  .item-image-col { width: 100%; height: 200px; }
-  .item-action-col { width: 100%; border-left: none; border-top: 1px dashed var(--border-color); padding-left: 0; padding-top: 20px; align-items: center; text-align: center; }
-  .price-container { text-align: center; }
-  .list-header { flex-direction: column; gap: 15px; align-items: stretch; }
-  .sort-select { max-width: 100%; }
+  .product-list-item {
+    flex-direction: column;
+  }
+  .item-image-col {
+    width: 100%;
+    height: 200px;
+  }
+  .item-action-col {
+    width: 100%;
+    border-left: none;
+    border-top: 1px dashed var(--border-color);
+    padding-left: 0;
+    padding-top: 20px;
+    align-items: center;
+    text-align: center;
+  }
+  .price-container {
+    text-align: center;
+  }
+  .stock-status {
+    text-align: center;
+  }
+  .list-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+  .sort-select {
+    max-width: 100%;
+  }
 }
 </style>

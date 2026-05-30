@@ -70,9 +70,22 @@ const toggleWishlist = async (id) => {
 };
 
 // Добавление в корзину
-const handleAddToCart = (p) => {
-  const totalStock = p.product_stocks?.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0) || 0;
-  cartStore.addToCart({ ...p, stock_quantity: totalStock });
+const handleAddToCart = async (p) => {
+  try {
+    // Делаем отдельный запрос за полными данными товара
+    const res = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/products/${p.id}`);
+    const fullProduct = res.data;
+
+    const totalStock = fullProduct.product_stocks?.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0) || 0;
+    cartStore.addToCart({
+      ...fullProduct,
+      stock_quantity: totalStock,
+      weight_kg: Number(fullProduct.weight_kg ?? 0),
+    });
+  } catch (e) {
+    console.error('Ошибка при загрузке товара для корзины:', e);
+    alert('Не удалось добавить товар');
+  }
 };
 
 // Логика карусели (Drag-to-scroll)
