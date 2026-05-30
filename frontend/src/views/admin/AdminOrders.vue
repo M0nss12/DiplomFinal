@@ -978,4 +978,199 @@ onMounted(loadAllData);
   .timeline-item { flex-direction: column; gap: 12px; }
   .timeline-left { width: 100%; align-items: flex-start; padding-right: 0; }
 }
+
+/* ==========================================================================
+   ДЕТАЛИ ЗАКАЗА (РАСКРЫВАЮЩАЯСЯ СТРОКА)
+   ========================================================================== */
+.order-detail-view {
+  padding: 24px;
+  background: var(--bg-glass);
+  border-radius: 20px;
+  margin: 12px 0 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.detail-column {
+  background: rgba(0, 0, 0, 0.02);
+  padding: 16px 20px;
+  border-radius: 16px;
+  transition: all 0.2s;
+}
+:global(.dark) .detail-column {
+  background: rgba(255, 255, 255, 0.03);
+}
+.detail-column:hover {
+  transform: translateY(-2px);
+  background: rgba(0, 0, 0, 0.04);
+}
+.detail-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--primary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-title::before {
+  content: "▸";
+  font-size: 0.8rem;
+}
+.detail-column p {
+  margin: 8px 0;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.detail-column p b {
+  min-width: 70px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Состав заказа – улучшенные карточки товаров */
+.items-grid-pro {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+}
+.item-row-pro {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--bg-card);
+  padding: 16px 20px;
+  border-radius: 20px;
+  transition: all 0.2s;
+  border: 1px solid var(--border-color);
+}
+.item-row-pro:hover {
+  transform: translateX(4px);
+  border-left: 4px solid var(--primary);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+.ipro-img {
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+  background: white;
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+.ipro-info {
+  flex: 1;
+}
+.ipro-name {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+.ipro-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.ipro-meta .badge {
+  background: var(--primary-light);
+  color: var(--primary);
+  padding: 4px 12px;
+  border-radius: 30px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.price-tag {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.ipro-warehouse {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0,0,0,0.02);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.ipro-warehouse b {
+  color: var(--primary);
+}
+.ipro-sum {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.08);
+  padding: 8px 16px;
+  border-radius: 40px;
+  white-space: nowrap;
+  text-align: center;
+  min-width: 100px;
+}
+
+/* Дополнительные иконки для контактных данных */
+.detail-column p:nth-child(1)::before {
+  content: "👤";
+  margin-right: 8px;
+  opacity: 0.7;
+}
+.detail-column p:nth-child(2)::before {
+  content: "📞";
+  margin-right: 8px;
+  opacity: 0.7;
+}
+.detail-column p:nth-child(3)::before {
+  content: "✉️";
+  margin-right: 8px;
+  opacity: 0.7;
+}
+.detail-column:last-child p:nth-child(1)::before {
+  content: "💰";
+}
+.detail-column:last-child p:nth-child(2)::before {
+  content: "🚚";
+}
+
+/* Адаптивность для деталей */
+@media (max-width: 900px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .item-row-pro {
+    flex-direction: column;
+    text-align: center;
+  }
+  .ipro-img {
+    width: 90px;
+    height: 90px;
+  }
+  .ipro-sum {
+    margin-top: 8px;
+    width: 100%;
+  }
+  .ipro-meta {
+    justify-content: center;
+  }
+}
 </style>
