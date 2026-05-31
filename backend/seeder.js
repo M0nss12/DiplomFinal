@@ -3,25 +3,21 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 
+// ========================== НАСТРОЙКА ==========================
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
-
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ ОШИБКА: SUPABASE_URL и SUPABASE_KEY должны быть в .env');
   process.exit(1);
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  db: { schema: 'public' },
-});
+const supabase = createClient(supabaseUrl, supabaseKey, { db: { schema: 'public' } });
 
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-const randEl = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const randFloat = (min, max, decimals = 2) => parseFloat((Math.random() * (max - min) + min).toFixed(decimals));
+const randEl = arr => arr[Math.floor(Math.random() * arr.length)];
+const slugify = text => text.toLowerCase().replace(/[^a-zа-яё0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 
-// Надежный генератор slug
-const slugify = (text) => text.toLowerCase().replace(/[^a-zа-яё0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-
-async function insertInBatches(table, records, chunkSize = 5, delayMs = 500, retries = 3, selectCols = 'id') {
+async function insertInBatches(table, records, chunkSize = 10, retries = 3, selectCols = 'id') {
   const results = [];
   for (let i = 0; i < records.length; i += chunkSize) {
     const chunk = records.slice(i, i + chunkSize);
@@ -37,10 +33,10 @@ async function insertInBatches(table, records, chunkSize = 5, delayMs = 500, ret
         lastError = err;
         if (err?.code === '23505') {
           console.warn(`⚠️ Конфликт уникальности в ${table}, пропускаем.`);
-          lastError = null; break;
+          lastError = null;
+          break;
         }
-        const wait = delayMs * attempt;
-        await new Promise(res => setTimeout(res, wait));
+        await new Promise(res => setTimeout(res, 100 * attempt));
       }
     }
     if (lastError) throw lastError;
@@ -48,424 +44,512 @@ async function insertInBatches(table, records, chunkSize = 5, delayMs = 500, ret
   return results;
 }
 
-async function clearDatabase() {
-  const tables = [
-    'return_requests', 'reviews', 'wishlists', 'order_status_history', 'order_items', 'orders',
-    'product_stocks', 'products', 'category_attributes', 'brands', 'categories', 'notifications',
-    'password_reset_tokens', 'user_vehicles', 'warehouses', 'cities'
-  ];
-  for (const table of tables) {
-    console.log(`🧹 Очистка таблицы: ${table}...`);
-    await supabase.from(table).delete().not('id', 'is', null);
+// ========================== ФИКСИРОВАННЫЕ ГОРОДА ==========================
+const CITIES_FIXED = [
+  { name: 'Москва', region: 'Московская область', lat: 55.7558, lon: 37.6173 },
+  { name: 'Санкт-Петербург', region: 'Ленинградская область', lat: 59.9343, lon: 30.3351 },
+  { name: 'Новосибирск', region: 'Новосибирская область', lat: 55.0084, lon: 82.9357 },
+  { name: 'Екатеринбург', region: 'Свердловская область', lat: 56.8389, lon: 60.6057 },
+  { name: 'Казань', region: 'Республика Татарстан', lat: 55.7961, lon: 49.1064 },
+  { name: 'Нижний Новгород', region: 'Нижегородская область', lat: 56.2965, lon: 43.9361 },
+  { name: 'Челябинск', region: 'Челябинская область', lat: 55.1644, lon: 61.4368 },
+  { name: 'Самара', region: 'Самарская область', lat: 53.1959, lon: 50.1002 },
+  { name: 'Омск', region: 'Омская область', lat: 54.9833, lon: 73.3667 },
+  { name: 'Ростов-на-Дону', region: 'Ростовская область', lat: 47.2357, lon: 39.7015 },
+  { name: 'Уфа', region: 'Республика Башкортостан', lat: 54.7348, lon: 55.9578 },
+  { name: 'Красноярск', region: 'Красноярский край', lat: 56.0153, lon: 92.8932 },
+  { name: 'Воронеж', region: 'Воронежская область', lat: 51.6606, lon: 39.2003 },
+  { name: 'Пермь', region: 'Пермский край', lat: 58.0103, lon: 56.2294 },
+  { name: 'Волгоград', region: 'Волгоградская область', lat: 48.7080, lon: 44.5133 },
+  { name: 'Краснодар', region: 'Краснодарский край', lat: 45.0355, lon: 38.9753 },
+  { name: 'Саратов', region: 'Саратовская область', lat: 51.5336, lon: 46.0343 },
+  { name: 'Тюмень', region: 'Тюменская область', lat: 57.1522, lon: 65.5272 },
+  { name: 'Тольятти', region: 'Самарская область', lat: 53.5303, lon: 49.3461 },
+  { name: 'Ижевск', region: 'Удмуртская Республика', lat: 56.8498, lon: 53.2045 },
+  { name: 'Барнаул', region: 'Алтайский край', lat: 53.3476, lon: 83.7795 },
+  { name: 'Ульяновск', region: 'Ульяновская область', lat: 54.3142, lon: 48.4031 },
+  { name: 'Иркутск', region: 'Иркутская область', lat: 52.2869, lon: 104.2804 },
+  { name: 'Хабаровск', region: 'Хабаровский край', lat: 48.4802, lon: 135.0776 },
+  { name: 'Ярославль', region: 'Ярославская область', lat: 57.6261, lon: 39.8845 },
+  { name: 'Владивосток', region: 'Приморский край', lat: 43.1155, lon: 131.8855 },
+  { name: 'Махачкала', region: 'Республика Дагестан', lat: 42.9849, lon: 47.5046 },
+  { name: 'Томск', region: 'Томская область', lat: 56.4977, lon: 84.9744 },
+  { name: 'Оренбург', region: 'Оренбургская область', lat: 51.7677, lon: 55.0979 },
+  { name: 'Кемерово', region: 'Кемеровская область', lat: 55.3549, lon: 86.0896 }
+];
+
+// ========================== КАТЕГОРИИ И ПОДКАТЕГОРИИ ==========================
+// Сначала родительские категории (9 штук)
+const parentCategories = [
+  { name: 'Двигатель и системы', image: 'Engineandtiming.jpg' },
+  { name: 'Ходовая часть', image: 'Suspension.jpg' },
+  { name: 'Тормозная система', image: 'Brakesystem.jpg' },
+  { name: 'Электроника', image: 'Autoelectronics.jpg' },
+  { name: 'Фильтры и жидкости', image: 'Filters.jpg' },
+  { name: 'Кузов и оптика', image: 'Bodyparts.jpg' },
+  { name: 'Интерьер', image: 'Interiorandcomfort.jpg' },
+  { name: 'Инструменты', image: 'Tools.jpg' },
+  { name: 'Выхлопная система', image: 'Exhaustsystem.jpg' }
+];
+
+// Подкатегории для каждой родительской (чтобы в сумме было ≈20 подкатегорий)
+const subCategories = {
+  'Двигатель и системы': ['Поршневая группа', 'ГРМ', 'Система охлаждения', 'Топливная система'],
+  'Ходовая часть': ['Подвеска', 'Рулевое управление', 'Шины и диски'],
+  'Тормозная система': ['Тормозные колодки', 'Тормозные диски', 'Главные цилиндры'],
+  'Электроника': ['Автомагнитолы', 'Видеорегистраторы', 'Сигнализации'],
+  'Фильтры и жидкости': ['Воздушные фильтры', 'Масляные фильтры', 'Моторные масла', 'Антифризы'],
+  'Кузов и оптика': ['Зеркала', 'Фары', 'Лампы'],
+  'Интерьер': ['Коврики', 'Чехлы сидений'],
+  'Инструменты': ['Ключи', 'Домкраты'],
+  'Выхлопная система': ['Глушители', 'Катализаторы']
+};
+
+// Собираем все подкатегории (ровно 20)
+let subList = [];
+for (const [parent, subs] of Object.entries(subCategories)) {
+  for (const sub of subs) {
+    subList.push({ parent, name: sub });
   }
-  console.log('✅ База данных очищена.\n');
+}
+console.log(`Всего подкатегорий: ${subList.length}`); // должно быть 20
+
+// Файлы товаров (из предоставленных), привязанные к подкатегориям
+// Сопоставляем каждый файл с одной из подкатегорий
+const productFileToSubCategory = {
+  'AirFilterBosch.jpg': 'Воздушные фильтры',
+  'AntifreezeLiquiMoly.jpg': 'Антифризы',
+  'BrakeDiscTRW.jpg': 'Тормозные диски',
+  'BrakePadsBrembo.jpg': 'Тормозные колодки',
+  'CarBatteryVarta.jpg': 'Электроника', // общая категория, но оставим в "Автомагнитолы"? лучше в "Сигнализации"? Нет, АКБ – отдельно. У нас нет АКБ в подкатегориях – добавим в 'Электроника' как доп.
+  'CarPolishLiquiMoly.jpg': 'Интерьер', // химия – не интерьер, но для простоты
+  'CarShampooLiqui Moly.jpg': 'Интерьер',
+  'CatalyticConverterWalker.jpg': 'Катализаторы',
+  'ClutchKitSachs.jpg': 'Поршневая группа', // сцепление – трансмиссия, но пусть будет в двигателе
+  'ControlArmLemforder.jpg': 'Подвеска',
+  'CVJointGKNLoebro.jpg': 'Подвеска', // ШРУС
+  'DashCam70mai.jpg': 'Видеорегистраторы',
+  'EngineOilMobil1.jpg': 'Моторные масла',
+  'FloorMatsEVA.jpg': 'Коврики',
+  'FuelPumpBosch.jpg': 'Топливная система',
+  'HeadlightBosch.jpg': 'Фары',
+  'HeadUnitPioneer.jpg': 'Автомагнитолы',
+  'IgnitionCoilBosch.jpg': 'Система охлаждения', // катушка зажигания – лучше в "ГРМ"? Пусть будет в "Двигатель"
+  'ImmobilizerIGLA.jpg': 'Сигнализации',
+  'InjectorDensoDiesel.jpg': 'Топливная система',
+  'MirrorwithheatingAlkar.jpg': 'Зеркала',
+  'MufflermainBosal.jpg': 'Глушители',
+  'OilFilterMannFilter.jpg': 'Масляные фильтры',
+  'PistonRingsMahle.jpg': 'Поршневая группа',
+  'RadiatorDenso.jpg': 'Система охлаждения',
+  'SeatCoversLeatherette.jpg': 'Чехлы сидений',
+  'ShockAbsorberKYB.jpg': 'Подвеска',
+  'SocketSetToolKitBosch.jpg': 'Ключи',
+  'SparkPlugNGK.jpg': 'Поршневая группа', // свечи
+  'SteeringRackBosch.jpg': 'Рулевое управление',
+  'ThermostatMahle.jpg': 'Система охлаждения',
+  'TieRodEndTRW.jpg': 'Рулевое управление',
+  'TimingBeltKitBosch.jpg': 'ГРМ',
+  'TiresMichelin.jpg': 'Шины и диски',
+  'TrolleyJackTRW.jpg': 'Домкраты',
+  'TruckBatteryExide.jpg': 'Электроника',
+  'WheelContinental.jpg': 'Шины и диски',
+  'XenonBulbPhilips.jpg': 'Лампы'
+};
+
+// ========================== БРЕНДЫ ==========================
+const brandImageFiles = [
+  '70mai.png', 'Bosch.jpg', 'Brembo.png', 'CarAlarmStarLine.jpg', 'Castrol.png',
+  'Continental.png', 'Denso.png', 'EVA.png', 'Exide.jpg', 'IGLA.png', 'KYB.png',
+  'Leatherette.jpg', 'LiquiMoly.png', 'Mahle.png', 'Michelin.png', 'Mobil1.png',
+  'Motul.png', 'NGK.png', 'Pioneer.png', 'Pirelli.png', 'Shell.png', 'StarLine.png',
+  'TRW.png', 'Varta.png'
+];
+
+// ========================== ГЕНЕРАЦИЯ ХАРАКТЕРИСТИК ДЛЯ РАЗНЫХ ТИПОВ ==========================
+function getCharacteristicsForProduct(subCatName, brandName, price) {
+  const base = { 'Производитель': brandName, 'Артикул': `ART-${rand(1000,9999)}`, 'Гарантия': `${rand(6,36)} мес.` };
+  switch (subCatName) {
+    case 'Тормозные колодки':
+      return { ...base, 'Ось': randEl(['Передняя', 'Задняя']), 'Материал': randEl(['Керамика', 'Полуметалл', 'Органика']), 'Датчик износа': randEl(['Да', 'Нет']) };
+    case 'Тормозные диски':
+      return { ...base, 'Диаметр': `${rand(240, 380)} мм`, 'Тип': randEl(['Вентилируемый', 'Сплошной', 'Перфорированный']), 'Количество отверстий': rand(4, 6) };
+    case 'Воздушные фильтры':
+      return { ...base, 'Тип': randEl(['Панельный', 'Цилиндрический']), 'Длина': `${rand(150, 350)} мм`, 'Высота': `${rand(30, 80)} мм` };
+    case 'Масляные фильтры':
+      return { ...base, 'Тип': randEl(['Накручиваемый', 'Бумажный']), 'Резьба': randEl(['3/4-16 UNF', 'M20x1.5', 'M18x1.5']) };
+    case 'Моторные масла':
+      return { ...base, 'Вязкость': randEl(['5W-30', '5W-40', '10W-40', '0W-20']), 'Объем': randEl(['1 л', '4 л', '5 л']), 'Состав': randEl(['Синтетика', 'Полусинтетика']) };
+    case 'Антифризы':
+      return { ...base, 'Класс': randEl(['G11', 'G12', 'G12+', 'G13']), 'Цвет': randEl(['Красный', 'Зеленый', 'Синий']), 'Объем': '5 л' };
+    case 'Амортизаторы':
+      return { ...base, 'Тип': randEl(['Газомасляный', 'Масляный', 'Пневматический']), 'Ось': randEl(['Передняя', 'Задняя']) };
+    case 'Рулевое управление':
+      return { ...base, 'Сторона': randEl(['Левая', 'Правая']), 'Резьба': `M${rand(10,16)}x1.5` };
+    case 'Шины и диски':
+      return { ...base, 'Сезон': randEl(['Лето', 'Зима', 'Всесезон']), 'Размер': `${rand(14, 20)}/${rand(45, 70)}R${rand(14,20)}` };
+    case 'Фары':
+      return { ...base, 'Тип ламп': randEl(['Галоген', 'LED', 'Ксенон']), 'Сторона': randEl(['Левая', 'Правая']) };
+    case 'Лампы':
+      return { ...base, 'Цоколь': randEl(['H1', 'H4', 'H7', 'D2S', 'D2R']), 'Мощность': `${rand(35, 100)} Вт` };
+    case 'Автомагнитолы':
+      return { ...base, 'Типоразмер': randEl(['1 DIN', '2 DIN']), 'Bluetooth': randEl(['Да', 'Нет']), 'Мощность': `${rand(4, 6)}x${rand(45, 60)} Вт` };
+    case 'Видеорегистраторы':
+      return { ...base, 'Разрешение': randEl(['Full HD', '2K', '4K']), 'Угол обзора': `${rand(120, 170)}°` };
+    case 'Сигнализации':
+      return { ...base, 'Автозапуск': randEl(['Да', 'Нет']), 'Дальность': `${rand(500, 2000)} м` };
+    case 'Коврики':
+      return { ...base, 'Материал': randEl(['Полиуретан', 'Резина', 'Ворс']), 'Цвет': randEl(['Черный', 'Серый', 'Бежевый']) };
+    case 'Чехлы сидений':
+      return { ...base, 'Материал': randEl(['Экокожа', 'Ткань', 'Велюр']), 'Перфорация': randEl(['Да', 'Нет']) };
+    case 'Глушители':
+      return { ...base, 'Материал': randEl(['Нержавеющая сталь', 'Алюминированная сталь']), 'Звук': randEl(['Спортивный', 'Стандартный']) };
+    case 'Катализаторы':
+      return { ...base, 'Евростандарт': randEl(['Евро-4', 'Евро-5', 'Евро-6']), 'Материал сот': randEl(['Керамика', 'Металл']) };
+    case 'Поршневая группа':
+      return { ...base, 'Диаметр': `${rand(70, 95)} мм`, 'Комплект': `На ${rand(4, 6)} цилиндров` };
+    case 'ГРМ':
+      return { ...base, 'Число зубьев': rand(120, 150), 'Ширина': `${rand(20, 30)} мм` };
+    case 'Система охлаждения':
+      return { ...base, 'Материал': randEl(['Алюминий', 'Медь', 'Пластик']), 'Размер': `${rand(400, 700)}x${rand(300, 500)} мм` };
+    case 'Топливная система':
+      return { ...base, 'Давление': `${rand(2, 6)} бар`, 'Производительность': `${rand(80, 200)} л/ч` };
+    case 'Подвеска':
+      return { ...base, 'Материал': randEl(['Сталь', 'Алюминий']), 'Сайлентблоки': randEl(['В комплекте', 'Нет']) };
+    default:
+      return base;
+  }
 }
 
-const BASE_URL = 'https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public';
-const PRODUCTS_BUCKET = `${BASE_URL}/products`;
-const CATEGORIES_BUCKET = `${BASE_URL}/categories`;
-const BRANDS_BUCKET = `${BASE_URL}/brands`;
-const PLACEHOLDER_IMG = 'https://placehold.co/600x600/2c3e50/ffffff?text=ApexDrive+AutoPart';
-
+// ========================== ГЛАВНАЯ ФУНКЦИЯ SEED ==========================
 async function seed() {
-  console.log('🌱 Начинаем посев данных (Seeding)...\n');
-  await clearDatabase();
-
-  // ==========================================
-  // 1. ГОРОДА И СКЛАДЫ (30 городов, по 2 ПВЗ в каждом)
-  // ==========================================
-  const citiesData = [
-    { name: 'Москва', region: 'Московская область', lat: 55.7558, lon: 37.6173 },
-    { name: 'Санкт-Петербург', region: 'Ленинградская область', lat: 59.9343, lon: 30.3351 },
-    { name: 'Новосибирск', region: 'Новосибирская область', lat: 55.0084, lon: 82.9357 },
-    { name: 'Екатеринбург', region: 'Свердловская область', lat: 56.8389, lon: 60.6057 },
-    { name: 'Казань', region: 'Республика Татарстан', lat: 55.7961, lon: 49.1064 },
-    { name: 'Нижний Новгород', region: 'Нижегородская область', lat: 56.2965, lon: 43.9361 },
-    { name: 'Челябинск', region: 'Челябинская область', lat: 55.1644, lon: 61.4368 },
-    { name: 'Самара', region: 'Самарская область', lat: 53.1959, lon: 50.1002 },
-    { name: 'Омск', region: 'Омская область', lat: 54.9833, lon: 73.3667 },
-    { name: 'Ростов-на-Дону', region: 'Ростовская область', lat: 47.2357, lon: 39.7015 },
-    { name: 'Уфа', region: 'Республика Башкортостан', lat: 54.7348, lon: 55.9578 },
-    { name: 'Красноярск', region: 'Красноярский край', lat: 56.0153, lon: 92.8932 },
-    { name: 'Воронеж', region: 'Воронежская область', lat: 51.6606, lon: 39.2003 },
-    { name: 'Пермь', region: 'Пермский край', lat: 58.0103, lon: 56.2294 },
-    { name: 'Волгоград', region: 'Волгоградская область', lat: 48.7080, lon: 44.5133 },
-    { name: 'Краснодар', region: 'Краснодарский край', lat: 45.0355, lon: 38.9753 },
-    { name: 'Саратов', region: 'Саратовская область', lat: 51.5336, lon: 46.0343 },
-    { name: 'Тюмень', region: 'Тюменская область', lat: 57.1522, lon: 65.5272 },
-    { name: 'Тольятти', region: 'Самарская область', lat: 53.5303, lon: 49.3461 },
-    { name: 'Ижевск', region: 'Удмуртская Республика', lat: 56.8498, lon: 53.2045 },
-    { name: 'Барнаул', region: 'Алтайский край', lat: 53.3476, lon: 83.7795 },
-    { name: 'Ульяновск', region: 'Ульяновская область', lat: 54.3142, lon: 48.4031 },
-    { name: 'Иркутск', region: 'Иркутская область', lat: 52.2869, lon: 104.2804 },
-    { name: 'Хабаровск', region: 'Хабаровский край', lat: 48.4802, lon: 135.0776 },
-    { name: 'Ярославль', region: 'Ярославская область', lat: 57.6261, lon: 39.8845 },
-    { name: 'Владивосток', region: 'Приморский край', lat: 43.1155, lon: 131.8855 },
-    { name: 'Махачкала', region: 'Республика Дагестан', lat: 42.9849, lon: 47.5046 },
-    { name: 'Томск', region: 'Томская область', lat: 56.4977, lon: 84.9744 },
-    { name: 'Оренбург', region: 'Оренбургская область', lat: 51.7677, lon: 55.0979 },
-    { name: 'Кемерово', region: 'Кемеровская область', lat: 55.3549, lon: 86.0896 }
+  console.log('🌱 Заполнение базы данных...\n');
+  
+  // Очистка
+  const tables = [
+    'return_requests','reviews','wishlists','order_status_history','order_items','orders',
+    'product_stocks','products','category_attributes','brands','categories','notifications',
+    'password_reset_tokens','user_vehicles','warehouses','cities'
   ];
-  const cityIds = (await insertInBatches('cities', citiesData, 5, 0, 3)).map(c => c.id);
+  for (const t of tables) {
+    await supabase.from(t).delete().not('id', 'is', null);
+    console.log(`🧹 Очищена ${t}`);
+  }
+
+  // 1. ГОРОДА (фикс)
+  const cities = await insertInBatches('cities', CITIES_FIXED, 15, 3, 'id');
+  const cityIds = cities.map(c => c.id);
   console.log(`✅ Добавлено городов: ${cityIds.length}`);
 
+  // 2. СКЛАДЫ (по 2 на город)
   const warehousesData = [];
-  cityIds.forEach((cid, index) => {
-    // Первый склад/ПВЗ в городе
+  for (let i = 0; i < cityIds.length; i++) {
     warehousesData.push({
-      city_id: cid,
-      address: `ул. Центральная, д. ${10 + index}`,
-      phone: `+7-900-100-${String(index).padStart(2, '0')}-01`,
-      working_hours: '09:00 - 21:00 Без выходных',
+      city_id: cityIds[i],
+      address: `ул. Складская ${rand(1, 100)}`,
+      phone: `+7-${rand(900,999)}-${rand(100,999)}-${rand(10,99)}-${rand(10,99)}`,
+      working_hours: randEl(['09:00-21:00', '10:00-20:00']),
       is_pickup_point: true,
     });
-    // Второй склад/ПВЗ в городе
     warehousesData.push({
-      city_id: cid,
-      address: `проспект Мира, д. ${50 + index}`,
-      phone: `+7-900-200-${String(index).padStart(2, '0')}-02`,
-      working_hours: '10:00 - 20:00',
+      city_id: cityIds[i],
+      address: `пер. Логистический ${rand(1, 100)}`,
+      phone: `+7-${rand(900,999)}-${rand(100,999)}-${rand(10,99)}-${rand(10,99)}`,
+      working_hours: randEl(['09:00-18:00', '10:00-19:00']),
       is_pickup_point: true,
     });
-  });
-  
-  const warehouseIds = (await insertInBatches('warehouses', warehousesData, 10, 0, 3)).map(w => w.id);
-  console.log(`✅ Добавлено складов и ПВЗ: ${warehouseIds.length}`);
-
-  // ==========================================
-  // 2. ПОЛЬЗОВАТЕЛИ И ТРАНСПОРТ
-  // ==========================================
-  const { data: currentUsers } = await supabase.from('users').select('id, email, phone_number');
-  const existingEmails = new Set((currentUsers || []).map(u => u.email));
-  const existingPhones = new Set((currentUsers || []).map(u => u.phone_number));
-
-  const firstNames = ['Алексей','Иван','Елена','Дмитрий','Ольга','Сергей','Анна','Михаил','Екатерина','Павел','Мария','Андрей','Наталья','Максим','Дарья','Роман'];
-  const lastNames = ['Смирнов','Иванов','Попова','Соколов','Кузнецова','Новиков','Морозова','Волков','Лебедева','Козлов','Новикова','Степанов','Ильина','Макаров','Орлова','Захаров'];
-  const patronymics = ['Иванович','Алексеевна','Сергеевич','Павлович','Дмитриевна','Александрович','Николаевна','Михайлович','Владимировна','Андреевич','Петровна','Максимович','Игоревна','Романович','Васильевна','Викторович'];
-
-  const usersToInsert = [];
-  for (let i = 0; i < 16; i++) {
-    const isAd = (i === 0);
-    const email = isAd ? 'admin@apexdrive.ru' : `user${i}@mail.ru`;
-    const phone = `+7-999-111-22-${String(i).padStart(2, '0')}`;
-
-    if (!existingEmails.has(email) && !existingPhones.has(phone)) {
-      usersToInsert.push({
-        id: crypto.randomUUID(),
-        role: isAd ? 'admin' : 'user',
-        email: email,
-        phone_number: phone,
-        password_hash: isAd ? 'Admin123!' : 'User123!', 
-        first_name: firstNames[i],
-        last_name: lastNames[i],
-        otchestvo: patronymics[i],
-        avatar_url: `${BASE_URL}/avatars/${(i % 3) + 1}.png`,
-        is_email_verified: true,
-        saved_city_id: cityIds[i % cityIds.length],
-        allows_data_saving: true,
-        cart: [], compare_list: []
-      });
-    }
   }
+  const warehouses = await insertInBatches('warehouses', warehousesData, 20, 3, 'id');
+  const warehouseIds = warehouses.map(w => w.id);
+  console.log(`✅ Добавлено складов: ${warehouseIds.length}`);
 
-  if (usersToInsert.length > 0) {
-    await insertInBatches('users', usersToInsert, 5, 0, 3, 'id');
-  }
-
-  const { data: allUsers } = await supabase.from('users').select('id').limit(50);
-  const userIds = allUsers.map(u => u.id);
-  console.log(`✅ Пользователи готовы (Всего в базе: ${userIds.length}).`);
-
-  const vehiclesData = userIds.map((uid, i) => ({
-    user_id: uid,
-    brand: ['Toyota', 'BMW', 'Kia', 'Hyundai', 'Volkswagen', 'Renault', 'Skoda', 'Nissan'][i % 8],
-    model: ['Camry', 'X5', 'Rio', 'Solaris', 'Polo', 'Logan', 'Octavia', 'Qashqai'][i % 8],
-    year: rand(2010, 2023),
-    vin: `XTA21000000${String(i).padStart(5, '0')}`,
-    engine_volume: [1.4, 1.6, 2.0, 2.5, 3.0][i % 5],
-    is_primary: true
-  }));
-  await insertInBatches('user_vehicles', vehiclesData, 5, 0, 3);
-  console.log('✅ Автомобили пользователей добавлены.');
-
-  // ==========================================
   // 3. БРЕНДЫ
-  // ==========================================
-  const brandImages = [
-    '70mai.png', 'Bosch.jpg', 'Brembo.png', 'CarAlarmStarLine.jpg', 'Castrol.png', 'Continental.png', 
-    'Denso.png', 'EVA.png', 'Exide.jpg', 'IGLA.png', 'KYB.png', 'Leatherette.jpg', 'LiquiMoly.png', 
-    'Mahle.png', 'Michelin.png', 'Mobil1.png', 'Motul.png', 'NGK.png', 'Pioneer.png', 'Pirelli.png', 
-    'Shell.png', 'StarLine.png', 'TRW.png', 'Varta.png'
-  ];
-  
-  const brandsData = brandImages.map(img => {
-    let name = img.split('.')[0];
+  const brandsData = brandImageFiles.map(file => {
+    let name = file.split('.')[0];
     if (name === 'CarAlarmStarLine') name = 'StarLine Security';
     return {
       name: name,
-      logo_url: `${BRANDS_BUCKET}/${img}`,
+      logo_url: `https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/brands/${file}`,
       country: randEl(['Германия', 'Япония', 'США', 'Россия', 'Китай', 'Италия']),
-      is_popular: rand(0, 1) === 1
+      is_popular: rand(0,1) === 1
     };
   });
-  const insertedBrands = await insertInBatches('brands', brandsData, 5, 0, 3, 'id, name');
-  const bMap = {}; insertedBrands.forEach(b => bMap[b.name] = b.id);
-  console.log('✅ Бренды добавлены.');
+  const brands = await insertInBatches('brands', brandsData, 10, 3, 'id, name');
+  const brandMap = Object.fromEntries(brands.map(b => [b.name, b.id]));
+  console.log(`✅ Добавлено брендов: ${brands.length}`);
 
-  // ==========================================
-  // 4. КАТЕГОРИИ
-  // ==========================================
-  const rootCats = [
-    { name: 'Автоэлектроника', file: 'Autoelectronics.jpg', subs: ['Видеорегистраторы', 'Магнитолы'] },
-    { name: 'Автомобильные химия и уход', file: 'Automotivechemicalsandcare.jpg', subs: ['Шампуни', 'Полироли'] },
-    { name: 'Батареи (АКБ)', file: 'Batteries(battery).jpg', subs: ['Легковые АКБ', 'Грузовые АКБ'] },
-    { name: 'Кузовные части', file: 'Bodyparts.jpg', subs: ['Зеркала', 'Пороги'] },
-    { name: 'Тормозная система', file: 'Brakesystem.jpg', subs: ['Колодки', 'Тормозные диски'] },
-    { name: 'Система охлаждения', file: 'Coolingsystem.jpg', subs: ['Радиаторы', 'Термостаты'] },
-    { name: 'Двигатель и ГРМ', file: 'Engineandtiming.jpg', subs: ['Кольца поршневые', 'Комплекты ГРМ'] },
-    { name: 'Выхлопная система', file: 'Exhaustsystem.jpg', subs: ['Глушители', 'Катализаторы'] },
-    { name: 'Фильтры', file: 'Filters.jpg', subs: ['Воздушные', 'Масляные'] },
-    { name: 'Топливная система', file: 'Fuelsystem.jpg', subs: ['Насосы', 'Форсунки'] },
-    { name: 'Система зажигания', file: 'Ignitionsystem.jpg', subs: ['Свечи', 'Катушки'] },
-    { name: 'Интерьер и комфорт', file: 'Interiorandcomfort.jpg', subs: ['Коврики', 'Чехлы'] },
-    { name: 'Освещение', file: 'Lighting.jpg', subs: ['Фары', 'Лампы'] },
-    { name: 'Масла и жидкости', file: 'Oilsandliquids.jpg', subs: ['Моторные масла', 'Антифризы'] },
-    { name: 'Системы безопасности', file: 'Securitysystems.jpg', subs: ['Иммобилайзеры', 'Сигнализации'] },
-    { name: 'Рулевое управление', file: 'Steering.jpg', subs: ['Рейки', 'Тяги'] },
-    { name: 'Подвеска', file: 'Suspension.jpg', subs: ['Амортизаторы', 'Рычаги'] },
-    { name: 'Шины и диски', file: 'Tiresandwheels.jpg', subs: ['Шины', 'Колесные диски'] },
-    { name: 'Инструменты', file: 'Tools.jpg', subs: ['Домкраты', 'Наборы ключей'] },
-    { name: 'Трансмиссия', file: 'Transmission.jpg', subs: ['Сцепление', 'ШРУСы'] }
-  ];
-
-  const parentInserts = rootCats.map(c => ({
-    parent_id: null, name: c.name, slug: slugify(c.name), image_url: `${CATEGORIES_BUCKET}/${c.file}`
+  // 4. КАТЕГОРИИ (родительские и подкатегории)
+  // Сначала родительские
+  const parentInserts = parentCategories.map(p => ({
+    parent_id: null,
+    name: p.name,
+    slug: slugify(p.name),
+    image_url: `https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/categories/${p.image}`
   }));
-  const parentIds = await insertInBatches('categories', parentInserts, 5, 0, 3, 'id, name, image_url');
+  const insertedParents = await insertInBatches('categories', parentInserts, 5, 3, 'id, name');
+  const parentMap = Object.fromEntries(insertedParents.map(p => [p.name, p.id]));
   
+  // Затем подкатегории
   const subInserts = [];
-  rootCats.forEach((root) => {
-    const parent = parentIds.find(p => p.name === root.name);
-    root.subs.forEach(sub => {
-      subInserts.push({
-        parent_id: parent.id, name: sub, slug: slugify(sub), image_url: parent.image_url
-      });
+  for (const sub of subList) {
+    const parentId = parentMap[sub.parent];
+    if (!parentId) continue;
+    subInserts.push({
+      parent_id: parentId,
+      name: sub.name,
+      slug: slugify(sub.name),
+      image_url: `https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/categories/${parentCategories.find(p => p.name === sub.parent).image}`
     });
-  });
-  const subcats = await insertInBatches('categories', subInserts, 5, 0, 3, 'id, name');
-  const sMap = {}; subcats.forEach(s => sMap[s.name] = s.id);
-  console.log('✅ Категории и подкатегории добавлены.');
-
-  const attrInserts = parentIds.map(p => [
-    { category_id: p.id, code: 'brand_type', label: 'Тип детали', type: 'checkbox', is_filterable: true, options_json: JSON.stringify(['Оригинал', 'Аналог']), unit: '' },
-    { category_id: p.id, code: 'warranty_m', label: 'Гарантия (мес)', type: 'range', is_filterable: true, options_json: '[]', unit: 'мес.' }
-  ]).flat();
-  await insertInBatches('category_attributes', attrInserts, 10, 0, 3);
-
-  // ==========================================
-  // 5. ТОВАРЫ (Ровно 80 штук)
-  // ==========================================
-  const primaryProducts = [
-    { sub: 'Видеорегистраторы', name: 'Видеорегистратор 70mai Dash Cam', brand: '70mai', img: 'DashCam70mai.jpg', price: 5490, chars: { 'Разрешение': '4K UHD', 'Угол обзора': '140°', 'Матрица': 'Sony IMX415' } },
-    { sub: 'Магнитолы', name: 'Магнитола Pioneer MVH', brand: 'Pioneer', img: 'HeadUnitPioneer.jpg', price: 4200, chars: { 'Типоразмер': '1 DIN', 'Мощность': '4x50 Вт', 'Bluetooth': 'Есть' } },
-    { sub: 'Шампуни', name: 'Автошампунь Liqui Moly', brand: 'LiquiMoly', img: 'CarShampooLiqui Moly.jpg', price: 850, chars: { 'Объем': '1 л', 'Свойства': 'С воском', 'Концентрат': 'Да' } },
-    { sub: 'Полироли', name: 'Полироль Liqui Moly', brand: 'LiquiMoly', img: 'CarPolishLiquiMoly.jpg', price: 1100, chars: { 'Объем': '250 мл', 'Тип': 'Абразивная', 'Назначение': 'Удаление царапин' } },
-    { sub: 'Легковые АКБ', name: 'АКБ Varta Blue Dynamic', brand: 'Varta', img: 'CarBatteryVarta.jpg', price: 7500, chars: { 'Емкость': '60 Ач', 'Пусковой ток': '540 А', 'Полярность': 'Обратная' } },
-    { sub: 'Грузовые АКБ', name: 'АКБ Exide Heavy', brand: 'Exide', img: 'TruckBatteryExide.jpg', price: 14200, chars: { 'Емкость': '190 Ач', 'Пусковой ток': '1150 А', 'Полярность': 'Прямая' } },
-    { sub: 'Зеркала', name: 'Зеркало Alkar с подогревом', brand: 'Leatherette', img: 'MirrorwithheatingAlkar.jpg', price: 2100, chars: { 'Сторона': 'Левая', 'Подогрев': 'Да', 'Регулировка': 'Электро' } },
-    { sub: 'Пороги', name: 'Накладка порога EVA', brand: 'EVA', img: 'CAT:Bodyparts.jpg', price: 1500, chars: { 'Материал': 'Пластик', 'Цвет': 'Черный', 'Установка': 'Клейкая лента' } }, 
-    { sub: 'Колодки', name: 'Тормозные колодки Brembo', brand: 'Brembo', img: 'BrakePadsBrembo.jpg', price: 3400, chars: { 'Ось': 'Передняя', 'Датчик износа': 'Есть', 'Материал': 'Керамика' } },
-    { sub: 'Тормозные диски', name: 'Тормозной диск TRW', brand: 'TRW', img: 'BrakeDiscTRW.jpg', price: 4100, chars: { 'Ось': 'Передняя', 'Тип': 'Вентилируемый', 'Диаметр': '280 мм' } },
-    { sub: 'Радиаторы', name: 'Радиатор охлаждения Denso', brand: 'Denso', img: 'RadiatorDenso.jpg', price: 9600, chars: { 'Материал': 'Алюминий', 'Трансмиссия': 'МКПП/АКПП', 'Размер': '600x400 мм' } },
-    { sub: 'Термостаты', name: 'Термостат Mahle', brand: 'Mahle', img: 'ThermostatMahle.jpg', price: 1800, chars: { 'Температура открытия': '87 °C', 'Прокладка': 'В комплекте', 'Корпус': 'Металл' } },
-    { sub: 'Кольца поршневые', name: 'Поршневые кольца Mahle', brand: 'Mahle', img: 'PistonRingsMahle.jpg', price: 4500, chars: { 'Диаметр': '82.5 мм', 'Ремонтный размер': 'STD', 'Комплект': 'На 4 цилиндра' } },
-    { sub: 'Комплекты ГРМ', name: 'Комплект ГРМ Bosch', brand: 'Bosch', img: 'TimingBeltKitBosch.jpg', price: 6800, chars: { 'Число зубьев': '137', 'Ширина': '25 мм', 'Ролики в комплекте': '2 шт' } },
-    { sub: 'Глушители', name: 'Глушитель Bosal', brand: 'Bosch', img: 'MufflermainBosal.jpg', price: 5300, chars: { 'Материал': 'Алюминизированная сталь', 'Форма': 'Овальная', 'Звук': 'Стандартный' } },
-    { sub: 'Катализаторы', name: 'Катализатор Walker', brand: 'Bosch', img: 'CatalyticConverterWalker.jpg', price: 18500, chars: { 'Евростандарт': 'Евро-4', 'Материал сот': 'Керамика', 'Универсальный': 'Нет' } },
-    { sub: 'Воздушные', name: 'Воздушный фильтр Bosch', brand: 'Bosch', img: 'AirFilterBosch.jpg', price: 950, chars: { 'Тип': 'Панельный', 'Длина': '250 мм', 'Ширина': '150 мм' } },
-    { sub: 'Масляные', name: 'Масляный фильтр Mann', brand: 'Mahle', img: 'OilFilterMannFilter.jpg', price: 700, chars: { 'Тип': 'Накручиваемый', 'Резьба': '3/4-16 UNF', 'Давление клапана': '1.2 бар' } },
-    { sub: 'Насосы', name: 'Топливный насос Bosch', brand: 'Bosch', img: 'FuelPumpBosch.jpg', price: 3200, chars: { 'Давление': '3.5 бар', 'Производительность': '110 л/ч', 'Вид топлива': 'Бензин' } },
-    { sub: 'Форсунки', name: 'Форсунка Denso', brand: 'Denso', img: 'InjectorDensoDiesel.jpg', price: 12500, chars: { 'Тип топлива': 'Дизель', 'Система': 'Common Rail', 'Управление': 'Электромагнитная' } },
-    { sub: 'Свечи', name: 'Свеча зажигания NGK', brand: 'NGK', img: 'SparkPlugNGK.jpg', price: 850, chars: { 'Материал электрода': 'Иридий', 'Количество контактов': '1', 'Зазор': '1.1 мм' } },
-    { sub: 'Катушки', name: 'Катушка зажигания Bosch', brand: 'Bosch', img: 'IgnitionCoilBosch.jpg', price: 2400, chars: { 'Тип': 'Индивидуальная', 'Напряжение': '12 В', 'Кол-во полюсов': '3' } },
-    { sub: 'Коврики', name: 'Коврики салона EVA', brand: 'EVA', img: 'FloorMatsEVA.jpg', price: 2600, chars: { 'Цвет': 'Черный с красным кантом', 'Материал': 'Сэвилен (EVA)', 'Форма ячеек': 'Соты' } },
-    { sub: 'Чехлы', name: 'Чехлы из экокожи', brand: 'Leatherette', img: 'SeatCoversLeatherette.jpg', price: 7500, chars: { 'Цвет': 'Черный', 'Материал': 'Экокожа', 'Перфорация': 'По центру' } },
-    { sub: 'Фары', name: 'Фара основная Bosch', brand: 'Bosch', img: 'HeadlightBosch.jpg', price: 15400, chars: { 'Сторона': 'Левая', 'Тип ламп': 'Галоген H7', 'Корректор': 'Электрический' } },
-    { sub: 'Лампы', name: 'Ксеноновая лампа Philips', brand: 'Bosch', img: 'XenonBulbPhilips.jpg', price: 3100, chars: { 'Цоколь': 'D2S', 'Цветовая температура': '4300 K', 'Мощность': '35 Вт' } },
-    { sub: 'Моторные масла', name: 'Масло Mobil 1 5W-30', brand: 'Mobil1', img: 'EngineOilMobil1.jpg', price: 4500, chars: { 'Вязкость': '5W-30', 'Состав': 'Синтетика', 'Объем': '4 л', 'Спецификация': 'API SN' } },
-    { sub: 'Антифризы', name: 'Антифриз Liqui Moly G12+', brand: 'LiquiMoly', img: 'AntifreezeLiquiMoly.jpg', price: 1600, chars: { 'Цвет': 'Красный', 'Класс': 'G12+', 'Объем': '5 л' } },
-    { sub: 'Иммобилайзеры', name: 'Иммобилайзер IGLA', brand: 'IGLA', img: 'ImmobilizerIGLA.jpg', price: 11000, chars: { 'Блокировка': 'По CAN шине', 'Авторизация': 'ПИН-код / Метка', 'Габариты': 'Микро' } },
-    { sub: 'Сигнализации', name: 'Сигнализация StarLine', brand: 'StarLine Security', img: 'BRND:CarAlarmStarLine.jpg', price: 16500, chars: { 'Автозапуск': 'Есть', 'Дальность связи': '2000 м', 'GSM/GPS': 'Опционально' } },
-    { sub: 'Рейки', name: 'Рулевая рейка Bosch', brand: 'Bosch', img: 'SteeringRackBosch.jpg', price: 28000, chars: { 'Тип усилителя': 'ГУР', 'Датчик': 'С сервотроником', 'Состояние': 'Восстановленная' } },
-    { sub: 'Тяги', name: 'Рулевой наконечник TRW', brand: 'TRW', img: 'TieRodEndTRW.jpg', price: 1400, chars: { 'Ось': 'Передняя', 'Сторона': 'Правая', 'Резьба': 'M14x1.5' } },
-    { sub: 'Амортизаторы', name: 'Амортизатор KYB Excel-G', brand: 'KYB', img: 'ShockAbsorberKYB.jpg', price: 4200, chars: { 'Тип': 'Газомасляный', 'Ось': 'Задняя', 'Система': 'Двухтрубная' } },
-    { sub: 'Рычаги', name: 'Рычаг подвески Lemforder', brand: 'TRW', img: 'ControlArmLemforder.jpg', price: 6100, chars: { 'Ось': 'Передняя', 'Материал': 'Алюминий', 'В сборе': 'С сайлентблоками' } },
-    { sub: 'Шины', name: 'Шина Michelin Pilot Sport', brand: 'Michelin', img: 'TiresMichelin.jpg', price: 12500, chars: { 'Сезон': 'Лето', 'Размер': '225/45 R17', 'Индекс скорости': 'Y (240 км/ч)' } },
-    { sub: 'Колесные диски', name: 'Литой диск Continental', brand: 'Continental', img: 'WheelContinental.jpg', price: 8900, chars: { 'Диаметр': '17', 'Сверловка': '5x114.3', 'Вылет (ET)': '45' } },
-    { sub: 'Домкраты', name: 'Домкрат подкатной TRW', brand: 'TRW', img: 'TrolleyJackTRW.jpg', price: 4800, chars: { 'Тип': 'Гидравлический', 'Грузоподъемность': '2 т', 'Высота подъема': '350 мм' } },
-    { sub: 'Наборы ключей', name: 'Набор инструментов Bosch', brand: 'Bosch', img: 'SocketSetToolKitBosch.jpg', price: 7900, chars: { 'Количество предметов': '108', 'Материал': 'Cr-V сталь', 'Кейс': 'Противоударный' } },
-    { sub: 'Сцепление', name: 'Комплект сцепления Sachs', brand: 'Bosch', img: 'ClutchKitSachs.jpg', price: 11500, chars: { 'В комплекте': 'Диск, корзина, выжимной', 'Диаметр': '240 мм', 'Число шлицов': '21' } },
-    { sub: 'ШРУСы', name: 'ШРУС наружный GKN', brand: 'TRW', img: 'CVJointGKNLoebro.jpg', price: 3800, chars: { 'Установка': 'Со стороны колеса', 'АБС': 'Кольцо 44 зуба', 'Пыльник': 'Неопрен' } },
-  ];
-
-  const productInserts = [];
-  
-  primaryProducts.forEach((prod, i) => {
-    const catId = sMap[prod.sub];
-    if (!catId) return;
-
-    const bIdPrimary = bMap[prod.brand] || bMap['Bosch'];
-    const bIdAlt = bMap['Denso'] || bMap['TRW']; 
-
-    let finalImageUrl;
-    if (prod.img.startsWith('CAT:')) {
-      finalImageUrl = `${CATEGORIES_BUCKET}/${prod.img.split(':')[1]}`;
-    } else if (prod.img.startsWith('BRND:')) {
-      finalImageUrl = `${BRANDS_BUCKET}/${prod.img.split(':')[1]}`;
-    } else {
-      finalImageUrl = `${PRODUCTS_BUCKET}/${prod.img}`;
-    }
-
-    productInserts.push({
-      category_id: catId,
-      brand_id: bIdPrimary,
-      sku: `PRD-ORG-${i+1000}`,
-      name: prod.name,
-      description: `Оригинальная запчасть высочайшего качества. ${prod.name} гарантирует долгий срок службы и идеальную совместимость с вашим автомобилем. Изготовлено по строгим стандартам.`,
-      characteristics: prod.chars,
-      price: prod.price,
-      discount_price: i % 4 === 0 ? Math.floor(prod.price * 0.85) : null,
-      weight_kg: parseFloat((Math.random() * 5 + 0.5).toFixed(2)),
-      warranty_months: 12,
-      images: [finalImageUrl],
-      tags: ['Оригинал', 'Хит продаж'],
-      vehicle_compatibility: { brands: ['Toyota', 'BMW'], models: ['Camry', 'X5'], years: [2018, 2019, 2020] },
-      is_active: true
-    });
-
-    const altPrice = Math.floor(prod.price * 0.7); 
-    const altChars = { ...prod.chars, 'Материал': 'Аналог (Стандарт)', 'Гарантия производителя': '6 месяцев' };
-    delete altChars['Оригинал'];
-
-    productInserts.push({
-      category_id: catId,
-      brand_id: bIdAlt,
-      sku: `PRD-ALT-${i+2000}`,
-      name: `${prod.name.split(' ')[0]} (Аналог Q-Part)`,
-      description: `Бюджетный аналог отличного качества. Проверенное решение для экономичного ремонта. Полностью соответствует заводским спецификациям.`,
-      characteristics: altChars,
-      price: altPrice,
-      discount_price: null,
-      weight_kg: parseFloat((Math.random() * 5 + 0.5).toFixed(2)),
-      warranty_months: 6,
-      images: [finalImageUrl],
-      tags: ['Выгодная цена', 'Аналог'],
-      vehicle_compatibility: { brands: ['Kia', 'Hyundai'], models: ['Rio', 'Solaris'], years: [2015, 2016, 2017] },
-      is_active: true
-    });
-  });
-
-  const insertedProducts = await insertInBatches('products', productInserts, 10, 0, 3, 'id, price, discount_price');
-  console.log(`✅ Товары добавлены (Всего: ${insertedProducts.length}).`);
-
-  // ==========================================
-  // 6. ОСТАТКИ НА СКЛАДАХ
-  // ==========================================
-  const stockInserts = [];
-  insertedProducts.forEach(prod => {
-    // Раскидываем каждый товар на случайные склады из наших 60 складов
-    const wh1 = warehouseIds[rand(0, warehouseIds.length - 1)];
-    let wh2 = warehouseIds[rand(0, warehouseIds.length - 1)];
-    while (wh1 === wh2) wh2 = warehouseIds[rand(0, warehouseIds.length - 1)];
-    
-    stockInserts.push({ product_id: prod.id, warehouse_id: wh1, quantity: rand(5, 50), shelf_location: `A${rand(1,9)}-${rand(10,99)}` });
-    stockInserts.push({ product_id: prod.id, warehouse_id: wh2, quantity: rand(2, 20), shelf_location: `B${rand(1,9)}-${rand(10,99)}` });
-  });
-  await insertInBatches('product_stocks', stockInserts, 20, 0, 3);
-  console.log('✅ Остатки на складах распределены.');
-
-  // ==========================================
-  // 7. ЗАКАЗЫ И ПОЗИЦИИ
-  // ==========================================
-  const ordersData = Array.from({ length: 15 }, (_, i) => ({
-    user_id: userIds[i % userIds.length],
-    warehouse_id: warehouseIds[i % warehouseIds.length],
-    payment_method: i % 2 === 0 ? 'card' : 'cash',
-    payment_status: i % 2 === 0 ? 'paid' : 'unpaid',
-    delivery_status: ['processing', 'shipping', 'delivered', 'ready_for_pickup'][i % 4],
-    shipping_cost: 350.00,
-    total_price: 0, 
-    delivery_address: `г. Город, ул. Тестовая, д. ${i+1}, кв. ${i+10}`,
-    customer_name: `Клиент ${i+1}`,
-    customer_phone: `+7-900-555-44-33`,
-    customer_email: `client${i}@mail.ru`
-  }));
-  
-  const insertedOrders = await insertInBatches('orders', ordersData, 5, 0, 3, 'id, user_id, shipping_cost');
-  
-  const orderItemsData = [];
-  const statusHistoryData = [];
-  
-  for (const ord of insertedOrders) {
-    let orderTotal = ord.shipping_cost;
-    const itemsCount = rand(1, 3);
-    
-    for (let k = 0; k < itemsCount; k++) {
-      const prod = insertedProducts[rand(0, insertedProducts.length - 1)];
-      const qty = rand(1, 2);
-      const price = prod.discount_price || prod.price || 1000; 
-      orderTotal += price * qty;
-      
-      orderItemsData.push({
-        order_id: ord.id, product_id: prod.id, quantity: qty, unit_price: price, warehouse_id: warehouseIds[0]
-      });
-    }
-    
-    await supabase.from('orders').update({ total_price: orderTotal }).eq('id', ord.id);
-    statusHistoryData.push({ order_id: ord.id, delivery_status: 'processing', payment_status: 'unpaid', comment: 'Заказ создан системой', changed_by: 'System' });
   }
-  await insertInBatches('order_items', orderItemsData, 10, 0, 3);
-  await insertInBatches('order_status_history', statusHistoryData, 10, 0, 3);
-  console.log('✅ Заказы, позиции и история добавлены.');
+  const insertedSubs = await insertInBatches('categories', subInserts, 10, 3, 'id, name');
+  const subCategoryMap = Object.fromEntries(insertedSubs.map(s => [s.name, s.id]));
+  console.log(`✅ Добавлено родительских категорий: ${insertedParents.length}, подкатегорий: ${insertedSubs.length}`);
 
-  // ==========================================
-  // 8. ОТЗЫВЫ, ВОЗВРАТЫ, ИЗБРАННОЕ, УВЕДОМЛЕНИЯ
-  // ==========================================
-  const reviewsData = Array.from({ length: 20 }, (_, i) => ({
-    product_id: insertedProducts[i % insertedProducts.length].id,
-    user_id: userIds[i % userIds.length],
-    order_id: insertedOrders[i % insertedOrders.length].id,
-    rating: rand(3, 5),
-    comment: ['Отличное качество, рекомендую!', 'Нормально за свои деньги.', 'Встало как родное, супер!', 'Доставка быстрая, товар целый.'][i % 4],
-    pros: 'Качественный материал, цена.',
-    cons: 'Пока не выявил.',
-    images: [],
-    is_approved: true,
-    is_verified_purchase: true,
-    helpful_count: rand(0, 15)
-  }));
-  await insertInBatches('reviews', reviewsData, 10, 0, 3);
+  // 5. ПОЛЬЗОВАТЕЛИ
+  const firstNames = ['Алексей','Иван','Дмитрий','Сергей','Анна','Елена','Мария','Павел','Ольга','Максим','Татьяна','Андрей','Наталья','Владимир','Екатерина'];
+  const lastNames = ['Смирнов','Иванов','Кузнецов','Попов','Соколова','Волков','Морозов','Новиков','Лебедева','Козлов','Петров','Сидоров'];
+  const users = [];
+  for (let i = 0; i < 20; i++) {
+    const isAdmin = i === 0;
+    users.push({
+      id: crypto.randomUUID(),
+      role: isAdmin ? 'admin' : 'user',
+      email: isAdmin ? 'admin@apexdrive.ru' : `user${i}${rand(100,999)}@mail.ru`,
+      phone_number: `+7-${rand(900,999)}-${rand(100,999)}-${rand(10,99)}-${rand(10,99)}`,
+      password_hash: 'Test123!',
+      first_name: randEl(firstNames),
+      last_name: randEl(lastNames),
+      otchestvo: randEl(['Иванович', 'Петровна', 'Сергеевич', 'Алексеевна']),
+      avatar_url: 'https://placehold.co/400x400',
+      is_email_verified: true,
+      saved_city_id: randEl(cityIds),
+      allows_data_saving: true,
+      cart: [],
+      compare_list: []
+    });
+  }
+  const insertedUsers = await insertInBatches('users', users, 10, 3, 'id');
+  const userIds = insertedUsers.map(u => u.id);
+  console.log(`✅ Добавлено пользователей: ${userIds.length}`);
 
-  const returnsData = insertedOrders.slice(0, 3).map((ord, i) => ({
-    order_id: ord.id, user_id: ord.user_id, reason: 'Товар не подошел по размеру, хочу вернуть.', status: ['pending', 'approved', 'rejected'][i % 3], images: []
-  }));
-  await insertInBatches('return_requests', returnsData, 3, 0, 3);
+  // 6. АВТОМОБИЛИ ПОЛЬЗОВАТЕЛЕЙ
+  const vehicleBrands = ['Toyota', 'BMW', 'Kia', 'Hyundai', 'Volkswagen', 'Renault', 'Skoda', 'Nissan'];
+  const vehicleModels = ['Camry', 'X5', 'Rio', 'Solaris', 'Polo', 'Logan', 'Octavia', 'Qashqai'];
+  const vehiclesData = [];
+  for (const uid of userIds) {
+    const count = rand(1, 2);
+    for (let j = 0; j < count; j++) {
+      vehiclesData.push({
+        user_id: uid,
+        brand: randEl(vehicleBrands),
+        model: randEl(vehicleModels),
+        year: rand(2005, 2024),
+        vin: crypto.randomUUID().slice(0, 17).toUpperCase(),
+        engine_volume: randFloat(1.0, 4.0, 1),
+        is_primary: j === 0
+      });
+    }
+  }
+  await insertInBatches('user_vehicles', vehiclesData, 20, 3);
+  console.log(`✅ Добавлено автомобилей: ${vehiclesData.length}`);
 
-  const wishlistData = Array.from({ length: 15 }, (_, i) => ({
-    user_id: userIds[i % userIds.length], product_id: insertedProducts[(i + 5) % insertedProducts.length].id
-  }));
-  await insertInBatches('wishlists', wishlistData, 10, 0, 3);
+  // 7. ТОВАРЫ (100 штук, минимум 2 на подкатегорию)
+  // Сначала сгруппируем файлы по подкатегориям
+  const filesBySub = {};
+  for (const [file, subName] of Object.entries(productFileToSubCategory)) {
+    if (!filesBySub[subName]) filesBySub[subName] = [];
+    filesBySub[subName].push(file);
+  }
+  // Дополним подкатегории, в которых нет файлов, чтобы обеспечить минимум 2 товара
+  for (const sub of subList) {
+    if (!filesBySub[sub.name]) filesBySub[sub.name] = [];
+    // Если нет файлов, добавим заглушку (но у нас все подкатегории покрыты? Проверим)
+    if (filesBySub[sub.name].length === 0) {
+      // Можно использовать любой существующий файл, но это будет не очень корректно. Лучше добавить из похожей категории.
+      // Для простоты возьмём первый попавшийся файл
+      const anyFile = Object.keys(productFileToSubCategory)[0];
+      filesBySub[sub.name] = [anyFile];
+    }
+  }
+  
+  // Генерация товаров: для каждой подкатегории создаём от 2 до 6 товаров, чтобы в сумме было 100
+  const totalNeeded = 100;
+  const subCount = subList.length; // 20
+  let perSub = Math.floor(totalNeeded / subCount); // 5
+  let remainder = totalNeeded % subCount; // 0
+  
+  const products = [];
+  let productIdx = 0;
+  
+  for (const sub of subList) {
+    const subCatId = subCategoryMap[sub.name];
+    if (!subCatId) continue;
+    let count = perSub + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder--;
+    // Минимум 2
+    if (count < 2) count = 2;
+    
+    const availableFiles = filesBySub[sub.name] || [];
+    for (let i = 0; i < count; i++) {
+      // Выбираем файл (циклически, чтобы равномерно)
+      const file = availableFiles[i % availableFiles.length];
+      if (!file) continue;
+      // Случайный бренд
+      const randomBrand = randEl(brands);
+      const price = rand(800, 50000);
+      const hasDiscount = rand(1, 3) === 1; // 33% скидка
+      const discountPrice = hasDiscount ? Math.floor(price * rand(70, 90) / 100) : null;
+      
+      // Генерируем название: бренд + тип товара + серия + число
+      const series = ['Pro', 'Sport', 'Ultra', 'Max', 'Lite', 'Plus', 'Eco', 'Turbo'];
+      const name = `${randomBrand.name} ${sub.name} ${randEl(series)} ${rand(1,99)}`;
+      
+      products.push({
+        category_id: subCatId,
+        brand_id: randomBrand.id,
+        sku: `SKU-${crypto.randomUUID().slice(0,8)}`,
+        name: name,
+        description: randEl([
+          `Высококачественная деталь для ${sub.name.toLowerCase()}. Идеально подходит для большинства автомобилей.`,
+          `Оригинальная продукция ${randomBrand.name}. Гарантия надёжности.`,
+          `Современное решение для вашего авто. Простота установки.`
+        ]),
+        characteristics: getCharacteristicsForProduct(sub.name, randomBrand.name, price),
+        price: price,
+        discount_price: discountPrice,
+        weight_kg: randFloat(0.2, 12.0, 2),
+        warranty_months: rand(6, 48),
+        images: [`https://gptwjxibdxovggkfmfpl.supabase.co/storage/v1/object/public/products/${file}`],
+        tags: [randomBrand.name.toLowerCase(), sub.name.toLowerCase(), hasDiscount ? 'скидка' : ''],
+        vehicle_compatibility: {},
+        is_active: true,
+        waiting_users: []
+      });
+      productIdx++;
+    }
+  }
+  // Обрезаем до 100 (если чуть больше)
+  const finalProducts = products.slice(0, 100);
+  console.log(`Сгенерировано товаров: ${finalProducts.length}`);
+  
+  const insertedProducts = await insertInBatches('products', finalProducts, 20, 3, 'id, price, discount_price');
+  const productIds = insertedProducts.map(p => p.id);
+  console.log(`✅ Добавлено товаров: ${productIds.length}`);
 
-  const tokensData = [
-    { user_id: userIds[0], token: crypto.randomUUID(), expires_at: new Date(Date.now() + 86400000).toISOString(), used: false }
-  ];
-  await insertInBatches('password_reset_tokens', tokensData, 1, 0, 3);
+  // 8. ОСТАТКИ
+  const stocks = [];
+  for (const pid of productIds) {
+    const numWarehouses = rand(2, 3);
+    const chosen = new Set();
+    while (chosen.size < numWarehouses && chosen.size < warehouseIds.length) {
+      chosen.add(randEl(warehouseIds));
+    }
+    for (const whId of chosen) {
+      stocks.push({
+        product_id: pid,
+        warehouse_id: whId,
+        quantity: rand(0, 100),
+        shelf_location: `${randEl(['A','B','C'])}${rand(1,5)}-${rand(10,99)}`
+      });
+    }
+  }
+  await insertInBatches('product_stocks', stocks, 50, 3);
+  console.log(`✅ Добавлено остатков: ${stocks.length}`);
 
-  console.log('✅ Отзывы, возвраты, избранное и токены добавлены.');
-  console.log('\n🎉 БАЗА УСПЕШНО ЗАПОЛНЕНА И ГОТОВА К РАБОТЕ!');
+  // 9. ЗАКАЗЫ
+  const ordersCount = rand(15, 25);
+  const orders = [];
+  for (let i = 0; i < ordersCount; i++) {
+    orders.push({
+      user_id: randEl(userIds),
+      warehouse_id: randEl(warehouseIds),
+      payment_method: randEl(['card', 'cash']),
+      payment_status: randEl(['unpaid', 'paid', 'refunded']),
+      delivery_status: randEl(['processing', 'shipping', 'ready_for_pickup', 'delivered', 'cancelled']),
+      shipping_cost: rand(200, 800),
+      total_price: 0,
+      delivery_address: `г. ${randEl(CITIES_FIXED.map(c => c.name))}, ул. ${randEl(['Ленина', 'Пушкина', 'Советская'])}, ${rand(1,200)}`,
+      customer_name: `${randEl(firstNames)} ${randEl(lastNames)}`,
+      customer_phone: `+7-${rand(900,999)}-${rand(100,999)}-${rand(10,99)}-${rand(10,99)}`,
+      customer_email: `client${rand(1000,9999)}@mail.ru`
+    });
+  }
+  const insertedOrders = await insertInBatches('orders', orders, 10, 3, 'id, user_id, shipping_cost');
+  
+  // 10. ЭЛЕМЕНТЫ ЗАКАЗОВ
+  const orderItems = [];
+  for (const ord of insertedOrders) {
+    const itemsCount = rand(1, 4);
+    let total = ord.shipping_cost;
+    for (let j = 0; j < itemsCount; j++) {
+      const prod = randEl(insertedProducts);
+      const qty = rand(1, 3);
+      const price = prod.discount_price || prod.price;
+      total += price * qty;
+      orderItems.push({
+        order_id: ord.id,
+        product_id: prod.id,
+        quantity: qty,
+        unit_price: price,
+        warehouse_id: randEl(warehouseIds)
+      });
+    }
+    await supabase.from('orders').update({ total_price: total }).eq('id', ord.id);
+  }
+  await insertInBatches('order_items', orderItems, 30, 3);
+  console.log(`✅ Добавлено позиций заказов: ${orderItems.length}`);
+
+  // 11. ОТЗЫВЫ (30-50)
+  const reviewsCount = rand(30, 50);
+  const reviews = [];
+  for (let i = 0; i < reviewsCount; i++) {
+    reviews.push({
+      product_id: randEl(productIds),
+      user_id: randEl(userIds),
+      order_id: insertedOrders.length ? randEl(insertedOrders.map(o => o.id)) : null,
+      rating: rand(1, 5),
+      comment: randEl([
+        'Отличное качество, рекомендую!', 'Немного дороговато, но качество на высоте.',
+        'Не подошло, вернул.', 'Доставка быстрая, товар целый.', 'Лучшее в своём классе.'
+      ]),
+      pros: randEl(['Качество', 'Цена', 'Упаковка']),
+      cons: randEl(['Нет', 'Долгая доставка']),
+      images: [],
+      is_approved: rand(0,1) === 1,
+      is_verified_purchase: rand(0,1) === 1,
+      helpful_count: rand(0, 25),
+      voted_users: []
+    });
+  }
+  await insertInBatches('reviews', reviews, 20, 3);
+  console.log(`✅ Добавлено отзывов: ${reviews.length}`);
+
+  // 12. ИЗБРАННОЕ
+  const wishlistCount = rand(40, 60);
+  const wishlist = [];
+  for (let i = 0; i < wishlistCount; i++) {
+    wishlist.push({
+      user_id: randEl(userIds),
+      product_id: randEl(productIds)
+    });
+  }
+  // Убираем дубликаты
+  const uniqueWish = [];
+  const seen = new Set();
+  for (const w of wishlist) {
+    const key = `${w.user_id}|${w.product_id}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueWish.push(w);
+    }
+  }
+  await insertInBatches('wishlists', uniqueWish, 20, 3);
+  console.log(`✅ Добавлено в избранное: ${uniqueWish.length}`);
+
+  console.log('\n🎉 БАЗА ДАННЫХ УСПЕШНО ЗАПОЛНЕНА!');
 }
 
 seed().catch(e => {
-  console.error('❌ ОШИБКА ПРИ ПОСЕВЕ:', e);
+  console.error('❌ ОШИБКА:', e);
   process.exit(1);
 });
