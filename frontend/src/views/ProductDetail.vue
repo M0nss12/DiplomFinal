@@ -116,10 +116,7 @@
           <div v-else class="new-price">{{ product.price }} ₽</div>
         </div>
 
-        <div class="delivery-hint">
-          <div v-if="totalLocalStock > 0" class="badge badge-success">✅ В наличии сегодня</div>
-          <div v-else class="badge badge-warning">🚢 Межгород. Доставка 2-4 дня</div>
-        </div>
+        <!-- БЛОК ДОСТАВКИ УДАЛЁН, ВМЕСТО НЕГО СТАТУС В .trust-icons -->
 
         <button 
           @click="handleAddToCart" 
@@ -131,7 +128,10 @@
 
         <div class="trust-icons">
           <div class="t-item">💳 Оплата: <b>Онлайн или при получении</b></div>
-          <div class="t-item">🚚 Быстрая логистика между складами</div>
+          <div class="t-item delivery-status">
+            <span v-if="totalLocalStock > 0" class="badge-success-inline">В наличии</span>
+            <span v-else class="badge-warning-inline">Межгород. Доставка 2-4 дня</span>
+          </div>
         </div>
       </aside>
     </div>
@@ -142,7 +142,7 @@
       <p>{{ product.description }}</p>
     </section>
 
-    <!-- СЕКЦИЯ ОТЗЫВОВ (без изменений, только кнопки и инпуты адаптированы под глобальные стили) -->
+    <!-- СЕКЦИЯ ОТЗЫВОВ -->
     <section class="reviews-section">
       <div class="reviews-header">
         <h2>Отзывы покупателей <span class="badge">{{ reviews.length }}</span></h2>
@@ -191,7 +191,7 @@
         </div>
       </transition>
 
-      <!-- СПИСОК ОТЗЫВОВ (только кнопки заменены на .btn) -->
+      <!-- СПИСОК ОТЗЫВОВ -->
       <div v-if="reviews.length > 0" class="reviews-list">
         <div v-for="review in reviews" :key="review.id" 
              class="review-item glass-card"
@@ -614,11 +614,13 @@ onMounted(loadData);
   color: #94a3b8;
 }
 
+/* Увеличенный логотип бренда */
 .brand-mini-logo {
-  height: 40px;
+  height: 60px;
+  max-width: 150px;
   object-fit: contain;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 6px 12px;
+  border-radius: 12px;
 }
 
 .specs-section,
@@ -735,10 +737,51 @@ onMounted(loadData);
   font-weight: 600;
 }
 
-.delivery-hint {
-  margin: 20px 0;
-  font-weight: 700;
-  font-size: 0.95rem;
+/* Стили для статуса доставки внутри trust-icons */
+.trust-icons {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.trust-icons .t-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.delivery-status {
+  margin-top: 4px;
+}
+.badge-success-inline,
+.badge-warning-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  padding: 6px 12px;
+  border-radius: 40px;
+  background: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.badge-success-inline {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid #10b981;
+}
+.badge-warning-inline {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid #f59e0b;
+}
+:global(.dark) .badge-success-inline {
+  background: rgba(16, 185, 129, 0.25);
+}
+:global(.dark) .badge-warning-inline {
+  background: rgba(245, 158, 11, 0.25);
 }
 
 .add-to-cart-btn {
@@ -753,15 +796,6 @@ onMounted(loadData);
 }
 :global(.dark) .add-to-cart-btn:disabled {
   background: rgba(255,255,255,0.05);
-}
-
-.trust-icons {
-  margin-top: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  font-size: 0.85rem;
-  color: var(--text-muted);
 }
 
 /* Секция отзывов */

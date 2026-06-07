@@ -67,7 +67,7 @@
         </div>
 
         <div v-if="filteredProducts.length > 0" class="products-list-vertical">
-          <div v-for="p in filteredProducts" :key="p.id" class="product-list-item glass-card">
+          <div v-for="p in paginatedProducts" :key="p.id" class="product-list-item glass-card">
             <div class="item-image-col">
               <img
                 :src="p.images && p.images.length > 0 ? p.images[0] : '/assets/images/no-image.png'"
@@ -125,20 +125,20 @@
               </div>
 
               <!-- СТАТУС НАЛИЧИЯ ПОД ЦЕНОЙ -->
-<div class="stock-status" style="margin-top: 12px; text-align: right;">
-  <span 
-    v-if="getTotalStock(p) === 0"
-    style="display: inline-block; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid #ef4444; border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;"
-  >❌ Нет в наличии</span>
-  <span 
-    v-else-if="getStockInCity(p) > 0"
-    style="display: inline-block; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid #10b981; border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;"
-  >✅ В наличии (г. {{ appStore.city }})</span>
-  <span 
-    v-else
-    style="display: inline-block; background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid #f59e0b; border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;"
-  >🚚 Доставка (Межгород)</span>
-</div>
+              <div class="stock-status" style="margin-top: 12px; text-align: right;">
+                <span 
+                  v-if="getTotalStock(p) === 0"
+                  style="display: inline-block; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid #ef4444; border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;"
+                >❌ Нет в наличии</span>
+                <span 
+                  v-else-if="getStockInCity(p) > 0"
+                  style="display: inline-block; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid #10b981; border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;"
+                >✅ В наличии (г. {{ appStore.city }})</span>
+                <span 
+                  v-else
+                  style="display: inline-block; background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid #f59e0b; border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;"
+                >🚚 Доставка (Межгород)</span>
+              </div>
 
               <button
                 @click="handleAddToCart(p)"
@@ -156,6 +156,29 @@
           <h3>Товары не найдены</h3>
           <p>Попробуйте изменить параметры фильтрации или выбрать другой город.</p>
           <button @click="resetFilters" class="btn btn-outline">Сбросить фильтры</button>
+        </div>
+
+        <!-- ПАГИНАЦИЯ -->
+        <div v-if="totalPages > 1" class="pagination glass-card">
+          <button 
+            class="page-btn" 
+            :disabled="currentPage === 1" 
+            @click="setPage(currentPage - 1)"
+          >←</button>
+          <div class="page-numbers">
+            <button 
+              v-for="page in visiblePages" 
+              :key="page" 
+              class="page-btn" 
+              :class="{ active: page === currentPage }"
+              @click="setPage(page)"
+            >{{ page }}</button>
+          </div>
+          <button 
+            class="page-btn" 
+            :disabled="currentPage === totalPages" 
+            @click="setPage(currentPage + 1)"
+          >→</button>
         </div>
       </main>
     </div>
@@ -177,6 +200,8 @@ const loading = ref(true);
 const products = ref([]);
 const allCategories = ref([]);
 const wishlistIds = ref([]);
+const currentPage = ref(1);
+const itemsPerPage = 10;
 
 const filterPriceMin = ref(null);
 const filterPriceMax = ref(null);
@@ -222,6 +247,7 @@ const getRating = (productId) => ratingsMap.value[productId] || { avg: 0, count:
 
 const loadData = async () => {
   loading.value = true;
+  currentPage.value = 1;
   const categoryId = Number(route.params.id);
   const uid = localStorage.getItem('user_id');
 
@@ -334,6 +360,41 @@ const filteredProducts = computed(() => {
     return sortOrder.value === 'cheap' ? p1 - p2 : p2 - p1;
   });
   return res;
+});
+
+const totalPages = computed(() => Math.ceil(filteredProducts.value.length / itemsPerPage));
+
+const paginatedProducts = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage;
+  return filteredProducts.value.slice(start, start + itemsPerPage);
+});
+
+const visiblePages = computed(() => {
+  const delta = 2;
+  const range = [];
+  const left = Math.max(1, currentPage.value - delta);
+  const right = Math.min(totalPages.value, currentPage.value + delta);
+  for (let i = left; i <= right; i++) range.push(i);
+  return range;
+});
+
+const setPage = (page) => {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+watch(filteredProducts, () => {
+  if (currentPage.value > totalPages.value && totalPages.value > 0) {
+    currentPage.value = totalPages.value;
+  } else if (currentPage.value > totalPages.value && totalPages.value === 0) {
+    currentPage.value = 1;
+  } else if (currentPage.value === 1 && totalPages.value >= 1) {
+    // если страница уже 1, ничего не делаем, но при изменении фильтров нужно сбросить
+    currentPage.value = 1;
+  } else {
+    currentPage.value = 1;
+  }
 });
 
 const availableSpecs = computed(() => {
@@ -626,12 +687,11 @@ h1 {
   gap: 8px;
   margin-bottom: 8px;
 }
+/* Увеличенные логотипы брендов */
 .brand-logo-mini {
-  height: 20px;
-  max-width: 80px;
+  height: 35px;
+  max-width: 120px;
   object-fit: contain;
-  filter: grayscale(1);
-  opacity: 0.7;
 }
 .brand-name-text {
   font-size: 0.8rem;
@@ -774,6 +834,45 @@ h1 {
   border: 1px solid #f59e0b !important;
 }
 
+/* ПАГИНАЦИЯ */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+  padding: 12px 20px;
+  flex-wrap: wrap;
+}
+.page-numbers {
+  display: flex;
+  gap: 8px;
+}
+.page-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-main);
+}
+.page-btn:hover:not(:disabled) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+.page-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ЗАГРУЗКА И ОШИБКИ */
 .loading-state {
   text-align: center;
@@ -838,6 +937,9 @@ h1 {
   }
   .sort-select {
     max-width: 100%;
+  }
+  .pagination {
+    flex-direction: column;
   }
 }
 </style>

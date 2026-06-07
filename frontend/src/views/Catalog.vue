@@ -82,17 +82,31 @@
         </div>
       </div>
 
-      <!-- ПАГИНАЦИЯ -->
-      <div v-if="totalPages > 1" class="pagination mt-10">
-        <button @click="currentPage--" :disabled="currentPage === 1">←</button>
-        <span class="font-bold text-muted mx-4">{{ currentPage }} / {{ totalPages }}</span>
-        <button @click="currentPage++" :disabled="currentPage === totalPages">→</button>
+      <!-- ПАГИНАЦИЯ С НОМЕРАМИ СТРАНИЦ -->
+      <div v-if="totalPages > 1" class="pagination glass-card">
+        <button 
+          class="page-btn" 
+          :disabled="currentPage === 1" 
+          @click="setPage(currentPage - 1)"
+        >←</button>
+        <div class="page-numbers">
+          <button 
+            v-for="page in visiblePages" 
+            :key="page" 
+            class="page-btn" 
+            :class="{ active: page === currentPage }"
+            @click="setPage(page)"
+          >{{ page }}</button>
+        </div>
+        <button 
+          class="page-btn" 
+          :disabled="currentPage === totalPages" 
+          @click="setPage(currentPage + 1)"
+        >→</button>
       </div>
     </div>
 
-    <!-- ПУСТО -->
     <div v-else class="empty-state glass-card text-center p-10">
-      <div class="empty-state-icon">📂</div>
       <h3>В этом разделе пока ничего нет</h3>
       <p>Попробуйте вернуться в основной каталог или воспользуйтесь поиском.</p>
       <button @click="$router.push('/catalog')" class="btn btn-primary btn-lg mt-4">В начало каталога</button>
@@ -112,7 +126,7 @@ const allProducts = ref([]);
 const loading = ref(true);
 
 const currentPage = ref(1);
-const itemsPerPage = 9;
+const itemsPerPage = 9; // изменено с 10 на 9
 
 const loadData = async () => {
   loading.value = true;
@@ -145,10 +159,27 @@ const getProductsForCategory = (catId) => allProducts.value.filter(p => p.catego
 const visibleCategories = computed(() => getChildCategories(currentParentId.value));
 
 const totalPages = computed(() => Math.ceil(visibleCategories.value.length / itemsPerPage));
+
 const paginatedCategories = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage;
   return visibleCategories.value.slice(start, start + itemsPerPage);
 });
+
+// Номера страниц для отображения (до 5 кнопок)
+const visiblePages = computed(() => {
+  const delta = 2;
+  const range = [];
+  const left = Math.max(1, currentPage.value - delta);
+  const right = Math.min(totalPages.value, currentPage.value + delta);
+  for (let i = left; i <= right; i++) range.push(i);
+  return range;
+});
+
+const setPage = (page) => {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
 const goToCategory = (cat) => {
   const children = getChildCategories(cat.id);
@@ -176,9 +207,19 @@ const breadcrumbs = computed(() => {
   return crumbs;
 });
 
+// Сброс страницы при изменении раздела или фильтров
 watch(() => route.params.id, () => {
   currentPage.value = 1;
   window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// Сброс страницы, если после фильтрации страниц стало меньше
+watch(visibleCategories, () => {
+  if (currentPage.value > totalPages.value && totalPages.value > 0) {
+    currentPage.value = totalPages.value;
+  } else if (currentPage.value > totalPages.value && totalPages.value === 0) {
+    currentPage.value = 1;
+  }
 });
 
 onMounted(loadData);
@@ -204,7 +245,7 @@ onMounted(loadData);
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 320px; /* немного выше для больших фото */
+  min-height: 320px;
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .category-card:hover {
@@ -214,12 +255,13 @@ onMounted(loadData);
 }
 
 .category-card h3 {
-  font-size: 1.6rem; /* было 1.4rem по умолчанию, увеличили */
+  font-size: 1.6rem;
 }
 
+/* Увеличенные картинки категорий */
 .cat-icon {
-  width: 80px;  /* было 60px */
-  height: 80px;
+  width: 110px;
+  height: 110px;
   object-fit: contain;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
 }
@@ -234,7 +276,7 @@ onMounted(loadData);
   position: relative;
   padding-left: 15px;
   color: var(--text-muted);
-  font-size: 1rem; /* было 0.95rem, увеличили */
+  font-size: 1rem;
 }
 .items-list li:not(.list-label)::before {
   content: '•';
@@ -245,7 +287,7 @@ onMounted(loadData);
 }
 
 .list-label {
-  font-size: 0.8rem; /* чуток крупнее */
+  font-size: 0.8rem;
   font-weight: 800;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -259,7 +301,7 @@ onMounted(loadData);
 }
 
 .action-primary {
-  font-size: 0.9rem; /* немного больше */
+  font-size: 0.9rem;
 }
 .action-primary:hover .arrow {
   transform: translateX(5px);
@@ -277,6 +319,48 @@ onMounted(loadData);
   background: rgba(255,255,255,0.08);
 }
 
+/* Стили пагинации (аналогично странице товаров) */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 40px;
+  padding: 12px 20px;
+  flex-wrap: wrap;
+  background: var(--bg-card);
+  border-radius: 60px;
+  border: 1px solid var(--border-color);
+}
+.page-numbers {
+  display: flex;
+  gap: 8px;
+}
+.page-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-main);
+}
+.page-btn:hover:not(:disabled) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+.page-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .categories-grid {
     grid-template-columns: 1fr;
@@ -285,8 +369,11 @@ onMounted(loadData);
     min-height: auto;
   }
   .cat-icon {
-    width: 60px;
-    height: 60px;
+    width: 70px;
+    height: 70px;
+  }
+  .pagination {
+    border-radius: 20px;
   }
 }
 </style>

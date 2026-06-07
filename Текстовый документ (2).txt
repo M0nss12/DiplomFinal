@@ -1,0 +1,61 @@
+Функции, процедуры и триггеры (Листинг 1 - Страница 25)
+
+Индексы (Листинг 2 - Страница - 26)
+
+Создание базы данных через SQL Editor (Листинг 3 - Страница 28)
+
+Базовая конфигурация server.js (Листинг 4 - Страница 34)
+
+Файл сборки /frontend/vite.config.js (Листинг 5 - Страница 36)
+
+Общий шаблон приложения (/frontend/src/App.vue) (Листинг 6 -  Страница 36)
+
+Панель навигации (/frontend/src/components/Navbar.vue) (Листинг 7 - Страница 36)
+
+Маршруты страниц frontend/src/router.index.js (Листинг 8 - Страница 37)
+
+Страница “Главная” (/frontend/src/views/Home.vue) (Листинг 9 - Страница 37)
+
+Страница “О нас” (/frontend/ src /views/About.vue) (Листинг 10 - Страница 38) 
+
+Страница “Контакты” (/frontend/src/views/Contacts.vue) (Листинг 11 - Страница 39) 
+
+Страница выбора категории (/frontend/src/views/Catalog.vue) (Листинг 12 - Страница 40)
+
+Список товаров категории (/frontend/src/views/CategoryProducts.vue) (Листинг 13 - Страница 41)
+
+Страница карточки товара (/frontend/src/views/ProductDetail.vue) (Листинг 14 - Страница 42)
+
+Регистрация (/frontend/src/views/Register.vue) (Листинг 15 - Страница 43)
+
+Авторизация (/frontend/src/views/Login.vue) (Листинг 16 - Страница 44)
+
+Восстановление пароля (/frontend/src/views/ResetPasswordConfirm.vue) (Листинг 17 - Страница 45)
+
+Главная страница профиля (/frontend/src/views/Profile.vue) (Листинг 18 - Страница 52)
+
+История заказов (/frontend/src/views/Orders.vue) (Листинг 19 - Страница 53)
+
+Избранное (/frontend/src/views/Wishlist.vue) (Листинг 20 - Страница 54)
+
+Настройки профиля (/frontend/src/views/Settings.vue) (Листинг 21 - Страница 55)
+
+Журнал уведомлений (/frontend/src/views/Notifications.vue) (Листинг 22 - Страница 56)
+
+Страница корзины (/frontend/src/views/Cart.vue) (Листинг 23 - Страница 57)
+
+Страница оформления заказа (/frontend/src/views/Checkout.vue) (Листинг 24 - Страница 58)
+
+Заказы и продажи (/frontend/src/views/admin/AdminOrders.vue) (Листинг 25 - Страница 60)
+
+Управление товарами (/frontend/src/views/admin/AdminProducts.vue) (Листинг 26 - Страница 61)
+
+Управление остатками товара (/frontend/src/views/admin/AdminStocks.vue) (Листинг 27 - Страница 62)
+
+Управление пользователями (/frontend/src/views/admin/AdminUsers.vue) (Листинг 28 - Страница 63)
+
+Системный журнал (/frontend/src/views/admin/AdminLogs.vue) (Листинг 29 - 63)
+
+Позитивные тесты (/backend/app.test.js) (Листинг 30 - Страница 64)
+
+Негативные тесты (/backend/app.failed.test.js) (Листинг 31 - Страница 66)
