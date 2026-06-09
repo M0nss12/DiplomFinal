@@ -120,7 +120,7 @@ const getEmailTemplate = (templateName, variables = {}) => {
             html = html.replace(new RegExp(`{{${key}}}`, 'g'), value);
         }
     } else {
-        html = `<h2>ApexDrive Уведомление</h2><p>${variables.message || 'Системное сообщение'}</p><br><small>${variables.link || ''}</small>`;
+        html = `<h2>Автотовары Уведомление</h2><p>${variables.message || 'Системное сообщение'}</p><br><small>${variables.link || ''}</small>`;
     }
     return html;
 };
@@ -491,7 +491,7 @@ app.post('/api/users/register', async (req, res) => {
             await notifyAndEmail({
                 userId: newUserId, type: 'system', email: email,
                 title: 'Подтверждение регистрации',
-                message: 'Добро пожаловать в ApexDrive! Подтвердите вашу почту.',
+                message: 'Добро пожаловать в Автотовары! Подтвердите вашу почту.',
                 templateName: 'email_verify.html',
                 templateVars: { link: verifyLink, first_name }
             });
@@ -573,7 +573,7 @@ app.post('/api/admin/users', verifyAdmin, async (req, res) => {
                 type: 'system',
                 email: email,
                 title: 'Подтверждение регистрации',
-                message: 'Добро пожаловать в ApexDrive! Подтвердите вашу почту.',
+                message: 'Добро пожаловать в Автотовары! Подтвердите вашу почту.',
                 templateName: 'email_verify.html',
                 templateVars: { link: verifyLink, first_name }
             });
@@ -5675,7 +5675,7 @@ html.dark .cart-card {
       <!-- ЛЕВАЯ ЧАСТЬ -->
       <div class="nav-section left-section">
         <router-link to="/" class="logo" aria-label="Главная страница ApexDrive">
-          <strong>ApexDrive</strong>
+          <strong>Автотовары</strong>
         </router-link>
         <div class="city-selector-container" ref="cityMenu">
           <button @click="toggleCityDropdown" class="city-btn glass-card" aria-haspopup="listbox" :aria-expanded="isCityDropdownOpen">
@@ -6883,7 +6883,7 @@ watch(() => route.path, () => {
 
       <div class="footer-bottom">
         <div class="bottom-content">
-          <p>&copy; 2026 ApexDrive. Все права защищены.</p>
+          <p>&copy; 2026 Автотовары. Все права защищены.</p>
           <div class="legal-links">
             <router-link to="/about">Политика конфиденциальности</router-link>
             <router-link to="/about">Публичная оферта</router-link>
@@ -7914,7 +7914,7 @@ seed().catch(e => {
     <!-- 1. HERO-СЕКЦИЯ -->
     <section class="hero-about glass-card">
       <div class="hero-content">
-        <h1>О компании <span class="highlight">ApexDrive</span></h1>
+        <h1>О компании <span class="highlight">Автотовары</span></h1>
         <p class="hero-subtitle">
           Инновационный маркетплейс автозапчастей с интеллектуальной системой логистики.
           Мы создали 100% нормализованную экосистему, которая объединяет десятки складов по всей России,
@@ -8026,7 +8026,7 @@ seed().catch(e => {
     <!-- 4. УМНАЯ ЛОГИСТИКА (3 фотографии) -->
     <section class="logistics-section glass-card">
       <div class="logistics-info">
-        <h2>Умная логистика ApexDrive</h2>
+        <h2>Умная логистика Автотовары</h2>
         <p class="section-subtitle">Мы оптимизировали доставку так, чтобы она зависела от реального наличия товара в вашем регионе:</p>
         
         <div class="logistics-grid">
@@ -10843,7 +10843,7 @@ watch([selectedWarehouseId, () => cartStore.items.map(i => i.quantity).join(',')
       <div class="hero-image">
         <img 
           src="/assets/images/contacts-hero.jpg" 
-          alt="Служба поддержки ApexDrive" 
+          alt="Служба поддержки Автотовары" 
           class="hero-img"
           loading="eager"
         />

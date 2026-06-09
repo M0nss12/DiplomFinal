@@ -1,7 +1,7 @@
 <template>
   <div class="auth-page animate-fade-in">
     <section class="auth-header">
-      <h1>Регистрация в <span class="highlight">ApexDrive</span></h1>
+      <h1>Регистрация в <span class="highlight">"Автотовары"</span></h1>
     </section>
 
     <div class="auth-card glass-card">

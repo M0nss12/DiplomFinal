@@ -4,7 +4,7 @@
       <!-- ЛЕВАЯ ЧАСТЬ -->
       <div class="nav-section left-section">
         <router-link to="/" class="logo" aria-label="Главная страница ApexDrive">
-          <strong>ApexDrive</strong>
+          <strong>Автотовары</strong>
         </router-link>
         <div class="city-selector-container" ref="cityMenu">
           <button @click="toggleCityDropdown" class="city-btn glass-card" aria-haspopup="listbox" :aria-expanded="isCityDropdownOpen">

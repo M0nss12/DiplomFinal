@@ -5,7 +5,7 @@
       <div class="admin-brand">
         <div class="admin-logo">AD</div>
         <div class="brand-text">
-          <h2>ApexDrive</h2>
+          <h2>"Автотовары"</h2>
           <span>Admin Panel v2.0</span>
         </div>
       </div>

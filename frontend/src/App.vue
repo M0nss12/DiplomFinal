@@ -255,7 +255,7 @@ watch(() => route.path, () => {
 
       <div class="footer-bottom">
         <div class="bottom-content">
-          <p>&copy; 2026 ApexDrive. Все права защищены.</p>
+          <p>&copy; 2026 "Автотовары". Все права защищены.</p>
           <div class="legal-links">
             <router-link to="/about">Политика конфиденциальности</router-link>
             <router-link to="/about">Публичная оферта</router-link>

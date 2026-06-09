@@ -3,7 +3,7 @@
     <!-- 1. HERO-СЕКЦИЯ -->
     <section class="hero-about glass-card">
       <div class="hero-content">
-        <h1>О компании <span class="highlight">ApexDrive</span></h1>
+        <h1>О компании <span class="highlight">"Автотовары"</span></h1>
         <p class="hero-subtitle">
           Инновационный маркетплейс автозапчастей с интеллектуальной системой логистики.
           Мы создали 100% нормализованную экосистему, которая объединяет десятки складов по всей России,
@@ -115,7 +115,7 @@
     <!-- 4. УМНАЯ ЛОГИСТИКА (3 фотографии) -->
     <section class="logistics-section glass-card">
       <div class="logistics-info">
-        <h2>Умная логистика ApexDrive</h2>
+        <h2>Умная логистика "Автотовары"</h2>
         <p class="section-subtitle">Мы оптимизировали доставку так, чтобы она зависела от реального наличия товара в вашем регионе:</p>
         
         <div class="logistics-grid">
@@ -155,7 +155,7 @@
     <section class="team-section glass-card">
       <h2>Наша команда</h2>
       <div class="team-content">
-        <img src="/assets/images/about-team.jpg" alt="Команда ApexDrive" class="team-img" />
+        <img src="/assets/images/about-team.jpg" alt="Команда Автотовары" class="team-img" />
         <p class="team-text">Профессионалы с многолетним опытом, готовые помочь вам.</p>
       </div>
     </section>

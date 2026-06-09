@@ -3,7 +3,7 @@
     <div class="login-card glass-card">
       <!-- ЗАГОЛОВОК -->
       <section class="login-header">
-        <h1>Вход в <span class="highlight">ApexDrive</span></h1>
+        <h1>Вход в <span class="highlight">"Автотовары"</span></h1>
         <p>Добро пожаловать! Войдите в свой профиль через почту или Google.</p>
       </section>
 

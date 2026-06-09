@@ -5,7 +5,7 @@
       <div class="hero-content">
         <h1>
           Связь с поддержкой 
-          <span class="highlight">ApexDrive</span>
+          <span class="highlight">"Автотовары"</span>
         </h1>
         <p class="hero-subtitle">
           Мы всегда на связи, чтобы помочь вам с выбором или решить любую проблему.

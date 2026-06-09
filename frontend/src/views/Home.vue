@@ -68,10 +68,7 @@
         </div>
 
         <div class="hero-buttons">
-          <router-link to="/catalog" class="btn btn-primary btn-lg hero-main-btn">
-            Открыть каталог
-          </router-link>
-          <router-link to="/about" class="btn btn-outline btn-lg hero-secondary-btn">
+          <router-link to="/about" class="btn btn-primary btn-lg hero-main-btn">
             Условия доставки
           </router-link>
         </div>
@@ -100,7 +97,7 @@
 
     <!-- 3. SEO-ТЕКСТ -->
     <section class="seo-description glass-card">
-      <h2>Интернет-магазин автозапчастей ApexDrive</h2>
+      <h2>Интернет-магазин автозапчастей "Автотовары"</h2>
       <p>
         Мы предлагаем более 100 000 наименований оригинальных запчастей и качественных аналогов для легковых автомобилей.
         Благодаря прямым контрактам с производителями и умной логистике, мы гарантируем низкие цены и быструю доставку в г.
