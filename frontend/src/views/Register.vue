@@ -7,7 +7,7 @@
     <div class="auth-card glass-card">
       <form @submit.prevent="handleRegister">
         <!-- ФИО -->
-        <div class="input-grid-3">
+        <div class="input-grid-2">
           <div class="input-group">
             <label>Фамилия</label>
             <input v-model="form.last_name" placeholder="Иванов" />
@@ -16,32 +16,6 @@
             <label>Имя *</label>
             <input v-model="form.first_name" placeholder="Иван" required />
           </div>
-          <div class="input-group">
-            <label>Отчество</label>
-            <input v-model="form.otchestvo" placeholder="Иванович" />
-          </div>
-        </div>
-
-        <!-- ГОРОД (автодополнение) -->
-        <div class="input-group city-autocomplete">
-          <label>📍 Ваш населённый пункт *</label>
-          <input 
-            :value="cityInput"
-            @input="onCityInput"
-            @focus="showCitySuggestions = true"
-            @blur="onCityBlur"
-            placeholder="Начните вводить название..."
-            required
-            autocomplete="off"
-          />
-          <transition name="dropdown-fade">
-            <ul v-if="showCitySuggestions && filteredCities.length" class="city-suggestions glass-card">
-              <li v-for="c in filteredCities" :key="c.id" @mousedown.prevent="selectCity(c)">
-                {{ c.name }}
-              </li>
-            </ul>
-          </transition>
-          <small class="hint">Это поможет точнее рассчитывать сроки доставки</small>
         </div>
 
         <!-- КОНТАКТЫ -->
@@ -119,15 +93,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive, computed, onUnmounted } from 'vue';
+import { ref, onMounted, reactive, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { supabase } from '@/supabase';
-import { useAppStore } from '@/stores/appStore';
 
 const router = useRouter();
 const route = useRoute();
-const appStore = useAppStore();
 
 const loading = ref(false);
 const error = ref('');
@@ -138,34 +110,14 @@ const showCP = ref(false);
 const captchaSiteKey = import.meta.env.VITE_YANDEX_CAPTCHA_CLIENT_KEY;
 
 const form = reactive({
-  first_name: '', last_name: '', otchestvo: '',
-  city: '', email: '', phone: '',
+  first_name: '', last_name: '',
+  email: '', phone: '',
   password: '', confirmPassword: '',
   captchaToken: ''
 });
 
 const googleLoading = ref(false);
 let authListener = null;
-
-// Города автодополнение
-const cities = ref([]);
-const cityInput = ref('');
-const showCitySuggestions = ref(false);
-
-const filteredCities = computed(() => {
-  const q = cityInput.value.trim().toLowerCase();
-  if (!q) return [];
-  return cities.value.filter(c => c.name.toLowerCase().includes(q));
-});
-
-const onCityInput = (e) => { cityInput.value = e.target.value; showCitySuggestions.value = true; };
-const selectCity = (city) => { cityInput.value = city.name; form.city = city.name; showCitySuggestions.value = false; };
-const onCityBlur = () => {
-  setTimeout(() => {
-    if (!cities.value.some(c => c.name === cityInput.value)) cityInput.value = form.city || '';
-    showCitySuggestions.value = false;
-  }, 150);
-};
 
 // Маска телефона
 const onPhoneInput = (e) => {
@@ -178,13 +130,6 @@ const onPhoneInput = (e) => {
   if (value.length >= 9) formatted += '-' + value.substring(8, 10);
   form.phone = formatted;
   e.target.value = formatted;
-};
-
-const loadCities = async () => {
-  try {
-    const res = await axios.get('/api/cities');
-    cities.value = res.data || [];
-  } catch (e) { /* ignore */ }
 };
 
 // Капча
@@ -236,7 +181,6 @@ const handleRegister = async () => {
   if (!form.email && !form.phone) return error.value = 'Укажите Email или Телефон для связи';
   if (form.password.length < 6) return error.value = 'Пароль должен быть не менее 6 символов';
   if (form.password !== form.confirmPassword) return error.value = 'Введённые пароли не совпадают';
-  if (!form.city.trim()) return error.value = 'Укажите ваш город';
   
   if (!form.captchaToken && !import.meta.env.DEV) return error.value = 'Пожалуйста, подтвердите, что вы не робот.';
 
@@ -275,8 +219,6 @@ const socialRegister = async (provider) => {
 
 // 5. ИНИЦИАЛИЗАЦИЯ И СЛУШАТЕЛИ
 onMounted(async () => {
-  loadCities();
-  if (appStore.city) { form.city = appStore.city; cityInput.value = appStore.city; }
   initCaptcha();
 
   const { data: { session } } = await supabase.auth.getSession();
@@ -335,17 +277,10 @@ onUnmounted(() => {
   max-width: 700px;
   padding: 48px;
   position: relative;
-  backdrop-filter: blur(8px); /* легкий эффект поверх глобального стекла */
+  backdrop-filter: blur(8px);
 }
 
 /* Сетки */
-.input-grid-3 {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  margin-bottom: 24px;
-}
-
 .input-grid-2 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -355,7 +290,7 @@ onUnmounted(() => {
 
 /* Группа ввода – использует глобальные стили input, label */
 .input-group {
-  margin-bottom: 0; /* убираем глобальный отступ, так как у нас сетка */
+  margin-bottom: 0;
 }
 
 /* Обёртка для пароля с глазиком */
@@ -380,50 +315,6 @@ onUnmounted(() => {
   transform: scale(1.1);
 }
 
-/* Автодополнение городов */
-.city-autocomplete {
-  position: relative;
-}
-.city-suggestions {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  max-height: 220px;
-  overflow-y: auto;
-  list-style: none;
-  padding: 0;
-  margin-top: 4px;
-}
-.city-suggestions li {
-  padding: 12px 18px;
-  cursor: pointer;
-  color: var(--text-main);
-  border-bottom: 1px solid var(--border-color);
-  transition: background 0.2s;
-}
-.city-suggestions li:hover {
-  background: var(--primary-light);
-}
-
-.dropdown-fade-enter-active,
-.dropdown-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-.dropdown-fade-enter-from,
-.dropdown-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
-.hint {
-  display: block;
-  margin-top: 6px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
 /* Капча */
 .captcha-container {
   display: flex;
@@ -432,7 +323,7 @@ onUnmounted(() => {
   min-height: 100px;
 }
 
-/* Кнопка регистрации: используем глобальный btn-success, добавляем градиент и отступы */
+/* Кнопка регистрации */
 .register-btn {
   background: linear-gradient(135deg, var(--success), #059669);
   border: none;
@@ -501,7 +392,6 @@ onUnmounted(() => {
   .auth-card {
     padding: 28px 20px;
   }
-  .input-grid-3,
   .input-grid-2 {
     grid-template-columns: 1fr;
   }
